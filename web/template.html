@@ -1,0 +1,143 @@
+<title>Spectrum Port Kit -- starter</title>
+<style>
+  /* The page is a frame around a Spectrum screen and nothing else.  Two
+     themes: the default follows the system, and the corner button pins one.
+     The GAME's own colours never change -- the black inside #overscan is the
+     Spectrum's border, painted from the emulated OUT ($FE), not page
+     furniture. */
+  :root{ color-scheme:light dark;
+         --bg:#0f1115; --edge:#2a313c; --btn:#98a2b3; }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#e9ebef; --edge:#c3c9d3; --btn:#59636f; }
+  }
+  :root[data-theme="dark"]{  --bg:#0f1115; --edge:#2a313c; --btn:#98a2b3; }
+  :root[data-theme="light"]{ --bg:#e9ebef; --edge:#c3c9d3; --btn:#59636f; }
+
+  *{ box-sizing:border-box }
+  html,body{ height:100% }
+  body{ margin:0; background:var(--bg); padding:16px;
+        display:flex; align-items:center; justify-content:center;
+        transition:background 140ms linear }
+  #overscan{ display:inline-block; padding:24px 32px; background:#000;
+             border:1px solid var(--edge); border-radius:4px; line-height:0;
+             transition:background 40ms linear, border-color 140ms linear }
+  canvas{ image-rendering:pixelated; background:#000; border:0; display:block;
+          max-width:100%; height:auto; width:768px }
+  /* deliberately faint: it is the only thing on the page that is not the game */
+  #theme{ position:fixed; top:10px; right:12px; width:28px; height:28px;
+          border:1px solid var(--edge); border-radius:50%; background:transparent;
+          color:var(--btn); font:14px/1 system-ui,sans-serif; cursor:pointer;
+          opacity:.22; transition:opacity 140ms linear, color 140ms linear;
+          display:flex; align-items:center; justify-content:center; padding:0 }
+  #theme:hover,#theme:focus-visible{ opacity:1 }
+</style>
+
+<!-- THE OVERSCAN FRAME: a real Spectrum draws a border around the 256x192
+     display and games use it.  The padding is the border's width and its
+     background is the emulated OUT ($FE). -->
+<div id="overscan"><canvas id="scr" width="256" height="192"></canvas></div>
+<button id="theme" type="button" title="theme: system / dark / light"
+        aria-label="switch theme">&#9680;</button>
+
+<script type="application/json" id="assets">__ASSETS__</script>
+<script>
+/* =======================================================================
+   GENERATED FILE -- do not edit.  Edit web/template.html and rebuild with
+       python tools/build.py
+   =======================================================================
+   THE STARTER.  Everything above the demo is the kit; the demo is the
+   smallest thing that exercises every layer of it end to end -- display
+   file, ULA colours and FLASH, border, keyboard matrix, Kempston/gamepad,
+   the beeper edge stream and the sound bridge, the fixed-timestep loop --
+   so a new port begins from a page that already runs and already has a
+   headless test suite (test/kit.test.js) driving it.  Replace `Demo` with
+   the port's engine; keep the shape:
+       step(kb) advances ONE video frame and logs sound against its own
+       frame counter; draw is fillRect-only; sound is flushed from draw
+       with the simulation's frame count.                                 */
+const A = JSON.parse(document.getElementById('assets').textContent);
+
+/*#include platform.js*/
+
+/* ---- the demo "game" ------------------------------------------------- */
+const TONE_HZ = 440;
+class Demo {
+  constructor(){
+    this.scr = new SpecScreen();
+    this.frame = 0;            // video frames stepped (the FLASH clock too)
+    this.simFrame = 0;         // the sound bridge's clock, in video frames
+    this.x = 15; this.y = 11;  // the block, in character cells
+    this.border = 0;
+    this.lvl = 0;              // the speaker level the log last set
+    this.tNext = 0;            // the next tone edge, in fractional frames
+    this.firing = false;
+    this.sound = { log: [] };  // rows of [simulatedFrame, level]
+    this.scr.fillAttr(0x0F);   // white ink on blue paper
+    this.paintCell(true);
+  }
+  paintCell(on){
+    let p = SpecScreen.pixelAddr(this.x*8, this.y*8);
+    for (let i = 0; i < 8; i++){ this.scr.put(p, on ? 0xFF : 0); p = SpecScreen.nextRow(p); }
+    /* FLASH while firing: bit 7 of the attribute, swapped by renderScreen
+       every 16 video frames from the frame counter it is handed */
+    this.scr.put(SpecScreen.attrAt(this.x, this.y), (this.firing ? 0x80 : 0) | 0x0F);
+  }
+  /* one video frame.  QAOP or the cursor keys (5678, i.e. the arrows) or a
+     Kempston joystick move; SPACE or fire beeps and reddens the border. */
+  step(kb){
+    const f0 = this.simFrame, k = kb.kempston;
+    let dx = 0, dy = 0;
+    if (kb.down('O') || kb.down('5') || (k & KEMPSTON_LEFT))  dx = -1;
+    if (kb.down('P') || kb.down('8') || (k & KEMPSTON_RIGHT)) dx = 1;
+    if (kb.down('Q') || kb.down('7') || (k & KEMPSTON_UP))    dy = -1;
+    if (kb.down('A') || kb.down('6') || (k & KEMPSTON_DOWN))  dy = 1;
+    const fire = kb.down('SPACE') || !!(k & KEMPSTON_FIRE);
+    if ((dx || dy) && (this.frame % 4) === 0){
+      this.paintCell(false);
+      this.x = (this.x + dx + 32) % 32; this.y = (this.y + dy + 24) % 24;
+    }
+    /* the tone is an EDGE STREAM on the simulated clock: a running phase,
+       so consecutive frames join without a phase jump */
+    if (fire){
+      const half = FRAME_HZ / (2 * TONE_HZ);         // half a period, in frames
+      if (!this.firing) this.tNext = Math.max(this.tNext, f0);
+      while (this.tNext < f0 + 1){
+        this.lvl ^= 1; this.sound.log.push([this.tNext, this.lvl]);
+        this.tNext += half;
+      }
+    } else if (this.lvl){
+      this.lvl = 0; this.sound.log.push([f0, 0]);    // leave the speaker LOW
+    }
+    this.firing = fire;
+    this.border = fire ? 2 : 0;
+    this.paintCell(true);
+    this.frame++; this.simFrame++;
+  }
+}
+
+/* ---- driver ---------------------------------------------------------- */
+const cvs = document.getElementById('scr'), ctx = cvs.getContext('2d');
+const demo = new Demo();
+/* created here, STARTED from the first gesture -- a browser will not run an
+   AudioContext before one */
+const sound = new SoundOut();
+const keyboard = new Keyboard();
+attachKeyboard(keyboard, { onGesture(){ sound.start(); } });
+const loop = makeLoop({
+  hz: FRAME_HZ,
+  poll(){ pollGamepads(keyboard); },
+  step(){ demo.step(keyboard); },
+  draw(){
+    /* the bridge is handed the driver's log and the SIMULATED frame the
+       engine has reached -- never wall time */
+    sound.flush(demo.sound.log, demo.simFrame);
+    paintBorder(demo.border);
+    renderScreen(ctx, demo.scr, demo.frame);
+  },
+});
+installThemeButton('theme', 'spec-port-theme');
+loop.start();
+
+/* the test hook: test/kit.test.js loads the BUILT file and drives this */
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A };
+</script>
