@@ -1,0 +1,14 @@
+# tape-derived material never goes in a public repository
+tape/
+*.tzx
+*.tap
+*.pkl
+build/*.bin
+build/*.pkl
+# local probe output
+*.ppm
+shot*.png
+# python / node
+__pycache__/
+*.pyc
+node_modules/

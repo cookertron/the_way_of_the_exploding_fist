@@ -1,0 +1,34 @@
+{
+  "name": "starter",
+  "template": "web/template.html",
+  "out": "web/starter.html",
+  "includes": {
+    "platform.js": "web/platform.js"
+  },
+  "assets": [
+    {
+      "key": "assets",
+      "file": "build/assets.json",
+      "required": true,
+      "note": "written by your extractor (manual phase 4); the starter ships a stub"
+    }
+  ],
+  "tape": {
+    "path": "tape/game.tzx",
+    "deck": null,
+    "blocks": [],
+    "copies": [],
+    "prog": "0x5CCB",
+    "entry": null,
+    "sp": "0xFFFF",
+    "tape_call_pc": null,
+    "tape_ret_pc": null
+  },
+  "z80": {
+    "contended": true,
+    "symbols": "tools/symbols.json",
+    "regions": "tools/regions.json",
+    "states": "build",
+    "image": "build/image.bin"
+  }
+}
