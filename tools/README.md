@@ -35,7 +35,7 @@ phase 1, not in phase 8.
 | `contact.py` | contact sheet of a range rendered as sprites BOTH ways (row-major and cell-major); LOOK | `python tools/contact.py build/image.bin out.png --base 0x5F00 --len 0x1000 --w 2 --h 16` | 5 static extraction of data |
 | `screen.py` | render the display file, or the 32x24 attribute sheet, out of a memory image | `python tools/screen.py build/live.bin out.png [--attrs]` | 6 ground truth from a real frame |
 | `harness.py` | the Z80 simulator harness: real 48K ROM (read locally from SkoolKit), tape deck at a PC breakpoint, keyboard/Kempston ports, memory write watch, step / run_until / run_frames / profile / call / save_state; ULA contention by default | `python tools/harness.py` (profile from the entry point); `from harness import Harness` | 7 the simulator harness (the pivot) |
-| `boot.py` | boot (from `z80.snapshot` if set, else the tape), `--state NAME` to resume, `--arm-at ADDR` for the interrupt trap (6.3), optionally drive a key script, dump the LIVE image and save a state | `python tools/boot.py --state boot --arm-at 0x8000 --script "60:,60:SPACE" --save menu` | 7-8 boot / drive into live play |
+| `boot.py` | boot (from `z80.snapshot` if set, else the tape), `--state NAME` to resume, `--arm-at ADDR` for the interrupt trap (6.3), optionally drive a key script, dump the LIVE image and save a state | `python tools/boot.py --state boot --arm-at 0xA420 --script "60:,60:SPACE" --save menu` | 7-8 boot / drive into live play |
 | `simload.py` | the SNAPSHOT ROUTE: run the tape's own loader in SkoolKit's simulated LOAD (tap2sna) -> a .z80/.szx at hand-over; handles protected/custom loaders (bleepload, speedlock, alkatraz, ...) with no loader-specific code | `python tools/simload.py [--machine 48\|128] [--start ADDR] [--no-finish-tape]` | 1-2 tape + loader |
 | `snapimport.py` | a .z80/.szx/.sna snapshot -> the harness image (`build/image.bin`) + a saved state (`--save NAME`); prints the loader's postcondition (PC/SP/IM/IFF/I/border) | `python tools/snapimport.py build/boot48.z80 --save boot` | 2 the loader and the memory map |
 | `bleepload.py` | decode a Firebird Bleepload tape: block framing (block->dest map, groups), the driver's decryption of group 1 (applied), the later groups' XOR key read from the stage-2 loader, the driver's own copies and hand-over JP read from its code (printed; `--apply-copies`), and a diff against the snapshot with every mismatching page attributed -- to recover R3 (the tape-byte cross-check) the snapshot route loses; verified against thirteen titles on fourteen tapes (1986-89; a 128K side included) | `python tools/bleepload.py [--snapshot build/boot48.z80] [--apply-copies]` | 3/5 cross-check |
@@ -45,9 +45,9 @@ phase 1, not in phase 8.
 | `dataread.py` | data reads with instruction fetches filtered out and stack-class reads (POP/RET/EX (SP)) listed apart; `--verify ADDR` for a scalar, `--verify LO HI` for a buffer or map (the physics reads the cells around the player, never a buffer's first byte) | `python tools/dataread.py --state level --keys M --verify 0x61A8 0x6448` | 8/10 find the structures the physics reads |
 | `keyprobe.py` | which key does something: press each of the 40 from one state, diff PCs and memory; exports `KEYS` / `keymask` / `KEYMAP` / `press` / `parse_script` / `drive` | `python tools/keyprobe.py --state menu` | 8 drive into live play |
 | `readwatch.py` | find buffers that are only ever READ (a level map) by watching memory reads per PC and page | `python tools/readwatch.py --state level --lo 0x5B00 --hi 0x8000` | 8 drive into live play |
-| `battery.py` | the post-harness diagnostic battery over driven play: Q2 ports, Q3 self-modification, Q10 clock, Q13 coverage, Q15/Q16 render + colour, Q17 speaker, Q19 stack | `python tools/battery.py --state level --loop 0x8503 --script "60:D,60:Z"` | 8 drive into live play |
+| `battery.py` | the post-harness diagnostic battery over driven play: Q2 ports, Q3 self-modification, Q10 clock, Q13 coverage, Q15/Q16 render + colour, Q17 speaker, Q19 stack | `python tools/battery.py --state level --loop <loop-top> --script "60:D,60:Z"` | 8 drive into live play |
 | `filmstrip.py` | consecutive frames side by side, keys held -- LOOK at them | `python tools/filmstrip.py strip.png --state level --keys D --every 4` | 8 drive into live play |
-| `clock.py` | the clock model by HISTOGRAM of T-states between visits to the loop top (never the mean) | `python tools/clock.py --pc 0x8503 --state level` | 9 measure time |
+| `clock.py` | the clock model by HISTOGRAM of T-states between visits to the loop top (never the mean) | `python tools/clock.py --pc <loop-top> --state level` | 9 measure time |
 | `blitprobe.py` | where the draw routine actually WRITES: (writer PC -> region) histogram of every write above $4000, shadow screen labelled if you give it | `python tools/blitprobe.py --state level --keys D --shadow 0xC000` | 10 read the routines, write the behavioural spec |
 | `srctrace.py` | ring buffer of PCs (with SP) leading up to a target PC, optionally gated on SP -- "who set this up" | `python tools/srctrace.py --state level --pc 0x9DD2 --sp 0x5F00 0x6F80` | 10 read the routines, write the behavioural spec |
 | `build.py` | assembles the shipped single HTML file from the template, the includes and the asset JSON | `python tools/build.py` | 12 write the engine |
@@ -55,7 +55,9 @@ phase 1, not in phase 8.
 Phases 3 (third-party disassembly), 11 (sound), 13-16 (differential tests,
 headless tests, provenance, handover) have no generic tool here: theirs are
 game-shaped and get written against the engine, as the manual says.  The
-example addresses in the invocations above are the case study's.
+concrete example addresses (entry, arm point $A420, ...) are the case
+study's, from the manual; `<loop-top>` is one you read off the profile (the manual
+describes it but gives it no fixed number, and it is game-specific).
 
 ## The manifest keys the tools read
 
