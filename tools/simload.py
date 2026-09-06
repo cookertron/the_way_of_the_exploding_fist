@@ -11,12 +11,16 @@ the loader's format; that is the point.
 Usage:
     python tools/simload.py [--machine 48|128] [--start ADDR] [--out FILE]
                             [--accelerator NAME|auto|none|list] [--cmio]
-                            [--no-fast-load] [--trace FILE] [--tape FILE]
+                            [--no-fast-load] [--no-finish-tape] [--trace FILE]
+                            [--tape FILE]
 
 Defaults: machine 48, accelerator list (auto-select and report), output
 build/boot48.z80 (build/boot128.z80 for --machine 128).  With --start the
 load is run to the end of the tape and then to ADDR (finish-tape=1), which is
-how the definitive hand-over snapshot is taken once ADDR is known.
+how the definitive hand-over snapshot is taken once ADDR is known.  A game
+that starts BEFORE the tape ends (a trailing tone after the last block; the
+loader jumps as soon as that block is in) is past ADDR by then and the run
+times out: add --no-finish-tape to stop at the first visit to ADDR instead.
 
 Example (a Firebird Bleepload tape): the bleepload accelerator fired 892,782 times with 0
 misses on both machines; the whole 375 s tape loads in about a minute.
@@ -35,7 +39,7 @@ def main():
     if '-h' in args or '--help' in args:
         print(__doc__.strip()); sys.exit(0)
     machine, start, out, accel = '48', None, None, 'list'
-    cmio, fast, trace, tape = False, True, None, None
+    cmio, fast, trace, tape, finish = False, True, None, None, True
     while args:
         a = args[0]
         if a == '--machine':
@@ -50,6 +54,8 @@ def main():
             cmio = True; del args[:1]
         elif a == '--no-fast-load':
             fast = False; del args[:1]
+        elif a == '--no-finish-tape':
+            finish = False; del args[:1]
         elif a == '--trace':
             trace = args[1]; del args[:2]
         elif a == '--tape':
@@ -76,7 +82,7 @@ def main():
         cfg.append('fast-load=0')
     if trace:
         cfg.append(f'trace={trace}')
-    if start is not None:
+    if start is not None and finish:
         cfg.append('finish-tape=1')
     argv = []
     for c in cfg:

@@ -24,47 +24,62 @@ tool rebuilds the image, applies the transforms that belong to BLEEPLOAD
 ITSELF (below), reads the game-specific ones out of the loader's own code and
 prints them, and attributes each mismatching page of the diff to one of them.
 
-SCOPE, STATED HONESTLY.  Verified against EIGHT Firebird tapes (loader REM
-dates 9/86 to 8/88): Bubble Bobble, Hybrid, I,Ball, Intensity, Ninja Scooter
-Simulator, Parabola, Samurai Warrior, The King's Keep -- each rebuilt from its
-tape bytes and diffed against a tap2sna snapshot taken at the loader's
-hand-over JP (tools/simload.py --start).  What held on all eight:
+SCOPE, STATED HONESTLY.  Verified against THIRTEEN titles on fourteen tapes
+(loader REM dates 9/86 to 7/89; Firebird, Electric Dreams and Ariolasoft
+releases): Bubble Bobble, Hybrid, I,Ball, Intensity, Ninja Scooter Simulator,
+Parabola, Samurai Warrior, The King's Keep, Back to the Future, Empire, Jaws
+(48K side and 128K side), Kenny Dalglish Soccer Manager, Starfox -- each
+rebuilt from its tape bytes and diffed against a tap2sna snapshot taken at
+the loader's hand-over JP (tools/simload.py --start; --no-finish-tape when
+the game starts before the tape's trailing tone ends).  What held on all:
   - the framing below, DATA_LEN 256, first group $64 (the stub's own CP
     immediate), block numbers 0,1,2,... within a group.  Three stage-1 stub
-    revisions exist (9/86; 3/87-8/88; Bubble Bobble's, which also saves
-    BANKM) and they differ only in bookkeeping, never in the framing;
+    revisions exist (9/86; 3/87-7/89; Bubble Bobble's, which also saves
+    BANKM) and they differ only in bookkeeping, never in the framing.  A
+    stub is assembled for ONE buffer address -- $FE00 on thirteen tapes,
+    $6D00 on Empire, whose stub also loads at $DA00 instead of $CD00 -- and
+    this tool reads the buffer and the stub's load address off the tape;
   - group 1 is LDIR'd verbatim by the stub; then the group-1 DRIVER page
     decrypts group 1's payload (loading screen, a 4K block, the stage-2
-    loader; $CF00-$FBFF on all eight) with a 256-byte key page K.  The key
-    page arrives in group 1 at the address held in the loader buffer at $FEE7
-    and is itself XORed with the stub's two pages ($CD00/$CE00: the driver
-    POPs the stub's return address to find them); the driver's own bytes
-    $40-$FF are XORed with K[0..$BF]; the region ($FEE9)..page ($FEEC) with
-    K[offset & $FF].  APPLIED here (--raw shows the tape bytes instead);
+    loader; $CF00-$FBFF on thirteen, $DC00-$FDFF on Empire) with a 256-byte
+    key page K.  The key page arrives in group 1 at the address held in the
+    loader buffer at offset $E7 and is itself XORed with the stub's two pages
+    (the driver POPs the stub's return address to find them); the driver's
+    own bytes $40-$FF are XORed with K[0..$BF]; the region (buffer+$E9)..page
+    (buffer+$EC) with K[offset & $FF].  APPLIED here (--raw shows the tape
+    bytes instead);
   - later groups are XORed before their copy with a key that is an IMMEDIATE
-    in the stage-2 loader: LD A,($FF03), the destination high byte, on six
-    tapes; LD A,n, a constant, on two (Parabola $21, The King's Keep $16).
-    READ from the decrypted stage 2 (--xor-key auto, the default); the tool
-    prints the instruction's address and what it read.
+    in the stage-2 loader: LD A,(buffer+$103), the destination high byte, on
+    eleven tapes; LD A,n, a constant, on three (Parabola $21, The King's
+    Keep $16, Empire $37).  READ from the decrypted stage 2 (--xor-key auto,
+    the default), whose entry is the page that loop sits in ($FA00 on
+    thirteen, $FC00 on Empire); the tool prints the address and what it read.
 What stays GAME-SPECIFIC is the driver's own copies after each group --
-loading screen to $4000, the 4K block to $5E00/$5F00/$6000/$6100/$6B00,
-group 3 staged in the display file and moved to $FA00, Parabola's 20K shift
-down by $1000, Ninja Scooter's $9C00-byte LDDR up by $500 -- and the
+loading screen to $4000, the 4K block to $5E00..$7000, group 3 staged in the
+display file and moved to $FA00 (or run from there: Kenny Dalglish jumps to
+$4700), Parabola's 20K shift down by $1000, Ninja Scooter's $9C00-byte LDDR
+up by $500, Back to the Future's $A000-byte LDDR up by $100, Empire's $500
+move and $8800-byte LDDR up by $900 -- the CALLs into game code some drivers
+make (Jaws 128K after its first later group, Back to the Future before its
+shift: a bank switch or a copy in there is invisible here) -- and the
 hand-over JP.  Those are READ from the decrypted driver page (a linear z80dis
-walk: LD HL/DE/BC immediates + LDIR/LDDR, CALL $FA00 as the group boundary,
-LD SP, the JP) and PRINTED; --apply-copies applies them in code order at
-their group boundaries (a fill -- an LDIR whose destination overlaps its
-source by one -- is skipped: it needs the register value the code put there).
-The diff attributes every mismatching page to one of: a driver copy target,
-the display file, the loader buffer, the key or driver page, the group-1
-payload -- or UNATTRIBUTED, which is the finding.  What a game does after the
-JP is the port's to name.
+walk: LD HL/DE/BC immediates + LDIR/LDDR, CALL stage-2 as the group boundary,
+other CALLs, LD SP, the JP) and PRINTED; --apply-copies applies the copies
+in code order at their group boundaries (a fill -- an LDIR whose destination
+overlaps its source by one -- is skipped: it needs the register value the
+code put there).  The diff attributes every mismatching page to one of: a
+driver copy target, the display file, the loader buffer, the key or driver
+page, the group-1 payload, the stack -- or UNATTRIBUTED, which is the
+finding -- and, for the later-group blocks that later groups or copies
+overwrote, searches the snapshot (all eight banks of a 128K one) for where
+they went.  What a game does after the JP is the port's to name.
 
 Bleepload turbo block, inside each TZX 0x11 block, after flag $FF:
     [gid][data * DATA_LEN][block#][dest lo][dest hi][tail ... ][XOR checksum]
   gid    groups blocks that load together: $64 = group 1 on every tape seen;
-         later ids vary per title ($65/$66, $34/$35, $52, $5C/$5D) and are
-         only ever compared with the id the driver hands to stage 2
+         later ids vary per title ($65/$66, $34/$35, $52, $5C/$5D, $16/$17,
+         $3E/$3F, $36/$37, $51..$54) and are only ever compared with the id
+         the driver hands to stage 2
   block# counts up within a group (a reload check)
   dest   where the DATA_LEN data bytes are copied: group 1 verbatim by the
          stub, later groups XORed with the key above by stage 2
@@ -80,6 +95,7 @@ Usage:
                               [--no-xor-later-groups]     (= --xor-key none)
 """
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -94,8 +110,17 @@ except ImportError:                     # the driver walk then reports "not read
     z80 = None
 
 DEFAULT_FIRST_GROUP = 0x64
-STAGE2 = 0xFA00             # CALL $FA00 in the driver = "load the next group"
-BUF = 0xFE00                # the loader buffer: gid, 256 data, block#, dest, tail
+STAGE2 = 0xFA00             # stage-2 entry (CALL in the driver = "load the next group") when not measured
+BUF = 0xFE00                # the loader buffer (gid, 256 data, block#, dest, tail) when not measured
+
+
+class Stub(bytes):
+    """The 512-byte stage-1 stub, with the address its CODE header loads it at
+    (.addr): $CD00 on every tape seen but one (Empire: $DA00)."""
+    def __new__(cls, data, addr):
+        s = super().__new__(cls, data)
+        s.addr = addr
+        return s
 
 
 # ---------------------------------------------------------------------------
@@ -104,11 +129,11 @@ BUF = 0xFE00                # the loader buffer: gid, 256 data, block#, dest, ta
 def read_tape(tape, data_len=256, notes=None):
     """Every TZX turbo (0x11) block parsed as a Bleepload block -- a list of
     dicts {index, gid, data, blk, dest, tail, checksum_ok} -- and the stage-1
-    stub (the 512-byte ROM-loaded CODE block) or None.  A turbo block too
-    short for the framing is skipped and noted in `notes`."""
+    stub (the 512-byte ROM-loaded CODE block, a Stub) or None.  A turbo block
+    too short for the framing is skipped and noted in `notes`."""
     _, tblocks = tzxmod.parse(tape)
     out, stub = [], None
-    want_code = False
+    want_code, code_addr = False, None
     for b in tblocks:
         if b.data is None:
             continue
@@ -116,8 +141,9 @@ def read_tape(tape, data_len=256, notes=None):
             hdr = tzxmod.decode_header(b.data)
             if hdr is not None:
                 want_code = hdr['type'] == 3 and hdr['length'] == 512
+                code_addr = hdr.get('load_address')
             elif want_code and len(b.data) == 514:
-                stub = bytes(b.data[1:-1])
+                stub = Stub(b.data[1:-1], code_addr)
                 want_code = False
             else:
                 want_code = False
@@ -170,31 +196,46 @@ def build_naive(blocks, first_group=DEFAULT_FIRST_GROUP, xor_later=True, xor_key
 # ---------------------------------------------------------------------------
 # what the loader itself does, read from the tape bytes
 # ---------------------------------------------------------------------------
-def stub_first_group(stub):
-    """The group id the stage-1 stub accepts: the n of its LD A,($FE00) / CP n."""
+def stub_params(stub):
+    """What the stage-1 stub was assembled for -- the group id it accepts and
+    the buffer it reads blocks into -- from its LD A,(buf) / CP n / JR NZ.
+    None when the pattern is not there."""
     if not stub:
         return None
-    i = stub.find(b'\x3a\x00\xfe\xfe')
-    return stub[i + 4] if i >= 0 else None
+    m = re.search(rb'\x3a(..)\xfe(.)\x20', bytes(stub), re.S)
+    if not m:
+        return None
+    return dict(first_group=m.group(2)[0], buf=m.group(1)[0] | (m.group(1)[1] << 8))
 
 
-def driver_model(blocks, stub, first_group=DEFAULT_FIRST_GROUP):
+def stub_first_group(stub):
+    """The group id the stage-1 stub accepts (see stub_params)."""
+    p = stub_params(stub)
+    return p['first_group'] if p else None
+
+
+def driver_model(blocks, stub, first_group=DEFAULT_FIRST_GROUP, buf=BUF):
     """The group-1 driver's decryption, read from the tape.  Returns (model,
     None) or (None, why).  model: keypage, key (the 256 bytes K), region
     (lo, hi), driver (the block carrying the driver page, or None), last (the
-    last group-1 block: its buffer image carries the parameters)."""
+    last group-1 block: its buffer image carries the parameters), buf, and
+    stub_page (the page the stub loads at: the key to the key page)."""
     g1 = [b for b in blocks if b['gid'] == first_group]
     if len(g1) < 3:
         return None, f'fewer than 3 blocks in group ${first_group:02X}'
     if stub is None or len(stub) != 512:
         return None, 'no 512-byte ROM-loaded CODE block (the stage-1 stub) on the tape'
+    stub_addr = getattr(stub, 'addr', None) or 0xCD00
+    if stub_addr & 0xFF:
+        return None, f'the stub loads at ${stub_addr:04X}, not a page boundary'
+    page = stub_addr >> 8
     last = g1[-1]
-    buf = (bytes([last['gid']]) + last['data']
-           + bytes([last['blk'], last['dest'] & 0xFF, last['dest'] >> 8]) + last['tail'])
-    if len(buf) < 0xED:
+    bimg = (bytes([last['gid']]) + last['data']              # the buffer as the last block leaves it
+            + bytes([last['blk'], last['dest'] & 0xFF, last['dest'] >> 8]) + last['tail'])
+    if len(bimg) < 0xED:
         return None, 'the last group-1 block is too short to carry the driver parameters'
-    keypage = buf[0xE7] | (buf[0xE8] << 8)
-    region = (buf[0xE9] | (buf[0xEA] << 8), buf[0xEC] << 8)
+    keypage = bimg[0xE7] | (bimg[0xE8] << 8)
+    region = (bimg[0xE9] | (bimg[0xEA] << 8), bimg[0xEC] << 8)
     by_dest = {b['dest']: b for b in g1}
     if keypage & 0xFF or keypage not in by_dest:
         return None, f'($FEE7) = ${keypage:04X} is not a page-aligned group-1 block destination'
@@ -202,12 +243,14 @@ def driver_model(blocks, stub, first_group=DEFAULT_FIRST_GROUP):
         return None, f'($FEE9)..($FEEC) = ${region[0]:04X}..${region[1]:04X} is not a RAM range'
     key = bytes(by_dest[keypage]['data'][i] ^ stub[i] ^ stub[256 + i] for i in range(256))
     driver = None
-    for b in g1:                        # PUSH IX / CALL stub-read / CALL stub-checksum, in clear
-        d = b['data']
-        if d[:2] == b'\xdd\xe5' and d[2] == 0xCD and d[4] == 0xCD and d[5] == 0xCD and d[7] == 0xCE:
+    for b in g1[:-1]:      # PUSH IX / CALL stub-read / CALL stub-checksum, in clear; the last
+        d = b['data']      # block mirrors this page with the parameters patched in, so skip it
+        if (d[:2] == b'\xdd\xe5' and d[2] == 0xCD and d[4] == page and d[5] == 0xCD
+                and d[7] in (page, page + 1)):
             driver = b
             break
-    return dict(keypage=keypage, key=key, region=region, driver=driver, last=last), None
+    return dict(keypage=keypage, key=key, region=region, driver=driver, last=last,
+                buf=buf, stub_page=page), None
 
 
 def apply_driver(img, model):
@@ -222,18 +265,21 @@ def apply_driver(img, model):
             img[d + 0x40 + i] ^= K[i]
 
 
-def stage2_xor_key(img, region):
+def stage2_xor_key(img, region, buf=BUF):
     """The later-group XOR key, read from the decrypted stage-2 loader's copy
-    loop: LD HL,$FE01 / LD BC,$100 / (LD A,($FF03) | LD A,n) / XOR (HL).
+    loop: LD HL,buf+1 / LD BC,$100 / (LD A,(buf+$103) | LD A,n) / XOR (HL).
     Returns ('hi' or the constant, address of the key instruction), or
-    (None, None) when the loop is not there."""
+    (None, None) when the loop is not there.  The stage-2 entry is the page
+    the loop sits in (address & $FF00)."""
     lo, hi = region
     seg = bytes(img[lo:hi])
-    head = b'\x21\x01\xfe\x01\x00\x01'
+    b1, dh = buf + 1, buf + 0x103
+    head = bytes([0x21, b1 & 0xFF, b1 >> 8, 0x01, 0x00, 0x01])
+    hi_key = bytes([0x3A, dh & 0xFF, dh >> 8, 0xAE])
     i = seg.find(head)
     while i >= 0:
         j = i + 6
-        if seg[j:j + 4] == b'\x3a\x03\xff\xae':
+        if seg[j:j + 4] == hi_key:
             return 'hi', lo + j
         if seg[j:j + 1] == b'\x3e' and seg[j + 2:j + 3] == b'\xae':
             return seg[j + 1], lo + j
@@ -241,16 +287,16 @@ def stage2_xor_key(img, region):
     return None, None
 
 
-def read_driver(img, model):
+def read_driver(img, model, stage2=STAGE2):
     """A linear z80dis walk of the decrypted driver page: its copies (LD
-    HL/DE/BC immediates followed by LDIR/LDDR), the CALL $FA00 group
-    boundaries, LD SP, and the JPs (the first JP after the last CALL $FA00 is
-    the hand-over).  None when there is no driver page or no z80dis."""
+    HL/DE/BC immediates followed by LDIR/LDDR), the CALL stage-2 group
+    boundaries, LD SP, and the JPs (the first JP after the last CALL stage-2
+    is the hand-over).  None when there is no driver page or no z80dis."""
     if model['driver'] is None or z80 is None:
         return None
     base = model['driver']['dest']
     code = bytes(img[base:base + 0x100]) + bytes(4)
-    regs, copies, calls, sps, jps = {}, [], [], [], []
+    regs, copies, calls, sps, jps, others = {}, [], [], [], [], []
     pc, group = 0, 1
     R, OT, OP = z80.REG, z80.OPER_TYPE, z80.OP
     while pc < 0x100:
@@ -277,16 +323,40 @@ def read_driver(img, model):
                                    src=src, dst=dst, len=bc, after_group=group,
                                    fill=(dst == src + 1) if d.op == OP.LDIR else (dst == src - 1)))
             regs[R.BC] = 0
-        elif d.op == OP.CALL and ops and ops[-1][0] == OT.ADDR and ops[-1][1] == STAGE2:
-            calls.append(base + pc)
-            group += 1
+        elif d.op == OP.CALL and ops and ops[-1][0] == OT.ADDR:
+            if ops[-1][1] == stage2:
+                calls.append(base + pc)
+                group += 1
+            elif ops[-1][1] >= 0x4000 and (ops[-1][1] >> 8) not in (model['stub_page'], model['stub_page'] + 1):
+                others.append((base + pc, ops[-1][1], group))   # game code the driver runs: not read here
         elif d.op == OP.JP and len(ops) == 1 and ops[0][0] == OT.ADDR:
             jps.append((base + pc, ops[0][1], group))
             if calls and code[pc + 3:pc + 7] == b'\0\0\0\0':   # the page's zero padding follows
                 break
         pc += d.len
     handover = next(((a, t) for a, t, g in jps if g == group and calls), None)
-    return dict(base=base, copies=copies, calls=calls, sps=sps, jps=jps, groups=group, handover=handover)
+    return dict(base=base, copies=copies, calls=calls, others=others, sps=sps, jps=jps,
+                groups=group, handover=handover)
+
+
+def find_blocks(blocks, first_group, xor_key, img, windows):
+    """For every later-group block the image no longer holds at its
+    destination (a later group or a copy landed on it), search the snapshot's
+    windows -- (name, 16K bytes) pairs: the three 48K thirds, or the eight
+    128K banks -- page by page for its 256 bytes.  Those blocks are the R3
+    coverage the destination diff cannot give.  {gid: [(dest, [(name, off)])]}"""
+    out = {}
+    for b in blocks:
+        if b['gid'] == first_group:
+            continue
+        data = unscramble(b, first_group, True, xor_key)
+        d = b['dest']
+        if bytes(img[d:d + 256]) == data:
+            continue
+        hits = [(name, off) for name, mem in windows
+                for off in range(0, len(mem) - 255, 0x100) if mem[off:off + 256] == data]
+        out.setdefault(b['gid'], []).append((d, hits))
+    return out
 
 
 def apply_copies(img, loaded, copies, after_group):
@@ -307,12 +377,16 @@ def apply_copies(img, loaded, copies, after_group):
     return done
 
 
-def attribute(page, model, copies, applied, raw):
+def attribute(page, model, copies, applied, raw, sp=None):
     """Why a page of the rebuilt image may legitimately differ from the snapshot."""
     if 0x4000 <= page < 0x5B00:
         return 'display file: transient (loading screen, "Loading" text, group-3 staging)'
-    if page >= BUF:
-        return 'loader buffer $FE00-$FFFF: the last group-1 block lands over it; rewritten at run time'
+    if sp is not None and page in ((sp - 1) & 0xFF00, (sp - 0x80) & 0xFF00):
+        return f"the stack below SP=${sp:04X} at hand-over (the driver's own CALLs and pushes)"
+    buf = (model['buf'] if model else BUF) & 0xFF00
+    if buf <= page < buf + 0x200:
+        return (f'loader buffer ${buf:04X}-${buf + 0x1FF:04X}: the last group-1 block lands over it; '
+                'rewritten at run time')
     for c in copies or ():
         if c['dst'] < page + 0x100 and page < c['dst'] + c['len']:
             what = f"{c['op']} ${c['src']:04X}->${c['dst']:04X} ${c['len']:04X} after group {c['after_group']}"
@@ -404,9 +478,11 @@ def main():
     if not blocks:
         print('  no turbo blocks: nothing to rebuild')
 
-    # -- the first group: measured from the stub ----------------------------
-    measured = stub_first_group(stub)
-    how = "the stub's LD A,($FE00) / CP immediate"
+    # -- the first group and the buffer: measured from the stub ---------------
+    sp = stub_params(stub)
+    measured = sp['first_group'] if sp else None
+    buf = sp['buf'] if sp else BUF
+    how = f"the stub's LD A,(${buf:04X}) / CP immediate"
     if measured is None:
         measured = blocks[0]['gid'] if blocks else DEFAULT_FIRST_GROUP
         how = "the first turbo block's gid (no stub CP found)" if blocks else 'the default'
@@ -415,52 +491,62 @@ def main():
     elif first_group != measured:
         print(f'  NOTE --first-group ${first_group:02X} but {how} says ${measured:02X}; using yours')
     print(f'first group ${first_group:02X} ({how}); stub: '
-          + (f'{len(stub)} bytes' if stub else 'not found'))
+          + (f'{len(stub)} bytes at ${stub.addr:04X}, buffer ${buf:04X}'
+             + ('' if sp else ' (assumed)') if stub else 'not found'))
 
     # -- the driver's decryption of group 1 -----------------------------------
-    model, why = driver_model(blocks, stub, first_group) if blocks else (None, 'no blocks')
+    model, why = driver_model(blocks, stub, first_group, buf) if blocks else (None, 'no blocks')
     img, loaded = bytearray(0x10000), bytearray(0x10000)
     for b in groups.get(first_group, ()):
         place(img, loaded, b['dest'], b['data'])
-    drv = None
     if model is None:
         print(f'group-1 driver: not modelled ({why}); group 1 is left as the tape bytes')
     else:
         lo, hi = model['region']
         dblk = model['driver']
         kblk = [b for b in groups[first_group] if b['dest'] == model['keypage']][0]
+        pg = model['stub_page']
         print(f"group-1 driver: key page ${model['keypage']:04X} (block #{kblk['index']}) "
-              f"XOR stub $CD00/$CE00 -> K = {model['key'][:6].hex()}...; decrypts ${lo:04X}-${hi - 1:04X}"
+              f"XOR stub ${pg:02X}00/${pg + 1:02X}00 -> K = {model['key'][:6].hex()}...; "
+              f"decrypts ${lo:04X}-${hi - 1:04X}"
               + (f" and its own page ${dblk['dest']:04X}+$40 (block #{dblk['index']})" if dblk else
                  '; driver page not identified (no PUSH IX / CALL stub head)')
               + ('  [NOT applied: --raw]' if raw else '  [applied]'))
         if not raw:
             apply_driver(img, model)
-            drv = read_driver(img, model)
-    # -- the later groups' XOR key, read from stage 2 -------------------------
+    # -- the later groups' XOR key and the stage-2 entry, read from stage 2 ----
+    stage2 = STAGE2
+    found, at = stage2_xor_key(img, model['region'], buf) if (model and not raw) else (None, None)
+    if found is not None:
+        stage2 = at & 0xFF00
     if xor_key == 'auto':
-        found, at = stage2_xor_key(img, model['region']) if (model and not raw) else (None, None)
         if found is None:
             xor_key = 'hi'
             print('later groups: stage-2 copy loop not found' + (' (--raw)' if raw else '')
                   + ' -- ASSUMING the destination high byte as the XOR key (--xor-key to override)')
         else:
             xor_key = found
-            print(f'later groups: stage 2 at ${at:04X} does '
-                  + ('LD A,($FF03) -> XOR key = destination high byte' if found == 'hi'
+            print(f'later groups: stage 2 (entry ${stage2:04X}) at ${at:04X} does '
+                  + (f'LD A,(${buf + 0x103:04X}) -> XOR key = destination high byte' if found == 'hi'
                      else f'LD A,${found:02X} -> XOR key = constant ${found:02X}'))
     else:
         print('later groups: XOR key ' + ('none' if xor_key == 'none' else
                                          'destination high byte' if xor_key == 'hi' else f'${xor_key:02X}')
-              + ' (from the command line)')
+              + ' (from the command line)'
+              + (f'; stage-2 entry ${stage2:04X} read from its copy loop at ${at:04X}' if found is not None
+                 else f'; stage-2 entry assumed ${stage2:04X}'))
     # -- the driver's copies and hand-over ------------------------------------
+    drv = read_driver(img, model, stage2) if (model and not raw) else None
     copies = drv['copies'] if drv else []
     if drv:
-        print(f"driver page ${drv['base']:04X}: {len(drv['calls'])} CALL $FA00 (later groups), "
+        print(f"driver page ${drv['base']:04X}: {len(drv['calls'])} CALL ${stage2:04X} (later groups), "
               f"{len(copies)} copies" + ('' if apply else ' (printed, not applied; --apply-copies)'))
         for c in copies:
             print(f"  after group {c['after_group']}: {c['op']} ${c['src']:04X}->${c['dst']:04X} "
                   f"${c['len']:04X} at ${c['at']:04X}" + ('  (a fill: skipped)' if c['fill'] else ''))
+        for a, t, g in drv['others']:
+            print(f'  after group {g}: CALL ${t:04X} at ${a:04X}  (game code the driver runs: not read; '
+                  'a bank switch or a copy there is invisible here)')
         if drv['handover']:
             sp = [v for a, v in drv['sps'] if a < drv['handover'][0]]
             print(f"  hand-over: JP ${drv['handover'][1]:04X} at ${drv['handover'][0]:04X}"
@@ -510,8 +596,13 @@ def main():
     ram = s.ram(-1)
     if len(ram) != 0xC000:
         page = s.out7ffd & 7
+        windows = [(f'bank {k}', bytes(ram[k * 0x4000:(k + 1) * 0x4000])) for k in range(8)]
+        bases = {}                              # a bank has no fixed address
         ram = s.ram(page)
         print(f'\n(128K snapshot: comparing against banks 5/2/{page}, the 48K view as paged at the snapshot)')
+    else:
+        windows = [(f'${b:04X}', bytes(ram[b - 0x4000:b])) for b in (0x4000, 0x8000, 0xC000)]
+        bases = {name: int(name[1:], 16) for name, _ in windows}      # ram[0] is $4000
     compared = mism = 0
     bad_pages = {}
     for a in range(0x4000, 0x10000):
@@ -524,7 +615,7 @@ def main():
     unattributed = 0
     lines = []
     for p in sorted(bad_pages):
-        why = attribute(p, model, copies, apply, raw)
+        why = attribute(p, model, copies, apply, raw, s.sp)
         if why == 'UNATTRIBUTED':
             unattributed += bad_pages[p]
         lines.append(f'  ${p:04X}: {bad_pages[p]:3d} bytes differ -- {why}')
@@ -535,6 +626,21 @@ def main():
     if unattributed:
         print('  UNATTRIBUTED bytes are the finding: a transform this tool does not know '
               '(name it in your port, or it is a variant).')
+    lost = find_blocks(blocks, first_group, xor_key, img, windows)
+    for gid, lst in sorted(lost.items()):
+        from collections import Counter
+        # a 48K window has an address, so the hit is "dest shifted by N"; a bank has an offset
+        c = Counter((w if w not in bases else '48K', (bases.get(w, 0) + off - d) & 0xFFFF)
+                    for d, h in lst for w, off in h)
+        located = sum(1 for d, h in lst if h)
+        line = (f'group ${gid:02X}: {len(lst)} blocks no longer at their destination in the image '
+                f'(later groups or copies landed on them); {located} found in the snapshot')
+        if c:
+            (w, delta), n = c.most_common(1)[0]
+            sign, mag = ('+', delta) if delta < 0x8000 else ('-', 0x10000 - delta)
+            line += (f', {n} of them at dest{sign}${mag:04X}' if w == '48K'
+                     else f', {n} of them in {w} at offset dest{sign}${mag:04X}')
+        print(line + ('' if located else ' -- NOT verified anywhere (R3 gap, or transformed)'))
 
 
 if __name__ == '__main__':

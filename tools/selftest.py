@@ -706,74 +706,89 @@ def t_bleepload_driver():
     def bl(gid, blk, dest, data):
         return turbo(rom_block(0xFF, bytes([gid]) + bytes(data) + bytes([blk, dest & 0xFF, dest >> 8, 0xC9])))
 
-    stub = bytearray((i * 13 + 7) & 0xFF for i in range(512))
-    stub[0x1E:0x23] = b'\x3a\x00\xfe\xfe\x64'                    # LD A,($FE00) / CP $64
-    K = bytes((i * 5 + 1) & 0xFF for i in range(256))
-    keypage = bytes(K[i] ^ stub[i] ^ stub[256 + i] for i in range(256))
-    stage2 = bytearray((i * 3) & 0xFF for i in range(256))
-    stage2[0x30:0x39] = b'\x21\x01\xfe\x01\x00\x01\x3e\x21\xae'  # LD HL,$FE01 / LD BC,$100 / LD A,$21 / XOR (HL)
-    payload = bytes(range(256))
+    def variant(stub_addr, buf, s2):
+        """Build and check one tape shape: the stub at stub_addr reading blocks
+        into buf, stage 2 entered at s2 (the two shapes seen: $CD00/$FE00/$FA00
+        on twelve tapes, $DA00/$6D00/$FC00 on Empire)."""
+        pg = stub_addr >> 8
+        stub = bytearray((i * 13 + 7) & 0xFF for i in range(512))
+        stub[0x1E:0x25] = b'\x3a' + le16(buf) + b'\xfe\x64\x20\xf6'    # LD A,(buf) / CP $64 / JR NZ
+        K = bytes((i * 5 + 1) & 0xFF for i in range(256))
+        keypage = bytes(K[i] ^ stub[i] ^ stub[256 + i] for i in range(256))
+        stage2 = bytearray((i * 3) & 0xFF for i in range(256))
+        stage2[0x30:0x39] = b'\x21' + le16(buf + 1) + b'\x01\x00\x01\x3e\x21\xae'   # LD HL,buf+1 / LD BC,$100 / LD A,$21 / XOR (HL)
+        payload = bytes(range(256))
 
-    def enc(page):
-        return bytes(page[i] ^ K[i] for i in range(256))
+        def enc(page):
+            return bytes(page[i] ^ K[i] for i in range(256))
 
-    drv_code = (b'\x21\x00\xcf\x11\x00\x40\x01\x00\x01\xed\xb0'       # after group 1: LDIR $CF00->$4000 $100
-                + b'\x3e\x65\x32\x00\x5b\xcd\x00\xfa'                # gid $65 -> CALL $FA00: group 2
-                + b'\x21\x00\xd0\x11\x00\x80\x01\x00\x01\xed\xb0'    # after group 2: LDIR $D000->$8000 $100
-                + b'\x21\xff\xd0\x11\xff\xd1\x01\x00\x01\xed\xb8'    # LDDR: $D000-$D0FF -> $D100-$D1FF
-                + b'\x21\x00\x40\x11\x01\x40\x01\xff\x00\xed\xb0'    # a fill: LDIR $4000->$4001 $FF
-                + b'\x31\x00\x60\xc3\x34\x12')                        # LD SP,$6000 / JP $1234
-    drv = bytearray(256)
-    drv[0:8] = b'\xdd\xe5\xcd\x6e\xcd\xcd\x2a\xce'                    # PUSH IX / CALL stub-read / CALL stub-checksum
-    drv[0x40:0x40 + len(drv_code)] = drv_code
-    drv_tape = bytes(drv[:0x40]) + bytes(drv[0x40 + i] ^ K[i] for i in range(0xC0))
-    params = bytearray(256)                 # the buffer image: gid at 0, data at 1.. -> ($FEE7) = data[$E6]
-    params[0xE6:0xE8] = le16(0xC900)
-    params[0xE8:0xEA] = le16(0xCF00)
-    params[0xEB] = 0xD1
-    tzxbytes = (b'ZXTape!\x1a' + bytes([1, 20])
-                + std_block(header(3, 'stub', 512, 0xCD00, 32768)) + std_block(rom_block(0xFF, stub))
-                + bl(0x64, 0, 0xC900, keypage) + bl(0x64, 1, 0xCF00, enc(stage2))
-                + bl(0x64, 2, 0xD000, enc(payload)) + bl(0x64, 3, 0x5B00, drv_tape)
-                + bl(0x64, 4, 0xFF09, params) + bl(0x65, 0, 0x9000, bytes(x ^ 0x21 for x in payload))
-                + turbo(rom_block(0xFF, bytes(100))))                  # truncated: skipped, not a crash
-    with tempfile.TemporaryDirectory() as d:
-        tp = os.path.join(d, 'bl2.tzx')
-        open(tp, 'wb').write(tzxbytes)
-        notes = []
-        blocks, got_stub = B.read_tape(tp, 256, notes)
-        eq(len(blocks), 6, 'blocks (the short one skipped)')
-        eq(len(notes), 1, 'the short block is noted')
-        eq(got_stub, bytes(stub), 'the stub is the 512-byte CODE block')
-        eq(B.stub_first_group(got_stub), 0x64, "first group from the stub's CP")
-        model, why = B.driver_model(blocks, got_stub, 0x64)
-        eq(why, None, 'driver model')
-        eq((model['keypage'], model['region'], model['driver']['dest']),
-           (0xC900, (0xCF00, 0xD100), 0x5B00), 'driver parameters from the buffer image')
-        eq(model['key'], K, 'K = key page XOR the two stub pages')
-        img, loaded = bytearray(0x10000), bytearray(0x10000)
-        for b in blocks[:5]:
-            B.place(img, loaded, b['dest'], b['data'])
-        B.apply_driver(img, model)
-        eq(bytes(img[0xC900:0xCA00]), K, 'key page decrypted in place')
-        eq(bytes(img[0xD000:0xD100]), payload, 'region decrypted with K')
-        eq(bytes(img[0x5B40:0x5B40 + len(drv_code)]), drv_code, 'driver page decrypted from $40')
-        eq(B.stage2_xor_key(img, model['region']), (0x21, 0xCF36), 'later-group key read from stage 2')
-        drv = B.read_driver(img, model)
-        eq([(c['op'], c['src'], c['dst'], c['len'], c['after_group'], c['fill']) for c in drv['copies']],
-           [('LDIR', 0xCF00, 0x4000, 0x100, 1, False), ('LDIR', 0xD000, 0x8000, 0x100, 2, False),
-            ('LDDR', 0xD000, 0xD100, 0x100, 2, False), ('LDIR', 0x4000, 0x4001, 0xFF, 2, True)],
-           'driver copies from the z80dis walk')
-        eq(drv['handover'], (0x5B40 + len(drv_code) - 3, 0x1234), 'hand-over JP')
-        eq(drv['sps'], [(0x5B40 + len(drv_code) - 6, 0x6000)], 'LD SP')
-        B.apply_copies(img, loaded, drv['copies'], 1)
-        eq(bytes(img[0x4000:0x4100]), bytes(stage2), 'copy after group 1 applied')
-        B.place(img, loaded, 0x9000, B.unscramble(blocks[5], 0x64, True, 0x21))
-        eq(bytes(img[0x9000:0x9100]), payload, 'later group de-XORed with the constant')
-        B.apply_copies(img, loaded, drv['copies'], 2)
-        eq(bytes(img[0x8000:0x8100]), payload, 'LDIR after group 2 applied')
-        eq(bytes(img[0xD100:0xD200]), payload, 'LDDR after group 2 applied')
-        eq(img[0x4001], stage2[1], 'the fill was skipped')
+        drv_code = (b'\x21\x00\xcf\x11\x00\x40\x01\x00\x01\xed\xb0'       # after group 1: LDIR $CF00->$4000 $100
+                    + b'\x3e\x65\x32\x00\x5b\xcd' + le16(s2)             # gid $65 -> CALL stage 2: group 2
+                    + b'\x21\x00\xd0\x11\x00\x80\x01\x00\x01\xed\xb0'    # after group 2: LDIR $D000->$8000 $100
+                    + b'\x21\xff\xd0\x11\xff\xd1\x01\x00\x01\xed\xb8'    # LDDR: $D000-$D0FF -> $D100-$D1FF
+                    + b'\x21\x00\x40\x11\x01\x40\x01\xff\x00\xed\xb0'    # a fill: LDIR $4000->$4001 $FF
+                    + b'\x31\x00\x60\xc3\x34\x12')                        # LD SP,$6000 / JP $1234
+        drv = bytearray(256)
+        drv[0:8] = bytes([0xDD, 0xE5, 0xCD, 0x6E, pg, 0xCD, 0x2A, pg + 1])   # PUSH IX / CALL stub-read / CALL stub-checksum
+        drv[0x40:0x40 + len(drv_code)] = drv_code
+        drv_tape = bytes(drv[:0x40]) + bytes(drv[0x40 + i] ^ K[i] for i in range(0xC0))
+        params = bytearray(drv)                 # the last block mirrors the driver page, parameters patched in:
+        params[0xE6:0xE8] = le16(0xC900)        # buffer image gid at 0, data at 1.. -> (buf+$E7) = data[$E6]
+        params[0xE8:0xEA] = le16(0xCF00)
+        params[0xEB] = 0xD1
+        # the stage-2 page is the one carrying the copy loop; put it in the region at s2 when s2 is
+        # inside it, else at $CF00 (the tool only needs "in the region")
+        s2_in_region = 0xCF00 <= s2 < 0xD100
+        region_pages = {0xCF00: stage2 if not s2_in_region or s2 == 0xCF00 else payload,
+                        0xD000: payload if not s2_in_region or s2 == 0xCF00 else stage2}
+        tzxbytes = (b'ZXTape!\x1a' + bytes([1, 20])
+                    + std_block(header(3, 'stub', 512, stub_addr, 32768)) + std_block(rom_block(0xFF, stub))
+                    + bl(0x64, 0, 0xC900, keypage) + bl(0x64, 1, 0xCF00, enc(region_pages[0xCF00]))
+                    + bl(0x64, 2, 0xD000, enc(region_pages[0xD000])) + bl(0x64, 3, 0x5B00, drv_tape)
+                    + bl(0x64, 4, buf + 0x109, params)
+                    + bl(0x65, 0, 0x9000, bytes(x ^ 0x21 for x in payload))
+                    + turbo(rom_block(0xFF, bytes(100))))                  # truncated: skipped, not a crash
+        tag = f'[stub ${stub_addr:04X} buf ${buf:04X}] '
+        with tempfile.TemporaryDirectory() as d:
+            tp = os.path.join(d, 'bl2.tzx')
+            open(tp, 'wb').write(tzxbytes)
+            notes = []
+            blocks, got_stub = B.read_tape(tp, 256, notes)
+            eq(len(blocks), 6, tag + 'blocks (the short one skipped)')
+            eq(len(notes), 1, tag + 'the short block is noted')
+            eq((bytes(got_stub), got_stub.addr), (bytes(stub), stub_addr), tag + 'the stub and its load address')
+            eq(B.stub_params(got_stub), dict(first_group=0x64, buf=buf), tag + "first group and buffer from the stub's CP")
+            model, why = B.driver_model(blocks, got_stub, 0x64, buf)
+            eq(why, None, tag + 'driver model')
+            eq((model['keypage'], model['region'], model['driver']['dest'], model['stub_page']),
+               (0xC900, (0xCF00, 0xD100), 0x5B00, pg), tag + 'driver parameters from the buffer image')
+            eq(model['key'], K, tag + 'K = key page XOR the two stub pages')
+            img, loaded = bytearray(0x10000), bytearray(0x10000)
+            for b in blocks[:5]:
+                B.place(img, loaded, b['dest'], b['data'])
+            B.apply_driver(img, model)
+            eq(bytes(img[0xC900:0xCA00]), K, tag + 'key page decrypted in place')
+            eq(bytes(img[0x5B40:0x5B40 + len(drv_code)]), drv_code, tag + 'driver page decrypted from $40')
+            key, at = B.stage2_xor_key(img, model['region'], buf)
+            eq((key, at & 0xFF00), (0x21, s2 if s2_in_region else 0xCF00), tag + 'later-group key and stage-2 page read from stage 2')
+            drv = B.read_driver(img, model, s2)
+            eq([(c['op'], c['src'], c['dst'], c['len'], c['after_group'], c['fill']) for c in drv['copies']],
+               [('LDIR', 0xCF00, 0x4000, 0x100, 1, False), ('LDIR', 0xD000, 0x8000, 0x100, 2, False),
+                ('LDDR', 0xD000, 0xD100, 0x100, 2, False), ('LDIR', 0x4000, 0x4001, 0xFF, 2, True)],
+               tag + 'driver copies from the z80dis walk')
+            eq(drv['handover'], (0x5B40 + len(drv_code) - 3, 0x1234), tag + 'hand-over JP')
+            eq(drv['sps'], [(0x5B40 + len(drv_code) - 6, 0x6000)], tag + 'LD SP')
+            B.apply_copies(img, loaded, drv['copies'], 1)
+            eq(bytes(img[0x4000:0x4100]), bytes(region_pages[0xCF00]), tag + 'copy after group 1 applied')
+            B.place(img, loaded, 0x9000, B.unscramble(blocks[5], 0x64, True, 0x21))
+            eq(bytes(img[0x9000:0x9100]), payload, tag + 'later group de-XORed with the constant')
+            B.apply_copies(img, loaded, drv['copies'], 2)
+            eq(bytes(img[0x8000:0x8100]), bytes(region_pages[0xD000]), tag + 'LDIR after group 2 applied')
+            eq(bytes(img[0xD100:0xD200]), bytes(region_pages[0xD000]), tag + 'LDDR after group 2 applied')
+            eq(img[0x4001], region_pages[0xCF00][1], tag + 'the fill was skipped')
+
+    variant(0xCD00, 0xFE00, 0xCF00)      # the common shape (stage 2 modelled at $CF00 for the tiny region)
+    variant(0xDA00, 0x6D00, 0xD000)      # Empire's shape: stub at $DA00, buffer $6D00, stage 2 in the second page
 
 
 CHECKS = [
