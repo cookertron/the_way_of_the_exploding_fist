@@ -315,6 +315,8 @@ class Harness:
         self.use_rom = use_rom
         self.image_lines = []
 
+        if snapshot is False:               # the docstring's promise: blank RAM, ROM only, no manifest
+            image, snapshot = False, None
         if image is None and snapshot is None:
             cfg_snap = portconfig.path(portconfig.get('z80', 'snapshot'))
             if cfg_snap is not None and os.path.exists(cfg_snap):

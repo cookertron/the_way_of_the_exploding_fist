@@ -656,6 +656,8 @@ def t_harness_snapshot():
         eq(h.regs[H.IM], 2, 'snapshot IM')
         eq(h.peek(0x8000), bytes([0xC9]), 'snapshot RAM byte')
         eq(h.peek(0, 3), bytes([0xF3, 0xAF, 0x11]), 'real ROM under the snapshot')
+    hb = H.Harness(snapshot=False, deck=False)
+    eq((hb.peek(0x8000), hb.pc()), (bytes([0]), 0), 'snapshot=False: blank RAM, no manifest fallback')
 
 
 def t_bleepload():
@@ -790,6 +792,65 @@ def t_bleepload_driver():
     variant(0xCD00, 0xFE00, 0xCF00)      # the common shape (stage 2 modelled at $CF00 for the tiny region)
     variant(0xDA00, 0x6D00, 0xD000)      # Empire's shape: stub at $DA00, buffer $6D00, stage 2 in the second page
 
+def t_stackscan():
+    """The slot-based shadow stack on a program whose every stack event is
+    known: two balanced CALLs, a POP that discards a frame, a RET into a
+    pushed address (fake return), a reset LD SP that buries a frame under new
+    frames, and a blitter-style LD SP switch-and-restore that must NOT count
+    as a discard; then the ROM ISR as frames (HALT loop, IM 1)."""
+    H, h = fresh()
+    S = mod('stackscan')
+    h.poke(0x8000, 0xCD, 0x20, 0x80,        # 8000 CALL 8020            frame A -> balanced
+           0xCD, 0x30, 0x80,                # 8003 CALL 8030            frame B -> balanced via 8037
+           0x21, 0x40, 0x80, 0xE5, 0xC9)    # 8006 LD HL,8040 / PUSH HL / RET   fake return at 800A
+    h.poke(0x8020, 0xC9)                    # 8020 RET
+    h.poke(0x8030, 0xCD, 0x36, 0x80,        # 8030 CALL 8036            frame C
+           0x18, 0xFE, 0x00,                # 8033 JR $   (never reached); 8035 NOP
+           0xE1,                            # 8036 POP HL               discards frame C
+           0xC9)                            # 8037 RET                  consumes B's slot -> 8006
+    h.poke(0x8040, 0x31, 0x00, 0xFE,        # 8040 LD SP,$FE00          no live frame: cuts nothing
+           0xCD, 0x50, 0x80,                # 8043 CALL 8050            frame D at slot $FDFE
+           0x18, 0xFE)                      # 8046 JR $   (never reached)
+    h.poke(0x8050, 0x31, 0x00, 0xFF,        # 8050 LD SP,$FF00          D cut (pending)
+           0xCD, 0x60, 0x80,                # 8053 CALL 8060            frame E buries D -> D discarded by 8050
+           0xE5, 0xC1,                      # 8056 PUSH HL / POP BC     data, balanced, no frame
+           0xCD, 0x70, 0x80,                # 8058 CALL 8070            frame F
+           0x18, 0xFE)                      # 805B JR $   (never reached: F returns elsewhere)
+    h.poke(0x8060, 0xED, 0x73, 0x00, 0x81,  # 8060 LD ($8100),SP
+           0x31, 0xF0, 0xFF,                # 8064 LD SP,$FFF0          E cut (pending): a data switch
+           0xC1,                            # 8067 POP BC               reads data, not a frame
+           0xED, 0x7B, 0x00, 0x81,          # 8068 LD SP,($8100)        restore: E revives
+           0xC9)                            # 806C RET                  E balanced
+    h.poke(0x8070, 0x21, 0x80, 0x80,        # 8070 LD HL,8080
+           0xE3,                            # 8073 EX (SP),HL           F's slot now holds 8080
+           0xC9)                            # 8074 RET                  consumes F's slot, lands 8080 -> REWRITE
+    h.poke(0x8080, 0x18, 0xFE)              # 8080 JR $
+    h.regs[H.PC] = 0x8000
+    h.regs[H.SP] = 0xFF00
+    s = S.scan(h, 2, None)
+    # (ODD -- SP raised by an instruction outside RET/POP/INC SP/LD SP -- has no Z80 witness: the
+    #  simulator steps an undocumented DD/FD prefix on its own, so a prefixed POP is a plain POP.
+    #  ODD is a model-integrity canary, not something a program can trip.)
+    eq((s['created'], s['balanced'], s['rewritten'], s['odd'], s['open'], sum(s['unresolved'].values())),
+       (6, 3, 1, 0, 0, 0), 'frames / balanced / rewritten / odd / open / unresolved')
+    eq(s['discards'], {(0x8036, 0x8036, 0x8033): 1, (0x8050, 0x8050, 0x8046): 1},
+       'discards: C by the POP at 8036, D by the LD SP reset at 8050')
+    eq(s['fakes'], {0x800A: 1}, 'the RET into a pushed address')
+    eq(s['rewrites'], {0x8074: 1}, 'the EX (SP),HL rewrite')
+    eq(h.regs[H.PC], 0x8080, 'the program reached its final loop')
+    # interrupts are frames: a HALT loop under IM 1 with the ROM ISR
+    H, h = fresh()
+    h.poke(0x8000, 0x76, 0x18, 0xFD)        # HALT / JR $-1
+    h.regs[H.PC] = 0x8000
+    h.regs[H.SP] = 0xFF00
+    h.regs[H.IM] = 1
+    h.regs[H.IFF] = 1
+    s = S.scan(h, 4, None)
+    eq(s['created'] > 8 and s['balanced'] + s['open'] == s['created'] and s['open'] <= 1, True,
+       f'ISR frames balanced (one may be open when the scan ends inside the ISR): {s}')
+    eq((sum(s['discards'].values()), sum(s['fakes'].values()), s['odd']), (0, 0, 0), 'no discards/fakes/odd in the ROM ISR')
+
+
 
 CHECKS = [
     ('tzx: parse synthetic tape', t_tzx_parse),
@@ -824,6 +885,7 @@ CHECKS = [
     ('contact: both layouts', t_contact),
     ('keyprobe: export surface + press()', t_keyprobe_exports),
     ('portconfig: manifest, defaults, need()', t_portconfig),
+    ('stackscan: slot-based frames, discards, fake return, LD SP reset vs switch, ISR', t_stackscan),
 ]
 
 
