@@ -687,6 +687,94 @@ def t_bleepload():
         eq((loaded[0x8000], loaded[0x9000]), (1, 1), 'loaded-page mask set')
 
 
+def t_bleepload_driver():
+    """A synthetic tape carrying everything the driver model reads (the shape
+    measured on eight Firebird tapes): the 512-byte stub with its CP $64, the
+    key page XORed with the stub's two pages, a region encrypted with K that
+    carries a stage-2 copy loop keyed on a CONSTANT, the driver page (clear
+    head, K-encrypted tail: LDIR / CALL $FA00 / LDDR / a fill / LD SP / JP),
+    the parameter block, a later group XORed with that constant -- and a
+    truncated turbo block, which must be skipped, not crash."""
+    B = mod('bleepload')
+
+    def turbo(payload):
+        hdr = (le16(2168) + le16(667) + le16(735) + le16(855) + le16(1710)
+               + le16(20) + bytes([8]) + le16(50))
+        ln = len(payload)
+        return bytes([0x11]) + hdr + bytes([ln & 0xFF, (ln >> 8) & 0xFF, (ln >> 16) & 0xFF]) + payload
+
+    def bl(gid, blk, dest, data):
+        return turbo(rom_block(0xFF, bytes([gid]) + bytes(data) + bytes([blk, dest & 0xFF, dest >> 8, 0xC9])))
+
+    stub = bytearray((i * 13 + 7) & 0xFF for i in range(512))
+    stub[0x1E:0x23] = b'\x3a\x00\xfe\xfe\x64'                    # LD A,($FE00) / CP $64
+    K = bytes((i * 5 + 1) & 0xFF for i in range(256))
+    keypage = bytes(K[i] ^ stub[i] ^ stub[256 + i] for i in range(256))
+    stage2 = bytearray((i * 3) & 0xFF for i in range(256))
+    stage2[0x30:0x39] = b'\x21\x01\xfe\x01\x00\x01\x3e\x21\xae'  # LD HL,$FE01 / LD BC,$100 / LD A,$21 / XOR (HL)
+    payload = bytes(range(256))
+
+    def enc(page):
+        return bytes(page[i] ^ K[i] for i in range(256))
+
+    drv_code = (b'\x21\x00\xcf\x11\x00\x40\x01\x00\x01\xed\xb0'       # after group 1: LDIR $CF00->$4000 $100
+                + b'\x3e\x65\x32\x00\x5b\xcd\x00\xfa'                # gid $65 -> CALL $FA00: group 2
+                + b'\x21\x00\xd0\x11\x00\x80\x01\x00\x01\xed\xb0'    # after group 2: LDIR $D000->$8000 $100
+                + b'\x21\xff\xd0\x11\xff\xd1\x01\x00\x01\xed\xb8'    # LDDR: $D000-$D0FF -> $D100-$D1FF
+                + b'\x21\x00\x40\x11\x01\x40\x01\xff\x00\xed\xb0'    # a fill: LDIR $4000->$4001 $FF
+                + b'\x31\x00\x60\xc3\x34\x12')                        # LD SP,$6000 / JP $1234
+    drv = bytearray(256)
+    drv[0:8] = b'\xdd\xe5\xcd\x6e\xcd\xcd\x2a\xce'                    # PUSH IX / CALL stub-read / CALL stub-checksum
+    drv[0x40:0x40 + len(drv_code)] = drv_code
+    drv_tape = bytes(drv[:0x40]) + bytes(drv[0x40 + i] ^ K[i] for i in range(0xC0))
+    params = bytearray(256)                 # the buffer image: gid at 0, data at 1.. -> ($FEE7) = data[$E6]
+    params[0xE6:0xE8] = le16(0xC900)
+    params[0xE8:0xEA] = le16(0xCF00)
+    params[0xEB] = 0xD1
+    tzxbytes = (b'ZXTape!\x1a' + bytes([1, 20])
+                + std_block(header(3, 'stub', 512, 0xCD00, 32768)) + std_block(rom_block(0xFF, stub))
+                + bl(0x64, 0, 0xC900, keypage) + bl(0x64, 1, 0xCF00, enc(stage2))
+                + bl(0x64, 2, 0xD000, enc(payload)) + bl(0x64, 3, 0x5B00, drv_tape)
+                + bl(0x64, 4, 0xFF09, params) + bl(0x65, 0, 0x9000, bytes(x ^ 0x21 for x in payload))
+                + turbo(rom_block(0xFF, bytes(100))))                  # truncated: skipped, not a crash
+    with tempfile.TemporaryDirectory() as d:
+        tp = os.path.join(d, 'bl2.tzx')
+        open(tp, 'wb').write(tzxbytes)
+        notes = []
+        blocks, got_stub = B.read_tape(tp, 256, notes)
+        eq(len(blocks), 6, 'blocks (the short one skipped)')
+        eq(len(notes), 1, 'the short block is noted')
+        eq(got_stub, bytes(stub), 'the stub is the 512-byte CODE block')
+        eq(B.stub_first_group(got_stub), 0x64, "first group from the stub's CP")
+        model, why = B.driver_model(blocks, got_stub, 0x64)
+        eq(why, None, 'driver model')
+        eq((model['keypage'], model['region'], model['driver']['dest']),
+           (0xC900, (0xCF00, 0xD100), 0x5B00), 'driver parameters from the buffer image')
+        eq(model['key'], K, 'K = key page XOR the two stub pages')
+        img, loaded = bytearray(0x10000), bytearray(0x10000)
+        for b in blocks[:5]:
+            B.place(img, loaded, b['dest'], b['data'])
+        B.apply_driver(img, model)
+        eq(bytes(img[0xC900:0xCA00]), K, 'key page decrypted in place')
+        eq(bytes(img[0xD000:0xD100]), payload, 'region decrypted with K')
+        eq(bytes(img[0x5B40:0x5B40 + len(drv_code)]), drv_code, 'driver page decrypted from $40')
+        eq(B.stage2_xor_key(img, model['region']), (0x21, 0xCF36), 'later-group key read from stage 2')
+        drv = B.read_driver(img, model)
+        eq([(c['op'], c['src'], c['dst'], c['len'], c['after_group'], c['fill']) for c in drv['copies']],
+           [('LDIR', 0xCF00, 0x4000, 0x100, 1, False), ('LDIR', 0xD000, 0x8000, 0x100, 2, False),
+            ('LDDR', 0xD000, 0xD100, 0x100, 2, False), ('LDIR', 0x4000, 0x4001, 0xFF, 2, True)],
+           'driver copies from the z80dis walk')
+        eq(drv['handover'], (0x5B40 + len(drv_code) - 3, 0x1234), 'hand-over JP')
+        eq(drv['sps'], [(0x5B40 + len(drv_code) - 6, 0x6000)], 'LD SP')
+        B.apply_copies(img, loaded, drv['copies'], 1)
+        eq(bytes(img[0x4000:0x4100]), bytes(stage2), 'copy after group 1 applied')
+        B.place(img, loaded, 0x9000, B.unscramble(blocks[5], 0x64, True, 0x21))
+        eq(bytes(img[0x9000:0x9100]), payload, 'later group de-XORed with the constant')
+        B.apply_copies(img, loaded, drv['copies'], 2)
+        eq(bytes(img[0x8000:0x8100]), payload, 'LDIR after group 2 applied')
+        eq(bytes(img[0xD100:0xD200]), payload, 'LDDR after group 2 applied')
+        eq(img[0x4001], stage2[1], 'the fill was skipped')
+
 
 CHECKS = [
     ('tzx: parse synthetic tape', t_tzx_parse),
@@ -694,6 +782,7 @@ CHECKS = [
     ('tzx: bad checksum flagged', t_tzx_bad_checksum),
     ('tzx: unhandled block stops', t_tzx_unhandled_stops),
     ('bleepload: block framing + naive image', t_bleepload),
+    ('bleepload: driver model, stage-2 key, copies', t_bleepload_driver),
     ('basic: detokenise / USR binary form', t_basic),
     ('mkloader: PROG/CHANS layout + relocation', t_mkloader),
     ('mkimage: follow the headers', t_mkimage_auto),

@@ -60,6 +60,15 @@ def main():
     if tape is None or not os.path.exists(tape):
         portconfig.need('tape', 'path', what='the tape to load')
     out = out or portconfig.path(f'build/boot{machine}.z80')
+    # tap2sna.py downloads anything whose urlparse() has a scheme, and on Windows
+    # 'E:\\...' parses as scheme 'e' ("unknown url type: e"): give it a path with
+    # no drive letter.  A tape on another drive has no relative form; say so.
+    tape_arg = tape
+    if os.path.splitdrive(tape)[0]:
+        try:
+            tape_arg = os.path.relpath(tape)
+        except ValueError:
+            print(f'simload: NOTE {tape} is on another drive; tap2sna may read it as a URL')
     cfg = [f'machine={machine}', f'accelerator={accel}']
     if cmio:
         cfg.append('cmio=1')
@@ -74,7 +83,7 @@ def main():
         argv += ['-c', c]
     if start is not None:
         argv += ['--start', str(start)]
-    argv += [tape, out]
+    argv += [tape_arg, out]
     print('tap2sna.py ' + ' '.join(argv))
     from skoolkit import tap2sna
     tap2sna.main(argv)

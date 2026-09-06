@@ -12,3 +12,7 @@ shot*.png
 __pycache__/
 *.pyc
 node_modules/
+# snapshots are tape-derived too
+*.z80
+*.szx
+*.sna
