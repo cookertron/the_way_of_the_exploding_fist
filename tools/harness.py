@@ -50,6 +50,10 @@ import sys
 from skoolkit.simulator import Simulator
 from skoolkit import simutils as U
 try:
+    from skoolkit.snapshot import Snapshot
+except ImportError:                                      # older SkoolKit
+    Snapshot = None
+try:
     from skoolkit.cmiosimulator import CMIOSimulator
 except ImportError:                                      # older SkoolKit
     CMIOSimulator = None
@@ -117,6 +121,29 @@ def tape_blocks(path):
     _, blocks = tzxmod.parse(path)
     return [(b.data[0], b.data[1:-1]) for b in blocks
             if b.data is not None and len(b.data) >= 2]
+
+
+def load_snapshot(path):
+    """A .z80/.szx/.sna snapshot -> (ram48, registers, state, info).  The
+    registers/state dicts are exactly what simutils.from_snapshot builds, so
+    the simulator starts in the snapshot's machine state (PC, SP, IM, IFF, I,
+    R, both register sets, T-states) instead of the kit's cold start.  A 128K
+    snapshot is refused here: this harness is a 48K machine (manual 3.1)."""
+    if Snapshot is None:
+        sys.exit('harness: this SkoolKit cannot read snapshots')
+    snap = Snapshot.get(path)
+    ram = snap.ram(-1)
+    if len(ram) != 0xC000:
+        sys.exit(f'harness: {path} is a 128K snapshot ({len(ram)} bytes of RAM); '
+                 'the 48K harness cannot page it; use a 128K harness for a paged game')
+    regs = {'A': snap.a, 'F': snap.f, 'BC': snap.bc, 'DE': snap.de, 'HL': snap.hl,
+            'IX': snap.ix, 'IY': snap.iy, 'SP': snap.sp, 'I': snap.i, 'R': snap.r,
+            '^A': snap.a2, '^F': snap.f2, '^BC': snap.bc2, '^DE': snap.de2, '^HL': snap.hl2,
+            'PC': snap.pc, 'MEMPTR': snap.memptr}
+    state = {'im': snap.im, 'iff': snap.iff1, 'tstates': snap.tstates}
+    info = (f'snapshot {os.path.basename(path)} ({snap.type}): PC=${snap.pc:04X} SP=${snap.sp:04X} '
+            f'IM={snap.im} IFF={snap.iff1} I=${snap.i:02X} border={snap.border} T={snap.tstates}')
+    return bytes(ram), regs, state, info, snap.border
 
 
 class Mem:
@@ -258,8 +285,13 @@ class TapeDeck:
 class Harness:
     """A 48K machine at the moment the loader hands over.
 
-    image      None  -> the post-loader image built from tape.path/tape.blocks
-                        in port.json (blank RAM when tape.path is unset);
+    image      None  -> z80.snapshot from port.json if it is set and exists
+                        (the SNAPSHOT ROUTE, manual 6.1: a .z80/.szx written by
+                        tap2sna.py or an emulator), else the post-loader image
+                        built from tape.path/tape.blocks (blank RAM when
+                        tape.path is unset);
+    snapshot   a .z80/.szx/.sna to boot from, overriding the manifest; the
+               registers, IM, IFF, I, R and T-states come from it too;
                False -> blank RAM regardless (ROM only);
                a path or bytes -> that 64K image, e.g. mkimage.py's output or
                         a boot.py dump (its ROM area is ignored; the real ROM
@@ -271,8 +303,10 @@ class Harness:
     """
 
     def __init__(self, use_rom=True, tape=None, deck=True, image=None,
-                 entry=None, contended=None):
+                 entry=None, contended=None, snapshot=None):
         raw = bytearray(0x10000)
+        snap = None                     # (ram, regs, state, info, border) when booting a snapshot
+        built_from_tape = False         # tape.sp/entry apply only to a tape-built image
         if use_rom:
             raw[0:0x4000] = rom48()
         else:
@@ -281,7 +315,15 @@ class Harness:
         self.use_rom = use_rom
         self.image_lines = []
 
-        if image is None:
+        if image is None and snapshot is None:
+            cfg_snap = portconfig.path(portconfig.get('z80', 'snapshot'))
+            if cfg_snap is not None and os.path.exists(cfg_snap):
+                snapshot = cfg_snap
+        if snapshot is not None:
+            snap = load_snapshot(snapshot)
+            raw[0x4000:] = snap[0]
+            self.image_lines = [snap[3]]
+        elif image is None:
             tp = portconfig.path(portconfig.get('tape', 'path'))
             if tp is not None:
                 if not os.path.exists(tp):
@@ -293,6 +335,7 @@ class Harness:
                 except ImageError as e:
                     sys.exit(f'harness: {e}')
                 raw[0x4000:] = mem[0x4000:]
+                built_from_tape = True
                 if entry is None and ENTRY is None:
                     portconfig.need('tape', 'entry', what='PC when the loader hands over')
         elif image is not False:
@@ -307,7 +350,13 @@ class Harness:
         else:
             cls = CMIOSimulator if (contended and CMIOSimulator is not None) else Simulator
         self.contended = cls is not Simulator
-        self.sim = cls(self.memobj, config={'fast_djnz': True, 'fast_ldir': True})
+        cfg = {'fast_djnz': True, 'fast_ldir': True}
+        if snap is not None:
+            self.sim = cls(self.memobj, registers=dict(snap[1]), state=dict(snap[2]), config=cfg)
+        else:
+            self.sim = cls(self.memobj, config=cfg)
+        self.snapshot_path = snapshot
+        self.border = snap[4] if snap is not None else 0
         self.memobj.sim = self.sim
         self.sim.set_tracer(self.ports)
 
@@ -330,12 +379,20 @@ class Harness:
         self.frame_duration = self.sim.frame_duration
         self.int_active = self.sim.int_active
         r = self.sim.registers
-        if entry is None:
-            entry = ENTRY if ENTRY is not None else 0x0000
-        r[PC] = entry
-        r[SP] = portconfig.num(portconfig.get('tape', 'sp'), 'tape.sp') or 0xFFFF
-        r[IFF] = 0
-        r[IM] = 1
+        if snap is not None:
+            # the snapshot IS the machine state; only an explicit entry overrides PC
+            if entry is not None:
+                r[PC] = entry
+        else:
+            if entry is None:
+                entry = (ENTRY if ENTRY is not None else 0x0000) if built_from_tape else 0x0000
+            r[PC] = entry
+            if built_from_tape:
+                r[SP] = portconfig.num(portconfig.get('tape', 'sp'), 'tape.sp') or 0xFFFF
+            else:
+                r[SP] = 0xFFFF          # a bare ROM machine, not this game (image=False / blank)
+            r[IFF] = 0
+            r[IM] = 1
 
     # -- accessors ----------------------------------------------------------
     @property
@@ -468,7 +525,7 @@ class Harness:
         mem = sim.memory
         fd, ia = self.frame_duration, self.int_active
         tcp = self.tape_call_pc if self.deck is not None else None
-        target = regs[T] + n * FRAME_T
+        target = regs[T] + n * self.frame_duration    # 69888 on 48K (was the module constant)
         steps = 0
         while regs[T] < target:
             pc = regs[PC]

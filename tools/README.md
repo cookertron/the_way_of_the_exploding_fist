@@ -35,7 +35,10 @@ phase 1, not in phase 8.
 | `contact.py` | contact sheet of a range rendered as sprites BOTH ways (row-major and cell-major); LOOK | `python tools/contact.py build/image.bin out.png --base 0x5F00 --len 0x1000 --w 2 --h 16` | 5 static extraction of data |
 | `screen.py` | render the display file, or the 32x24 attribute sheet, out of a memory image | `python tools/screen.py build/live.bin out.png [--attrs]` | 6 ground truth from a real frame |
 | `harness.py` | the Z80 simulator harness: real 48K ROM (read locally from SkoolKit), tape deck at a PC breakpoint, keyboard/Kempston ports, memory write watch, step / run_until / run_frames / profile / call / save_state; ULA contention by default | `python tools/harness.py` (profile from the entry point); `from harness import Harness` | 7 the simulator harness (the pivot) |
-| `boot.py` | boot, optionally drive a key script, dump the LIVE 64K image and save a machine state for every phase-8 tool | `python tools/boot.py --steps 400000 --script "60:,60:SPACE" --save menu` | 8 drive into live play |
+| `boot.py` | boot (from `z80.snapshot` if set, else the tape), `--state NAME` to resume, `--arm-at ADDR` for the interrupt trap (6.3), optionally drive a key script, dump the LIVE image and save a state | `python tools/boot.py --state boot --arm-at 0x8000 --script "60:,60:SPACE" --save menu` | 7-8 boot / drive into live play |
+| `simload.py` | the SNAPSHOT ROUTE: run the tape's own loader in SkoolKit's simulated LOAD (tap2sna) -> a .z80/.szx at hand-over; handles protected/custom loaders (bleepload, speedlock, alkatraz, ...) with no loader-specific code | `python tools/simload.py [--machine 48\|128] [--start ADDR]` | 1-2 tape + loader |
+| `snapimport.py` | a .z80/.szx/.sna snapshot -> the harness image (`build/image.bin`) + a saved state (`--save NAME`); prints the loader's postcondition (PC/SP/IM/IFF/I/border) | `python tools/snapimport.py build/boot48.z80 --save boot` | 2 the loader and the memory map |
+| `bleepload.py` | decode a Firebird Bleepload tape's block framing (block->dest map, groups) and rebuild a naive image, to recover R3 (the tape-byte cross-check) the snapshot route loses; framing verified against one tape, post-load transforms are game-specific | `python tools/bleepload.py [--snapshot build/boot48.z80]` | 3/5 cross-check |
 | `keyprobe.py` | which key does something: press each of the 40 from one state, diff PCs and memory; exports `KEYS` / `keymask` / `KEYMAP` / `press` / `parse_script` / `drive` | `python tools/keyprobe.py --state menu` | 8 drive into live play |
 | `readwatch.py` | find buffers that are only ever READ (a level map) by watching memory reads per PC and page | `python tools/readwatch.py --state level --lo 0x5B00 --hi 0x8000` | 8 drive into live play |
 | `battery.py` | the post-harness diagnostic battery over driven play: Q2 ports, Q3 self-modification, Q10 clock, Q13 coverage, Q15/Q16 render + colour, Q17 speaker, Q19 stack | `python tools/battery.py --state level --loop 0x8503 --script "60:D,60:Z"` | 8 drive into live play |
@@ -78,6 +81,13 @@ example addresses in the invocations above are the case study's.
   "regions": "tools/regions.json",   [{"start","end","desc","kind"}]      (adis)
   "states": "build",         directory for saved machine states (NAME.pkl)
   "image": "build/image.bin" the static post-loader image mkimage.py writes
+  "snapshot": null,          a .z80/.szx to BOOT from (the snapshot route,
+                             manual 6.1); when set, Harness() and the --state
+                             tools use it instead of the tape block table
+  "snapshot128": null,       the same tape on a 128K (for a 128K layer)
+  "varmap": "tools/varmap.json"  {name:{addr,width,note}} a port fills in, so the
+                             engine, the differential sampler and the tests all
+                             share one variable-name table
 }
 ```
 

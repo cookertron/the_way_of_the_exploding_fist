@@ -15,9 +15,15 @@ Save one at the menu, one at a live level, and so on; restoring is exact
 (manual 6.4: boot once, then poke).
 
 Usage:
-    python tools/boot.py [--steps N] [--ints] [--script "40:,60:SPACE,120:1"]
-                         [--out FILE] [--save NAME]
+    python tools/boot.py [--state NAME] [--arm-at ADDR] [--steps N] [--ints]
+                         [--script "40:,60:SPACE,120:1"] [--out FILE] [--save NAME]
 
+--state     resume a saved state (build/NAME.pkl) instead of booting afresh
+            (a fresh boot comes from z80.snapshot when the manifest sets it,
+            else from the tape's block table)
+--arm-at    run with interrupts OFF until PC == ADDR (the instruction after
+            the game's IM n / EI), print the mode, then arm them: the
+            interrupt trap of manual 6.3.  Implies --ints for what follows.
 --steps N   run N instructions first (default 400000; interrupts per --ints,
             default OFF)
 --script    then hold keys for frames with interrupts ON: FRAMES:KEY+KEY,...
@@ -41,11 +47,16 @@ def main():
     if '-h' in args or '--help' in args:
         print(__doc__.strip()); sys.exit(0)
     steps = 400_000
-    out = save = None
+    out = save = state = None
+    arm_at = None
     ints = False
     script = []
     while args:
-        if args[0] == '--steps':
+        if args[0] == '--state':
+            state = args[1]; del args[:2]
+        elif args[0] == '--arm-at':
+            arm_at = int(args[1], 0); del args[:2]
+        elif args[0] == '--steps':
             steps = int(args[1], 0); del args[:2]
         elif args[0] == '--out':
             out = args[1]; del args[:2]
@@ -62,6 +73,18 @@ def main():
     h = Harness()
     for line in h.image_lines:
         print(line)
+    if state:
+        p = portconfig.state_path(state)
+        h.load_state_file(p)
+        print(f'resumed state {p}: PC=${h.pc():04X}')
+    if arm_at is not None:
+        reason, n = h.run_until([arm_at], limit=20_000_000, interrupts=False)
+        if reason != 'target':
+            sys.exit(f'boot: --arm-at ${arm_at:04X} not reached ({reason} after {n} instructions)')
+        print(f'arm-at ${arm_at:04X} reached after {n} instructions: IM={h.regs[IM]} '
+              f'I=${h.regs[I]:02X}; enabling interrupts')
+        h.regs[IFF] = 1
+        ints = True
     hist = h.profile(steps, interrupts=ints) if steps else {}
     if script:
         drive(h, script)

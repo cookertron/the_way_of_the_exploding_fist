@@ -642,11 +642,58 @@ def t_portconfig():
     eq(pc.root(), default_root, 'default manifest restored')
 
 
+def t_harness_snapshot():
+    H = mod('harness')
+    from skoolkit.snapshot import write_snapshot
+    with tempfile.TemporaryDirectory() as d:
+        sp = os.path.join(d, 'snap.z80')
+        ram = bytearray(0xC000)                      # $4000..$FFFF
+        ram[0x8000 - 0x4000] = 0xC9                  # a RET at $8000
+        write_snapshot(sp, bytes(ram), ('pc=32768', 'sp=32000', 'bc=4660'), ('im=2',))
+        h = H.Harness(snapshot=sp, deck=False)
+        eq(h.pc(), 0x8000, 'snapshot PC')
+        eq(h.regs[H.SP], 32000, 'snapshot SP')
+        eq(h.regs[H.IM], 2, 'snapshot IM')
+        eq(h.peek(0x8000), bytes([0xC9]), 'snapshot RAM byte')
+        eq(h.peek(0, 3), bytes([0xF3, 0xAF, 0x11]), 'real ROM under the snapshot')
+
+
+def t_bleepload():
+    B = mod('bleepload')
+
+    def turbo(payload):
+        hdr = (le16(2168) + le16(667) + le16(735) + le16(855) + le16(1710)
+               + le16(20) + bytes([8]) + le16(50))
+        ln = len(payload)
+        return bytes([0x11]) + hdr + bytes([ln & 0xFF, (ln >> 8) & 0xFF, (ln >> 16) & 0xFF]) + payload
+
+    def bl(gid, blk, dest, fill):
+        body = bytes([gid]) + bytes([fill]) * 256 + bytes([blk, dest & 0xFF, dest >> 8]) + bytes([0xC9])
+        return turbo(rom_block(0xFF, body))
+
+    tzxbytes = (bytes([0x5A, 0x58, 0x54, 0x61, 0x70, 0x65, 0x21, 0x1A]) + bytes([1, 20])
+                + bl(0x64, 0, 0x8000, 0xAA) + bl(0x64, 1, 0x8100, 0xBB)
+                + bl(0x65, 0, 0x9000, 0x01))          # a later group: stored XORed by dest-hi ($90)
+    with tempfile.TemporaryDirectory() as d:
+        tp = os.path.join(d, 'bl.tzx')
+        open(tp, 'wb').write(tzxbytes)
+        blocks = B.decode(tp)
+        eq(len(blocks), 3, 'bleepload block count')
+        eq((blocks[0]['gid'], blocks[0]['blk'], blocks[0]['dest']), (0x64, 0, 0x8000), 'block framing')
+        eq(blocks[1]['dest'], 0x8100, 'second block dest')
+        img, loaded = B.build_naive(blocks)           # first_group $64, XOR later groups on
+        eq(img[0x8000], 0xAA, 'group-1 data placed verbatim')
+        eq(img[0x9000], 0x01 ^ 0x90, 'later-group data de-XORed by dest high byte')
+        eq((loaded[0x8000], loaded[0x9000]), (1, 1), 'loaded-page mask set')
+
+
+
 CHECKS = [
     ('tzx: parse synthetic tape', t_tzx_parse),
     ('tzx: file parse + report', t_tzx_file_and_report),
     ('tzx: bad checksum flagged', t_tzx_bad_checksum),
     ('tzx: unhandled block stops', t_tzx_unhandled_stops),
+    ('bleepload: block framing + naive image', t_bleepload),
     ('basic: detokenise / USR binary form', t_basic),
     ('mkloader: PROG/CHANS layout + relocation', t_mkloader),
     ('mkimage: follow the headers', t_mkimage_auto),
@@ -661,6 +708,7 @@ CHECKS = [
     ('harness: call() with sentinels', t_harness_call),
     ('harness: find_bytes', t_harness_find),
     ('harness: image from bytes / file', t_harness_image),
+    ('harness: snapshot boot (.z80 -> registers + RAM)', t_harness_snapshot),
     ('harness: interrupts + fast HALT via the ROM ISR', t_harness_interrupts),
     ('harness: contended variant constructs and costs', t_harness_contended),
     ('readwatch: memory swap counts reads', t_readwatch_swap),

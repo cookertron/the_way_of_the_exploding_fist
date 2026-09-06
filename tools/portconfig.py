@@ -59,6 +59,9 @@ DEFAULTS = {
         'regions': 'tools/regions.json',
         'states': 'build',      # directory for saved machine states (*.pkl)
         'image': 'build/image.bin',   # the static post-loader 64K image
+        'snapshot': None,       # a .z80/.szx to boot from instead (the snapshot route)
+        'snapshot128': None,    # the same tape loaded on a 128K, for the 128K layer
+        'varmap': 'tools/varmap.json',   # {name: {addr, width, note}} shared by sampler + engine
     },
 }
 
