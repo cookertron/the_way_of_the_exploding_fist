@@ -29,6 +29,15 @@ background (every byte $00 over $00 and $FF over $FF) is EMPTY: masked-empty
 and XOR-of-nothing are indistinguishable, so no mode is claimed.  The bounding
 box of the written addresses gives WxH; the write order gives the draw order.
 
+A THIRD run, over the real background, then checks the model: every byte
+written must equal (bg AND mask) OR data -- i.e. (bg AND over-$FF) OR over-$00
+-- or bg XOR data for an XOR blitter.  A routine outside that family (one that
+inverts or shifts what it reads back, or mixes in a third source) is reported
+as a MODEL MISMATCH with the disagreeing addresses, and its grid disowned.
+An erase pass (screen = (screen AND NOT sprite) OR background) IS in the
+family: it reads as MASKED with data = the background restored and the opaque
+black cells = the sprite silhouette being cleared (Chuckie Egg 2 $7FC9).
+
 THE BOUND.  One call is bracketed by the return address on the stack at
 --entry, so the stack top there must be the return of the CALL that led to it
 (directly, or via JP/JR inside the CALLed routine), i.e. hook BEFORE the routine
@@ -36,7 +45,9 @@ pushes anything.  The tool checks that a CALL/RST instruction precedes the word
 at (SP) and refuses otherwise (a fall-through entry, a JP from the main loop,
 or a hook placed after a PUSH give a stack top that is NOT a return address,
 and the measurement would silently run on into the game).  The check is a
-plausibility test, not proof: pass --ret 0xADDR to name the bound yourself.
+plausibility test, not proof: pass --ret to name the bound yourself, as an
+address or as the register holding the continuation (--ret IX for a blitter
+that ends in JP (IX) and is entered by JP with garbage under SP).
 If the call does not reach the bound within --steps the result is reported as
 NOT one call and the tool exits 3.
 
@@ -55,7 +66,9 @@ Usage:
   python tools/blitforensics.py --state NAME --entry 0xADDR
         [--target 0x4000 0x5B00]   region filled + watched (default display+attrs)
         [--skip N]                 measure the (N+1)-th hit of --entry (default 0)
-        [--ret 0xADDR]             the return address bounding the call (else (SP))
+        [--ret 0xADDR|IX|HL|DE|BC] the address bounding the call (else the word at (SP));
+                                   a register names a continuation, e.g. a blitter that
+                                   ends JP (IX) instead of RET (Gauntlet)
         [--src SP|HL|IX|IY|DE|BC]  also dump the source bytes at that register @entry
         [--src-len 64]             how many source bytes to dump (default 64)
         [--steps 200000]           per-call step cap
@@ -88,7 +101,8 @@ def run_call(h, ret, lo, hi, fill, steps):
     """Fill [lo,hi) with `fill`, run the current call to its return address with
     interrupts off, and return {addr: last value written} within [lo,hi) + order."""
     m = h.memobj
-    m.m[lo:hi] = bytes([fill]) * (hi - lo)
+    if fill is not None:
+        m.m[lo:hi] = bytes([fill]) * (hi - lo)
     m.watch(lo, hi)
     reason, n = h.run_until((ret,), limit=steps, interrupts=False)
     log = m.log
@@ -113,6 +127,8 @@ def call_before(h, ret):
     address, or None.  The call's target need not be --entry: a routine is often
     CALLed at one address and reaches the blit by JP/JR inside itself (Bubble
     Bobble: CALL $A447 ... JR C,$A600), and the stack top is still its return."""
+    if ret < 3:                                     # $0000-$0002: nothing can precede it
+        return None
     b3 = h.peek(ret - 3, 3)
     if b3[0] == 0xCD or b3[0] in COND_CALL:
         return ret - 3
@@ -140,9 +156,11 @@ def measure(h, entry, lo=0x4000, hi=0x5B00, steps=200000, ret=None):
     h.load_state(saved)
     w1, _, r1, n1 = run_call(h, ret, lo, hi, 0xFF, steps)
     h.load_state(saved)
-    if r0 != 'target' or r1 != 'target':
+    w2, _, r2, n2 = run_call(h, ret, lo, hi, None, steps)      # over the REAL background
+    h.load_state(saved)
+    if r0 != 'target' or r1 != 'target' or r2 != 'target':
         raise BoundError(f'the call did not return to ${ret:04X} within {steps} steps '
-                         f'({r0}/{r1}); the writes are NOT one call.  Raise --steps, or the '
+                         f'({r0}/{r1}/{r2}); the writes are NOT one call.  Raise --steps, or the '
                          f'bound is wrong (--ret)')
 
     bmp_hi = min(hi, lo + BMP_LEN)
@@ -191,16 +209,33 @@ def measure(h, entry, lo=0x4000, hi=0x5B00, steps=200000, ret=None):
                 grid[gy][gx] = '.' if (diff & bit) else 'K'     # masked: transparent vs black
     rows = [''.join(r) for r in grid]
     transparent = sum(c == '.' for r in rows for c in r)
+    # the model check: over the real background every written byte must equal
+    #   (bg AND mask) OR data  ==  (bg AND over-$FF) OR over-$00      (masked/opaque/empty)
+    #   bg XOR data                                                  (xor)
+    # or the routine is not a blitter of that family and the grid is a fiction.
+    bg = saved[0]
+    mismatch = []
+    for a in sorted(set(w2) | set(bmp)):
+        if a >= bmp_hi or a < lo:
+            continue
+        if a not in w2 or a not in d0:
+            mismatch.append(a)                                  # written on one background only
+            continue
+        want = (bg[a] ^ d0[a]) if mode == 'XOR' else ((bg[a] & d1[a]) | d0[a])
+        if w2[a] != want:
+            mismatch.append(a)
     bmp_order = [a for a in order if a in coords]
     order_rowmajor = bmp_order == sorted(bmp_order, key=lambda a: coords[a][::-1])
     return {
-        'entry': f'${entry:04X}', 'return': f'${ret:04X}', 'steps': [n0, n1],
+        'entry': f'${entry:04X}', 'return': f'${ret:04X}', 'steps': [n0, n1, n2],
         'target': [f'${lo:04X}', f'${hi:04X}'],
         'w': wpx, 'h': hpx, 'chars': [wpx // 8, (hpx + 7) // 8], 'mode': mode,
         'bmp_bytes': len(bmp), 'attr_bytes': len(attr), 'other_bytes': len(other),
         'origin': [x0, y0], 'transparent_px': transparent,
         'solid_warning': transparent == 0 and (wpx * hpx) >= 64 and mode == 'OPAQUE',
         'row_major': order_rowmajor,
+        'model_mismatch': len(mismatch),
+        'model_mismatch_addrs': [f'{a:04X}' for a in mismatch[:16]],
         'grid': rows,
         'data_over_00': {f'{a:04X}': d0[a] for a in bmp},
         'over_FF': {f'{a:04X}': d1[a] for a in bmp},
@@ -226,7 +261,7 @@ def main():
         elif a == '--entry': entry = int(args[1], 0); del args[:2]
         elif a == '--target': lo, hi = int(args[1], 0), int(args[2], 0); del args[:3]
         elif a == '--skip': skip = int(args[1], 0); del args[:2]
-        elif a == '--ret': ret = int(args[1], 0); del args[:2]
+        elif a == '--ret': ret = args[1].upper(); del args[:2]
         elif a == '--src': src = args[1].upper(); del args[:2]
         elif a == '--src-len': src_len = int(args[1], 0); del args[:2]
         elif a == '--steps': steps = int(args[1], 0); del args[:2]
@@ -249,6 +284,8 @@ def main():
             h.step(1)
     src_ptr = reg_at(h, src) if src else None
     src_bytes = bytes(h.peek(src_ptr, src_len)) if src else b''
+    if ret is not None:
+        ret = reg_at(h, ret) if ret in ('IX', 'IY', 'HL', 'DE', 'BC') else int(ret, 0)
 
     try:
         rep = measure(h, entry, lo, hi, steps, ret)
@@ -274,6 +311,11 @@ def main():
         print('  ! every written byte is background over both fills: nothing drawn.  A '
               'masked blit of an empty sprite and an XOR of nothing look the same; no mode '
               'is claimed -- try another --skip.')
+    if rep['model_mismatch']:
+        print(f'  ! MODEL MISMATCH: {rep["model_mismatch"]} of {rep["bmp_bytes"]} bytes written over the real '
+              f'background are not (bg AND mask) OR data{" / bg XOR data" if mode == "XOR" else ""} '
+              f'(first: {", ".join("$" + a for a in rep["model_mismatch_addrs"][:6])}).  The routine is '
+              f'not a plain masked/opaque/XOR blitter; the grid above is NOT its sprite.')
     if rep['solid_warning']:
         print('  ! fully solid with zero transparency -- may be a background-restore or an '
               'opaque tile, not a masked sprite; confirm --entry is the per-sprite blit.')

@@ -870,13 +870,16 @@ def t_blitforensics():
             0x38, 0x04, 0x7A, 0xD6, 0x08, 0x57, 0x10, 0xEB, 0xC9]           # opaque, one pixel row down with the ULA carry
     pairs = [b for m, d in zip(MASK, DATA) for b in (m, d)]
 
-    def run(routine, src, b=8, de=0x4820, call=True, entry=0x8000, **kw):
+    def run(routine, src, b=8, de=0x4820, call=True, entry=0x8000, bg=None, garbage=0x1234, **kw):
         H, h = fresh()
         h.poke(0x8000, *routine)
         h.poke(0xA000, *src)
+        if bg is not None:                              # something under the sprite
+            for i in range(b):
+                h.poke(de + (i << 8), bg)
         h.poke(0x9000, *([0xCD, 0x00, 0x80] if call else [0xC3, 0x00, 0x80]), 0x18, 0xFE)   # CALL/JP $8000; JR $
         if not call:
-            h.poke(0xFF00, 0x34, 0x12)                  # garbage on the stack top
+            h.poke(0xFF00, garbage & 0xFF, garbage >> 8)  # garbage on the stack top
         r = h.sim.registers
         r[H.PC], r[H.SP], r[H.B], r[H.IFF] = 0x9000, 0xFF00, b, 0
         r[H.H], r[H.L], r[H.D], r[H.E] = 0xA0, 0x00, de >> 8, de & 0xFF
@@ -897,6 +900,7 @@ def t_blitforensics():
     eq(list(rep['data_over_00'].values()), DATA, 'masked: data == over-$00')
     eq(list(rep['over_FF'].values()), [m | d for m, d in zip(MASK, DATA)], 'masked: over-$FF == mask OR data')
     eq(rep['grid'], grid('MASKED', DATA, MASK), 'masked: grid, transparent exactly where mask=1 & data=0')
+    eq(run(MASKED, pairs, bg=0x55)['model_mismatch'], 0, 'masked over a real background: model holds')
     rep = run(OPAQUE, DATA)
     eq((rep['mode'], rep['transparent_px']), ('OPAQUE', 0), 'opaque: mode, no transparency')
     eq((list(rep['data_over_00'].values()), list(rep['over_FF'].values())), (DATA, DATA), 'opaque: both backgrounds give the data')
@@ -905,12 +909,22 @@ def t_blitforensics():
     eq(rep['mode'], 'XOR', 'xor: detected')
     eq((list(rep['data_over_00'].values()), list(rep['over_FF'].values())), (DATA, [d ^ 0xFF for d in DATA]), 'xor: data, ~data')
     eq(rep['grid'], grid('XOR', DATA), 'xor: grid claims no mask')
+    eq(run(XOR, DATA, bg=0x55)['model_mismatch'], 0, 'xor over a real background: model holds')
+    eq(run(OPAQUE, DATA, bg=0x55)['model_mismatch'], 0, 'opaque over a real background: model holds')
+    INVERT = [0x1A, 0x2F, 0xA6, 0x12, 0x23, 0x14, 0x10, 0xF8, 0xC9]       # LD A,(DE)/CPL/AND (HL)/LD (DE),A ...: data AND NOT bg, outside the family
+    rep = run(INVERT, DATA, bg=0x55)
+    eq((rep['mode'], rep['model_mismatch'] > 0), ('MASKED', True), 'a routine outside the family is reported as a model mismatch')
     # guards
     try:
         run(MASKED, pairs, call=False)
         raise AssertionError('fall-through entry with a garbage stack top was accepted')
     except B.BoundError as e:
         eq('no CALL/RST precedes' in str(e), True, f'fall-through refused: {e}')
+    try:
+        run(MASKED, pairs, call=False, garbage=0x0000)   # a stack top nothing can precede (Gauntlet's JP-entered blitters)
+        raise AssertionError('stack top $0000 was accepted')
+    except B.BoundError as e:
+        eq('no CALL/RST precedes' in str(e), True, f'$0000 stack top refused, not a crash: {e}')
     try:
         run(MASKED, pairs, ret=0x9010, steps=2000)
         raise AssertionError('a call that never reaches its bound was accepted')
