@@ -36,6 +36,16 @@ def attr_addr(x, y):
     return 0x5800 + (y >> 3) * 32 + (x >> 3)
 
 
+def bmp_coords(addr, base=0x4000):
+    """Inverse of scr_addr: a bitmap address -> (x, y) of the top-left pixel of
+    that byte (x byte-aligned = col*8).  Pure ULA display geometry, game-agnostic;
+    the natural companion for turning write logs into sprite footprints."""
+    off = addr - base
+    x = (off & 0x1F) * 8
+    y = ((off >> 8) & 0x07) | ((off >> 2) & 0x38) | ((off >> 5) & 0xC0)
+    return x, y
+
+
 def render(mem, base=0x4000, attr_base=0x5800, flash_phase=0):
     img = Image.new('RGB', (256, 192))
     px = img.load()

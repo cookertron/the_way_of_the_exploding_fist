@@ -852,6 +852,80 @@ def t_stackscan():
 
 
 
+def t_blitforensics():
+    """The two-background differential on blitters whose sprite is KNOWN because
+    we poked it: masked AND-OR, opaque copy, XOR -- mode, WxH, origin, data,
+    over-$FF and the grid cell for cell.  Then the guards: a fall-through entry
+    (no CALL before the stack top) and a call that never returns are refused,
+    a same-layout back-buffer is measured through --target LO, a sprite clipped
+    into the attributes counts them instead of crashing, an all-transparent
+    sprite is EMPTY (masked-empty and XOR-of-nothing are indistinguishable)."""
+    B = mod('blitforensics')
+    DATA = [0x3C, 0x42, 0x81, 0xA5, 0xA5, 0x81, 0x42, 0x3C]
+    MASK = [0xC3, 0x81, 0x00, 0x18, 0x3C, 0x00, 0x81, 0xC3]        # 1 = transparent
+    MASKED = [0x1A, 0xA6, 0x23, 0xB6, 0x23, 0x12, 0x14, 0x10, 0xF7, 0xC9]   # LD A,(DE)/AND (HL)/INC HL/OR (HL)/INC HL/LD (DE),A/INC D/DJNZ/RET
+    OPAQUE = [0x7E, 0x12, 0x23, 0x14, 0x10, 0xFA, 0xC9]                     # LD A,(HL)/LD (DE),A/INC HL/INC D/DJNZ/RET
+    XOR = [0x1A, 0xAE, 0x12, 0x23, 0x14, 0x10, 0xF9, 0xC9]                  # LD A,(DE)/XOR (HL)/LD (DE),A/INC HL/INC D/DJNZ/RET
+    DOWN = [0x7E, 0x12, 0x23, 0x14, 0x7A, 0xE6, 0x07, 0x20, 0x0A, 0x7B, 0xC6, 0x20, 0x5F,
+            0x38, 0x04, 0x7A, 0xD6, 0x08, 0x57, 0x10, 0xEB, 0xC9]           # opaque, one pixel row down with the ULA carry
+    pairs = [b for m, d in zip(MASK, DATA) for b in (m, d)]
+
+    def run(routine, src, b=8, de=0x4820, call=True, entry=0x8000, **kw):
+        H, h = fresh()
+        h.poke(0x8000, *routine)
+        h.poke(0xA000, *src)
+        h.poke(0x9000, *([0xCD, 0x00, 0x80] if call else [0xC3, 0x00, 0x80]), 0x18, 0xFE)   # CALL/JP $8000; JR $
+        if not call:
+            h.poke(0xFF00, 0x34, 0x12)                  # garbage on the stack top
+        r = h.sim.registers
+        r[H.PC], r[H.SP], r[H.B], r[H.IFF] = 0x9000, 0xFF00, b, 0
+        r[H.H], r[H.L], r[H.D], r[H.E] = 0xA0, 0x00, de >> 8, de & 0xFF
+        eq(h.run_until((entry,), limit=100, interrupts=False)[0], 'target', 'reach the entry')
+        return B.measure(h, entry, **kw)
+
+    def grid(mode, data, mask=None):
+        rows = []
+        for i, d in enumerate(data):
+            m = mask[i] if mask else 0
+            rows.append(''.join('I' if d >> b & 1 else
+                                ('.' if m >> b & 1 else 'K') if mode == 'MASKED' else
+                                'K' if mode == 'OPAQUE' else '.' for b in range(7, -1, -1)))
+        return rows
+
+    rep = run(MASKED, pairs)
+    eq((rep['mode'], rep['w'], rep['h'], rep['origin'], rep['return']), ('MASKED', 8, 8, [0, 72], '$9003'), 'masked: shape')
+    eq(list(rep['data_over_00'].values()), DATA, 'masked: data == over-$00')
+    eq(list(rep['over_FF'].values()), [m | d for m, d in zip(MASK, DATA)], 'masked: over-$FF == mask OR data')
+    eq(rep['grid'], grid('MASKED', DATA, MASK), 'masked: grid, transparent exactly where mask=1 & data=0')
+    rep = run(OPAQUE, DATA)
+    eq((rep['mode'], rep['transparent_px']), ('OPAQUE', 0), 'opaque: mode, no transparency')
+    eq((list(rep['data_over_00'].values()), list(rep['over_FF'].values())), (DATA, DATA), 'opaque: both backgrounds give the data')
+    eq(rep['grid'], grid('OPAQUE', DATA), 'opaque: grid')
+    rep = run(XOR, DATA)
+    eq(rep['mode'], 'XOR', 'xor: detected')
+    eq((list(rep['data_over_00'].values()), list(rep['over_FF'].values())), (DATA, [d ^ 0xFF for d in DATA]), 'xor: data, ~data')
+    eq(rep['grid'], grid('XOR', DATA), 'xor: grid claims no mask')
+    # guards
+    try:
+        run(MASKED, pairs, call=False)
+        raise AssertionError('fall-through entry with a garbage stack top was accepted')
+    except B.BoundError as e:
+        eq('no CALL/RST precedes' in str(e), True, f'fall-through refused: {e}')
+    try:
+        run(MASKED, pairs, ret=0x9010, steps=2000)
+        raise AssertionError('a call that never reaches its bound was accepted')
+    except B.BoundError as e:
+        eq('did not return' in str(e), True, f'never-returned refused: {e}')
+    rep = run(MASKED, pairs, de=0xD820, lo=0xD000, hi=0xEB00)
+    eq((rep['mode'], rep['origin'], rep['grid']), ('MASKED', [0, 72], grid('MASKED', DATA, MASK)), 'back-buffer at $D000 via lo')
+    eq(run(MASKED, pairs, de=0xD820)['bmp_bytes'], 0, 'back-buffer blit invisible on the display target')
+    rep = run(DOWN, DATA + DATA[::-1], b=16, de=0x50E0)
+    eq((rep['w'], rep['h'], rep['origin'], rep['attr_bytes']), (8, 8, [0, 184], 3), 'clipped at the bottom: 8 rows + 3 attrs')
+    rep = run(DOWN, DATA + DATA[::-1], b=16)
+    eq((rep['w'], rep['h'], rep['row_major']), (8, 16, True), 'two cells tall')
+    eq(run(MASKED, [b for m, d in zip([0xFF] * 8, [0] * 8) for b in (m, d)])['mode'], 'EMPTY', 'all-transparent: EMPTY')
+
+
 CHECKS = [
     ('tzx: parse synthetic tape', t_tzx_parse),
     ('tzx: file parse + report', t_tzx_file_and_report),
@@ -886,6 +960,7 @@ CHECKS = [
     ('keyprobe: export surface + press()', t_keyprobe_exports),
     ('portconfig: manifest, defaults, need()', t_portconfig),
     ('stackscan: slot-based frames, discards, fake return, LD SP reset vs switch, ISR', t_stackscan),
+    ('blitforensics: two-background differential on known sprites + guards', t_blitforensics),
 ]
 
 
