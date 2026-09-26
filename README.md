@@ -15,7 +15,7 @@ job.  What the kit removes is the platform work and the method discovery.
 ## Quick start
 
 ```
-pip install skoolkit               # the Z80 simulator the harness wraps
+pip install "skoolkit>=10.0"       # the Z80 simulator the harness wraps (10.0, 10.1 tested)
 python tools/selftest.py           # the tools' own gate, no tape needed
 python tools/build.py              # port.json -> web/<name>.html
 node test/kit.test.js              # the platform suite against the BUILT page

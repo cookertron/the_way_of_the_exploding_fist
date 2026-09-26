@@ -230,7 +230,9 @@ class Ports:
             return self.kempston
         return self.unattached
 
-    def write_port(self, registers, port, value):
+    def write_port(self, registers, port, value, offset=0):
+        # SkoolKit 10.1 added `offset` (where in the instruction the write
+        # lands); 10.0 does not pass it.  Ignored, so logs match 10.0's.
         if self.record_writes:
             self.writes.append((registers[T], port, value))
 
