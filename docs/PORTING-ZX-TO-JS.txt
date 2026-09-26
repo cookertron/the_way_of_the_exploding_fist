@@ -35,17 +35,17 @@ unprotected tape, one load, no compression, no paging, no scrolling, no
 self-modifying code, a hand-written 48K binary with a third-party
 disassembly already available. Assume none of that.
 
-THIS REVISION adds two things. First, lessons from Bubble Bobble, the third
-port after Chuckie Egg and Gauntlet, marked [BB] wherever they appear. It
-was hard in exactly the ways the case study was easy: operands rewritten at
-runtime as live state, one body entered two ways, a cutscene that takes
-seconds to run, and measurements taken across a roster of save states from
-more than one build and machine. Unmarked numbers are still the case
-study's. Second, section 12, on a problem that grows with the project rather
-than with the game: an agent working across many sessions, context
-compactions and sub-agents loses track of what it has already established,
-and pays again -- in time and in tokens -- to establish it a second time.
-Read 0.8 before you resume any session.
+THIS REVISION adds two things. First, lessons from Bubble Bobble, the fourth
+port (after Chuckie Egg, Chuckie Egg 2 and Gauntlet), marked [BB] wherever
+they appear. It was hard in exactly the ways the case study was easy:
+operands rewritten at runtime as live state, one body entered two ways, a
+cutscene that takes seconds to run, and measurements taken across a roster
+of save states from more than one build and machine. Unmarked numbers are
+still the case study's. Second, section 12, on a problem that grows with the
+project rather than with the game: an agent working across many sessions,
+context compactions and sub-agents loses track of what it has already
+established, and pays again -- in time and in tokens -- to establish it a
+second time. Read 0.8 before you resume any session.
 
 0.2 WHAT YOU ARE PRODUCING
 

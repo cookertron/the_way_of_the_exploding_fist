@@ -48,7 +48,7 @@ Starting a port:
 | Path | What |
 |---|---|
 | `docs/PORTING-ZX-TO-JS.txt` | The field manual: sixteen phases, what evidence to demand at each |
-| `docs/TRAPS.md` | The recorded lessons (196, from three ports), each with the measurement that taught it |
+| `docs/TRAPS.md` | The recorded lessons (196; 26-196 from Bubble Bobble), each with the measurement that taught it |
 | `docs/TRAPS-MAP.md` | Every trap mapped to the mechanism that should prevent it, and whether that mechanism exists yet |
 | `CLAUDE.md` | The briefing and operating card, re-read from disk after every context compaction |
 | `.claude/` | Session hooks: status at every start, read-by-ID and heredoc guards, the end-of-response check, sub-agent context |

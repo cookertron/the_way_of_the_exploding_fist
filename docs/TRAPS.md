@@ -1,10 +1,9 @@
-# Traps — what three ports paid to learn
+# Traps — what earlier ports paid to learn
 
 Each entry is a measurement, not an opinion.  The manual
 (`docs/PORTING-ZX-TO-JS.txt`) says what to do in each phase; this file is
 the list of places a careful engineer still fell in, with the number that
-proved it.  Entries 1-25 come from Chuckie Egg and Gauntlet, 26-196 from
-Bubble Bobble.
+proved it.  Entries 1-25 predate Bubble Bobble; 26-196 come from it.
 
 Do not read it end to end.  `docs/TRAPS-MAP.md` maps every entry to the
 mechanism that should make it impossible to fall into again, and whether

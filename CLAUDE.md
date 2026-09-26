@@ -4,8 +4,9 @@ You are in a repository created from the Spectrum Port Kit.  The job is a
 FAITHFUL reproduction of one game, in one self-contained HTML file, verified
 against the real machine code running in a Z80 simulator.  The operating
 procedure is `docs/PORTING-ZX-TO-JS.txt` — sixteen phases — and
-`docs/TRAPS.md` is what three ports paid to learn, with `docs/TRAPS-MAP.md`
-mapping every trap to the mechanism that should prevent it.
+`docs/TRAPS.md` is what earlier ports paid to learn, with
+`docs/TRAPS-MAP.md` mapping every trap to the mechanism that should
+prevent it.
 
 This file is re-read from disk after every compaction; the conversation is
 not.  Keep it short: a rule that a tool or a hook enforces does not belong
