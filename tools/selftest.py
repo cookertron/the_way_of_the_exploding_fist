@@ -972,6 +972,23 @@ def t_manual_ids():
     out = run_py([tool, '--grep', 'straddle'])[1]
     if 'G11' not in out or 'T143' not in out:
         raise AssertionError('--grep must search the manual and the traps')
+    out = run_py([tool, '--grep', 'blit'])[1]
+    if 'blitforensics.py' not in out or not out.split()[0].endswith('.py'):
+        raise AssertionError('--grep must search the tools tables, and list tools first')
+    out = run_py([tool, '--tools', 'stack'])[1]
+    if 'stackscan.py' not in out or 'python tools/stackscan.py' not in out:
+        raise AssertionError('--tools must find a tool with its usage')
+
+
+def t_tools_registry():
+    import re
+    readme = open(os.path.join(HERE, 'README.md'), encoding='utf-8').read()
+    rows = re.findall(r'^\| `([A-Za-z0-9_./-]+\.py)` \|', readme, re.M)
+    scripts = sorted(f for f in os.listdir(HERE) if f.endswith('.py'))
+    eq(len(rows), len(set(rows)), 'each tool listed once')
+    missing = [s for s in scripts if s not in rows]
+    extra = sorted(set(rows) - set(scripts))
+    eq((missing, extra), ([], []), 'scripts without a row in tools/README.md, rows without a script')
 
 
 def t_traps_map():
@@ -1030,6 +1047,8 @@ def t_hooks():
         eq(code, 0, 'session hook exit status')
         if 'source: compact' not in out or 'tools/manual.py' not in out or len(out) >= 10000:
             raise AssertionError('session context must name its source and manual.py, under the cap')
+        if 'Tools in tools/' not in out or ' status' not in out:
+            raise AssertionError("session context must list the scripts in the project's tools/")
 
     out = run_py([os.path.join(hooks, 'subagent_context.py')], '{}')[1]
     spec = json.loads(out)['hookSpecificOutput']
@@ -1082,6 +1101,7 @@ CHECKS = [
     ('stackscan: slot-based frames, discards, fake return, LD SP reset vs switch, ISR', t_stackscan),
     ('blitforensics: two-background differential on known sprites + guards', t_blitforensics),
     ('manual: entries, traps, index, grep across both documents', t_manual_ids),
+    ('tools: every script in tools/ has a row in tools/README.md', t_tools_registry),
     ('traps: every trap has exactly one row in the trap-to-check map', t_traps_map),
     ('hooks: read and heredoc guards, stop check, session and sub-agent context', t_hooks),
 ]

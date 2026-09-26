@@ -20,8 +20,9 @@ tokens, and a hook refuses whole-file reads:
     python tools/manual.py --index           manual IDs, line numbers, titles
     python tools/manual.py C9 6.11 Q13       manual entries
     python tools/manual.py T146              a trap, with its row in the map
-    python tools/manual.py --grep straddle   entries and traps that mention a term
+    python tools/manual.py --grep straddle   entries, traps and tools that mention a term
     python tools/manual.py --map gate        the traps a mechanism must prevent
+    python tools/manual.py --tools stack     the tool for a job: purpose and usage
 
 Read manual sections 0.7, 0.8 and 12 once at the start of a port, and
 section 4 (the failure catalogue) once before phase 5.  After that, read an
@@ -53,7 +54,10 @@ a result surprises you.
   (contended timing on by default), config-driven disassembler, code
   walker, byte grep, keyboard probe, read-watch, clock histogram, the
   diagnostic battery, screen forensics, `build.py`.  `tools/README.md` maps
-  each to its phase.  `python tools/selftest.py` is their gate.
+  each to its phase.  `python tools/selftest.py` is their gate.  The session
+  block lists every script by name; `python tools/manual.py --tools TERM`
+  finds the one for a job.  Read its `--help` before extending it or writing
+  a new one, and give every new script a row in `tools/README.md`.
 - `web/platform.js` — the platform runtime: display file + renderer,
   keyboard matrix + Kempston + gamepads, AY and beeper chips, the Web Audio
   bridge (worklet transport, scheduled fallback), the loop, settings.

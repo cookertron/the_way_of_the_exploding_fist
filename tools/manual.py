@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
 """
-manual.py -- read the kit's two big documents by ID, never end to end.
+manual.py -- read the kit's documents by ID, never end to end, and find the
+tool for a job.
 
 The manual (docs/PORTING-ZX-TO-JS.txt) and the traps (docs/TRAPS.md) are
-together well over 100,000 tokens, and a compaction throws both away; a
-session reads the entries it needs, by ID (manual 0.7, 12.8).
+together well over 100,000 tokens, and a compaction throws both away, along
+with tools/README.md; a session reads the entries it needs, by ID, and asks
+for the tool it needs by what it does (manual 0.7, 12.8).
 
 Usage:
   python tools/manual.py C9 6.11 Q13        manual entries by ID
   python tools/manual.py T146 T63           traps by number, each with its map row
   python tools/manual.py --index [PREFIX]   manual IDs, lines, titles (--index T: traps)
   python tools/manual.py --whole N          a top-level manual section, subsections too
-  python tools/manual.py --grep TERM        manual entries and traps that mention TERM
+  python tools/manual.py --grep TERM        manual entries, traps and tools that mention TERM
   python tools/manual.py --map [WHAT]       the trap-to-check map: totals, or the rows
                                             for one mechanism or state (gate, READ, ...)
+  python tools/manual.py --tools [TERM]     the tools in tools/README.md, or those whose
+                                            name, purpose, usage or phase mention TERM
 
 Manual IDs: catalogue entries (A1..G14, B2b), diagnostics (Q1..Q19), rungs
 (R0..R9), phases (P9 or "PHASE 9") and numbered sections (0.8, 6.11, 12).
 Trap IDs: T146 or #146.  Each document is found through $ZX_MANUAL, $ZX_TRAPS
 or $ZX_TRAPMAP if set, else in docs/ under the repository root (the parent of
 this script's directory), else in the working directory or any directory
-above it, directly or under docs/.
+above it, directly or under docs/.  The tools index is the tables in
+tools/README.md, beside this script.
 """
 import os
 import re
@@ -32,6 +37,7 @@ INDEX = re.compile(r'^([A-G][0-9]+b? |Q[0-9]+ |R[0-9] |PHASE |[0-9]+\.[0-9]* )')
 TOP = re.compile(r'^[0-9]+\. ')
 TRAP = re.compile(r'^(\d+)\. \*\*')
 MAPROW = re.compile(r'^\| (\d+) \| (.*) \| `([a-z]+)` \| ([A-Z]+) \|$')
+TOOLROW = re.compile(r'^\| `([A-Za-z0-9_./-]+\.py)` \| (.*?) \| (.*?) \| (.*?) \|$')
 STATES = ('KIT', 'BB', 'BUILD', 'READ')
 GREP_MAX = 40
 
@@ -187,6 +193,41 @@ def cmd_whole(n):
     return 0
 
 
+def load_tools():
+    """Rows of every tool table in tools/README.md: (name, purpose, usage,
+    phase, section).  The README is the single source; nothing is copied."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.md')
+    if not os.path.isfile(path):
+        sys.exit('manual.py: cannot find %s' % path)
+    rows, section = [], ''
+    for l in read_lines(path):
+        if l.startswith('## '):
+            section = l[3:].strip()
+        m = TOOLROW.match(l)
+        if m:
+            clean = [c.replace('`', '').strip() for c in m.groups()]
+            rows.append(tuple(clean) + (section,))
+    return rows
+
+
+def cmd_tools(term):
+    rows = load_tools()
+    needle = term.lower()
+    picked = [r for r in rows if not needle or needle in ' '.join(r[:4]).lower()]
+    if not picked:
+        print('no tool mentions %r; python tools/manual.py --tools lists them all' % term)
+        return 0
+    for name, purpose, usage, phase, section in picked:
+        tag = '' if section.startswith('Tools by phase') else '  (%s)' % section
+        if needle:
+            print('%s  [phase %s]%s\n    %s\n    %s' % (name, phase, tag, purpose, usage))
+        else:
+            print('%-17s %s%s' % (name, purpose[:58], tag))
+    print('\npython tools/NAME.py --help gives full usage.  Read it before extending a '
+          'tool or writing a new one (TRAPS #65, #170).')
+    return 0
+
+
 def cmd_grep(term):
     needle, hits = term.lower(), []
     path, lines, spans, order, end = load_manual()
@@ -201,8 +242,11 @@ def cmd_grep(term):
         c = sum(l.lower().count(needle) for l in tlines[i:j])
         if c:
             hits.append(('T%d' % n, c, trap_title(tlines, tspans[n])))
+    tools = [(name, ' '.join((name, purpose, usage, phase)).lower().count(needle), purpose)
+             for name, purpose, usage, phase, section in load_tools()]
+    hits = [t for t in tools if t[1]] + hits      # tools first: never cut off
     if not hits:
-        print('no manual entry or trap mentions %r' % term)
+        print('no manual entry, trap or tool mentions %r' % term)
         return 0
     for key, c, title in hits[:GREP_MAX]:
         print('%-5s %3dx  %s' % (key, c, title[:62]))
@@ -297,6 +341,8 @@ def main(argv):
         return cmd_grep(' '.join(argv[1:]))
     if argv[0] == '--map':
         return cmd_map(argv[1] if len(argv) > 1 else '')
+    if argv[0] == '--tools':
+        return cmd_tools(' '.join(argv[1:]))
     return cmd_ids(argv)
 
 

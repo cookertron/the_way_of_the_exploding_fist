@@ -8,9 +8,9 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 
 | State | Meaning | All 196 | #61 onward |
 |---|---|---|---|
-| KIT | the kit already prevents it | 23 | 2 |
+| KIT | the kit already prevents it | 24 | 3 |
 | BB | built in the Bubble Bobble repo and generic; move it into the kit | 20 | 18 |
-| BUILD | no mechanism yet; build it | 129 | 98 |
+| BUILD | no mechanism yet; build it | 128 | 97 |
 | READ | knowledge only; read by ID when relevant | 24 | 18 |
 
 | Mechanism | Traps | Still to build |
@@ -22,11 +22,11 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 | `harness`: Harness defaults and API in tools/harness.py | 10 | 8 |
 | `roster`: Save-state manifest and census rules (manual 12.6) | 8 | 8 |
 | `codemap`: adis, walk, grepbytes and the byte-usage map (phase 4, 12.5) | 8 | 8 |
-| `status`: Ledger and status script (manual 12.2-12.4) | 6 | 6 |
+| `status`: Ledger and status script (manual 12.2-12.4) | 5 | 5 |
 | `build`: Build-time checks in tools/build.py | 6 | 3 |
 | `platform`: Runtime in web/platform.js | 19 | 3 |
 | `rig`: Test runner behaviour in test/rig.js | 4 | 0 |
-| `hook`: Claude Code hooks (manual 12.8) | 2 | 0 |
+| `hook`: Claude Code hooks (manual 12.8) | 3 | 0 |
 | `manual`: General knowledge, kept as prose | 21 | 0 |
 | `game`: Bubble Bobble facts | 3 | 0 |
 
@@ -62,9 +62,9 @@ Traps: #28, #31, #67, #84, #150, #165, #183, #188
 
 Traps: #51, #52, #58, #68, #74, #80, #83, #121
 
-**`status`: Ledger and status script (manual 12.2-12.4)** (6 traps; BUILD 6). Facts carry their conditions and the command that settles them; counts are derived, never typed; every artifact has a reader; fixtures come only from their tool (stamps); the tools registry is checked before a tool is created.
+**`status`: Ledger and status script (manual 12.2-12.4)** (5 traps; BUILD 5). Facts carry their conditions and the command that settles them; counts are derived, never typed; every artifact has a reader; fixtures come only from their tool (stamps).
 
-Traps: #32, #48, #65, #97, #116, #170
+Traps: #32, #48, #65, #97, #116
 
 **`build`: Build-time checks in tools/build.py** (6 traps; BUILD 3, BB 3). Ship only assets the engine reads; a page-size budget; every shipped asset traced to exactly one tape source; substitute glyphs that differ from the ROM's.
 
@@ -78,9 +78,9 @@ Traps: #5, #6, #7, #8, #9, #10, #11, #12, #13, #14, #15, #16, #18, #19, #20, #25
 
 Traps: #17, #21, #22, #92
 
-**`hook`: Claude Code hooks (manual 12.8)** (2 traps; KIT 2). Code files are written with the Write/Edit tools, never through shell heredocs; the manual and the traps are read by ID.
+**`hook`: Claude Code hooks (manual 12.8)** (3 traps; KIT 3). Code files are written with the Write/Edit tools, never through shell heredocs; the manual and the traps are read by ID; every session starts with the names of the scripts in tools/, and selftest fails on a script without a row in tools/README.md.
 
-Traps: #149, #168
+Traps: #149, #168, #170
 
 **`manual`: General knowledge, kept as prose** (21 traps; READ 21). Belongs in the manual's catalogue, read by ID when relevant.
 
@@ -263,7 +263,7 @@ Traps: #178, #179, #184
 | 167 | The baseline must show the positive N/N signal. | `battery` | BB |
 | 168 | Parse generated source before writing it; no heredocs. | `hook` | KIT |
 | 169 | Enumerate categories in code and assert none is unnamed. | `gate` | BUILD |
-| 170 | Check the tools registry before creating a tool; extend, don't overwrite. | `status` | BUILD |
+| 170 | Every session lists the tools; selftest fails on an unregistered script. | `hook` | KIT |
 | 171 | A counter's name states its unit. | `manual` | READ |
 | 172 | A diff can't see a write of an unchanged value; poison first. | `measure` | BUILD |
 | 173 | A number in a check's label must be read by its predicate. | `lint` | BUILD |

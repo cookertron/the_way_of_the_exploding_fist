@@ -21,7 +21,7 @@ phase 1, not in phase 8.
 | tool | purpose | typical invocation | manual phase |
 |---|---|---|---|
 | `portconfig.py` | the manifest reader every tool uses; run it to print the merged config and which `port.json` was found | `python tools/portconfig.py` | all |
-| `manual.py` | the manual and `docs/TRAPS.md` by ID, never end to end: entries (`C9`, `6.11`, `P9`), traps with their map rows (`T146`), `--index`, `--grep TERM` across both, `--map` for the trap-to-check map | `python tools/manual.py C9 T146` | all |
+| `manual.py` | the manual and `docs/TRAPS.md` by ID, never end to end: entries (`C9`, `6.11`, `P9`), traps with their map rows (`T146`), `--index`, `--grep TERM` across the manual, the traps and these tables, `--map` for the trap-to-check map, and `--tools TERM` to find the tool for a job from these tables | `python tools/manual.py --tools stack` | all |
 | `selftest.py` | self-test with NO tape: synthetic TZX, ROM-only harness, tiny images; exit status non-zero on failure | `python tools/selftest.py [-v]` | 7 the simulator harness (run before anything) |
 | `tzx.py` | TZX parser: prints and STOPS on any unhandled block, verifies every ROM-format checksum, decodes headers, checks body length against header, dumps block bodies | `python tools/tzx.py tape/game.tzx --dump build/blocks` | 1 read the tape |
 | `basic.py` | BASIC detokeniser; reports each USR target from the 5-byte binary form the ROM actually acts on, not the printed digits | `python tools/basic.py build/blocks/game.b01.body.bin` | 1 read the tape |
@@ -60,6 +60,19 @@ game-shaped and get written against the engine, as the manual says.  The
 concrete example addresses (entry, arm point $A420, ...) are the case
 study's, from the manual; `<loop-top>` is one you read off the profile (the manual
 describes it but gives it no fixed number, and it is game-specific).
+
+## This port's tools
+
+Oracles, extractors and probes written for this game go here, one row each,
+in the same four columns.  Every script in `tools/` has a row in this table or
+the one above -- `python tools/selftest.py` fails otherwise -- because these
+tables are what `python tools/manual.py --tools TERM` searches, and what a
+session reaches for after a compaction has taken this file out of its context.
+Read a tool's `--help` before extending it or writing a new one (TRAPS #65,
+#170).
+
+| tool | purpose | typical invocation | manual phase |
+|---|---|---|---|
 
 ## The manifest keys the tools read
 
@@ -120,6 +133,7 @@ block table is wrong.  `tools/symbols.json` and `tools/regions.json` ship empty
     python tools/battery.py --state level --loop 0x???? --script "60:D,60:Z"
     python tools/filmstrip.py strip.png --state level --keys D
 
-Requirements: Python 3, SkoolKit 9 (its `resources/48.rom` is read locally and
-never copied), z80dis, Pillow.  Everything the tools write under `build/` --
-block bodies, images, states -- is tape-derived: keep it out of the repository.
+Requirements: Python 3, SkoolKit 10.0 or later (10.0 and 10.1 tested; its
+`resources/48.rom` is read locally and never copied), z80dis, Pillow.
+Everything the tools write under `build/` -- block bodies, images, states --
+is tape-derived: keep it out of the repository.

@@ -201,8 +201,9 @@ and sed -n 'FIRST,LASTp' docs/PORTING-ZX-TO-JS.txt prints one entry,
 FIRST being its line and LAST the line before the next index entry.
 tools/manual.py, which ships with the kit (12.8), does both by ID --
 "manual.py C9 6.11" -- reads docs/TRAPS.md the same way ("manual.py
-T146"), and "manual.py --grep TERM" lists the entries in both files that
-mention a term, without printing them.
+T146"), finds the kit tool for a job ("manual.py --tools stack"), and
+"manual.py --grep TERM" lists the entries, traps and tools that mention a
+term, without printing them.
 
 AND DO NOT RELY ON THIS PARAGRAPH BEING REMEMBERED. In a long session this
 file's text is the first thing a compaction discards, and this
@@ -4406,9 +4407,11 @@ That gives a rule three possible homes, in order of strength:
      the few rules that must never be broken, in well under two hundred
      lines. And a SessionStart hook that prints the status brief (12.4),
      the uncommitted changes -- which ARE the unit in progress, derived
-     rather than remembered -- the last few commits, and the manual IDs
-     named by the ledger entries being changed (12.2), so the agent
-     re-reads exactly those entries and nothing else.
+     rather than remembered -- the last few commits, the names of the
+     scripts in tools/, and the manual IDs named by the ledger entries
+     being changed (12.2), so the agent re-reads exactly those entries
+     and nothing else. The tool names are the cue; each tool's purpose is
+     a query away (manual.py --tools), and its --help is its manual.
   3. LOOKED UP. Everything else, this manual included. It does not have
      to survive, only to be findable, and that costs one line of the
      card.

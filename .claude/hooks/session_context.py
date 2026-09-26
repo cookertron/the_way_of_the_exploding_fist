@@ -78,6 +78,21 @@ def main():
         'Whole-file reads of either document are refused by a hook.',
     ]
 
+    # The tool names are the cue that survives compaction; the details are a
+    # query away.  Read from the directory, so a port's own scripts appear too.
+    try:
+        names = sorted(f[:-3] for f in os.listdir(os.path.join(ROOT, 'tools'))
+                       if f.endswith('.py'))
+    except OSError:
+        names = []
+    if names:
+        listed = ' '.join(names)
+        if len(listed) > 1500:
+            listed = listed[:1500].rsplit(' ', 1)[0] + ' ...'
+        out.append('Tools in tools/ -- python tools/manual.py --tools TERM gives '
+                   "each one's purpose and usage, and a tool's --help the rest; read "
+                   'it before extending a tool or writing a new one: ' + listed)
+
     status = os.path.join(ROOT, 'tools', 'status.py')
     if os.path.isfile(status):
         code, text = run([sys.executable, status, '--brief'], timeout=30)
