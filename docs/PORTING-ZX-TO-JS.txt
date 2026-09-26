@@ -5,6 +5,8 @@
 
                  Case study: Chuckie Egg (A&F Software, 1984)
                     Written for an AI model doing this work.
+          Revision 2: lessons from Bubble Bobble, marked [BB], and a
+          method for keeping track across many sessions (section 12).
 
 
 ------------------------------------------------------------------------------
@@ -32,6 +34,18 @@ case study was an unusually easy specimen in almost every dimension:
 unprotected tape, one load, no compression, no paging, no scrolling, no
 self-modifying code, a hand-written 48K binary with a third-party
 disassembly already available. Assume none of that.
+
+THIS REVISION adds two things. First, lessons from Bubble Bobble, the third
+port after Chuckie Egg and Gauntlet, marked [BB] wherever they appear. It
+was hard in exactly the ways the case study was easy: operands rewritten at
+runtime as live state, one body entered two ways, a cutscene that takes
+seconds to run, and measurements taken across a roster of save states from
+more than one build and machine. Unmarked numbers are still the case
+study's. Second, section 12, on a problem that grows with the project rather
+than with the game: an agent working across many sessions, context
+compactions and sub-agents loses track of what it has already established,
+and pays again -- in time and in tokens -- to establish it a second time.
+Read 0.8 before you resume any session.
 
 0.2 WHAT YOU ARE PRODUCING
 
@@ -165,6 +179,96 @@ Static asset extraction (phase 5) can always be replaced by reading the
 data out of live RAM in the harness. The harness cannot be replaced by
 anything.
 
+And from the first hour, keep the record of the work in a form a script
+can read (section 12). On anything longer than a sitting, that is the
+difference between progress that compounds and progress that has to be
+rediscovered every session.
+
+READ THIS FILE BY ID, NOT END TO END. It runs to well over 50,000 tokens,
+and an agent that rereads it every session spends much of its budget on
+text it already knows. Read the whole of section 4 ONCE per project,
+before phase 5, as above. After that, read 0.8 at the start of every
+session; a phase's section when you begin that phase; and a catalogue
+entry (A1..G14), diagnostic (Q1..Q19) or rung (R0..R9) when it is cited
+or when a result surprises you. Each of those begins a line with its ID,
+as does every phase and numbered section, so one command prints the
+whole index with line numbers:
+
+    grep -nE '^([A-G][0-9]+b? |Q[0-9]+ |R[0-9] |PHASE |[0-9]+\.[0-9]* )' \
+         docs/PORTING-ZX-TO-JS.txt
+
+and sed -n 'FIRST,LASTp' docs/PORTING-ZX-TO-JS.txt prints one entry,
+FIRST being its line and LAST the line before the next index entry.
+tools/manual.py, which ships with the kit (12.8), does both by ID --
+"manual.py C9 6.11" -- reads docs/TRAPS.md the same way ("manual.py
+T146"), and "manual.py --grep TERM" lists the entries in both files that
+mention a term, without printing them.
+
+AND DO NOT RELY ON THIS PARAGRAPH BEING REMEMBERED. In a long session this
+file's text is the first thing a compaction discards, and this
+instruction goes with it. So the rule also lives where compaction cannot
+reach it: in the project's CLAUDE.md, and in a hook that refuses
+whole-file reads of this file (12.8).
+
+THE MAP, for choosing what to read:
+
+    0   what this is, scope, legal, prerequisites; 0.8 the session routine
+    1   the prime directive
+    2   the pipeline: phases 1-16, each with an exit gate
+    3   platform facts, and what to measure instead of assuming
+    4   the failure catalogue: A data layout, B time, C control flow,
+        D rule shape, E substitution, F "improvement", G method;
+        4.99 the one-page short list
+    5   the evidence ladder R0-R9, the done rule, done as a computation
+    6   the harness, the differential test, one measurement entry point
+    7   structuring the JavaScript engine
+    8   the diagnostic battery Q1-Q19 and the decision checklist 8.20
+    9   one rule carried end to end
+    10  the checklist
+    11  the six habits
+    12  keeping track across many sessions: the ledger, stamps, the status
+        script, the byte-usage map, delegation, what survives a
+        compaction, token economy
+
+0.8 IF YOU ARE RESUMING: THE SESSION PROTOCOL
+
+A port is dozens of sessions long, and every session, every compaction of
+the context and every sub-agent starts cold. Whatever one of them
+established is lost to the next unless it was written where a script can
+find it. Section 12 is the machinery; this is the routine.
+
+  AT THE START, READ THE STATUS SCRIPT'S OUTPUT, NOT YOUR NOTES (12.4):
+  what is classified, which rung each routine holds, what has gone stale,
+  what can be taken next. A session-start hook prints it unasked, after
+  every compaction too (12.8). If the project has no status script yet,
+  building it is the next task (12.10). Never reread listings to find out
+  where you are.
+
+  WORK IN UNITS. A unit is one routine -- or one table, one effect --
+  taken up one rung of the ladder (5.1). Begin it by printing everything
+  the ledger holds for that address. End it by producing the artifact that
+  proves the new rung -- a fixture, a gate result, a frozen test -- through
+  a tool that stamps it (12.3). A unit that ends without an artifact did
+  not happen, however much was learned during it.
+
+  WRITE A JUDGMENT DOWN THE MOMENT IT IS SETTLED: a fact about the bytes,
+  a refuted hypothesis, an open question, each in the routine's ledger
+  entry with the command that settles it (12.2). Whatever is left only in
+  context is gone at the next compaction.
+
+  WHEN A UNIT STALLS, RECORD AND MOVE ON. When a measurement surprises you
+  twice, the next move is to check the instrument (G1, G11), not to run it
+  a third time. If that does not settle it, write the open question into
+  the ledger with what was tried, and take the next item from the
+  frontier. Coming back cold to a written question is cheaper than a
+  fourth attempt in a context full of the first three.
+
+  AT THE END OF A UNIT, commit -- one commit per unit, with the address
+  and the rung in the message -- and tell the operator that a /clear is
+  now safe: a context cleared at a unit boundary loses nothing, while an
+  automatic compaction lands wherever the window fills (12.8). The status
+  script's consistency check runs by itself at the end of every response.
+
 
 ------------------------------------------------------------------------------
 1. THE PRIME DIRECTIVE
@@ -295,8 +399,9 @@ TOOLING: write your own parser against the TZX spec (0.6). You need to
     because 1982-84 games routinely store level data in DIM'd string
     arrays. Detokenise and look before concluding.
   - WRITE A BASIC DETOKENISER. It is 100 lines (tokens are byte values
-    0xA5-0xFF; numbers carry a 5-byte binary form after the digits, which
-    you skip). For a substantially-BASIC game it IS the disassembly.
+    0xA5-0xFF; every number's digits are followed by six hidden bytes --
+    the marker 0x0E, then the 5-byte binary form -- which you skip). For a
+    substantially-BASIC game it IS the disassembly.
   - Headerless blocks (flag 0xFF) carry no destination address. It is not
     on the tape. It is in the loader. See phase 2.
 
@@ -447,12 +552,35 @@ that:
     as you learn. In the case study this accumulated entries like
     farmer_frame_ptr, farmer_jump_phase, farmer_air_x, level_buffer.
 
+[BB] Then teach it to mark the three things the eye reliably misses, each
+of which cost a wrong reading in the Bubble Bobble port:
+
+  - every address that is BOTH a CALL or JP target AND reachable by
+    falling through from the instruction above it -- one body, two
+    entries (C8);
+  - a bracket from every backward jump to its target, so a loop's extent
+    is DRAWN rather than inferred from the layout (C9);
+  - every flag result that is overwritten before any instruction reads it
+    (C10).
+
+And teach it two economies, because on a long project this tool's output
+is most of what you read:
+
+  - FOLD WHAT IS KNOWN. A routine the ledger already covers (12.2) prints
+    as one line -- address, name, rung, facts -- unless you ask for it in
+    full. Rereading a region for context should cost only for the parts
+    nobody understands yet.
+  - SHOW THE LEDGER INLINE: each recorded fact and each REFUTED claim at
+    its address, so a wrong idea disproved last week cannot be proposed
+    again from a cold start.
+
 The difference between reading LD HL,$61A8 and LD HL,level_buffer is the
 difference between transcribing and understanding. Every routine you will
 have to reason about in phase 10 gets read through this tool.
 
-GATE: you can print any address range with labels resolved, and adding a
-new name takes one line.
+GATE: you can print any address range with labels resolved; adding a new
+name takes one line; known routines fold, and refuted claims show at
+their addresses.
 
 
 PHASE 5 -- STATIC EXTRACTION OF DATA
@@ -472,12 +600,13 @@ plan for that:
        ranges. That is all you can honestly do yet.
   5.0b AFTER PHASE 10: real extraction. Dimensions come out of each draw
        routine's inner loop; code/data separation comes out of execution
-       coverage (section 8, Q13) plus recursive descent from the entry
-       point; and TILE SEMANTICS -- which id means floor -- come out of
-       the PREDICATES, not the artwork. The closure test proves the format
-       closes; it never tells you what a tile means. In the case study
-       "floor" is defined by the support test's CP 5 at $B34C and the
-       landing routine's ranges at $A356, both phase 10 work.
+       coverage (section 8, Q13; better, the byte-usage map of 12.5,
+       which survives self-modifying code) plus recursive descent from the
+       entry point; and TILE SEMANTICS -- which id means floor -- come out
+       of the PREDICATES, not the artwork. The closure test proves the
+       format closes; it never tells you what a tile means. In the case
+       study "floor" is defined by the support test's CP 5 at $B34C and
+       the landing routine's ranges at $A356, both phase 10 work.
 
 Three decisions here silently corrupt everything downstream if you get
 them wrong. None of them announces itself.
@@ -811,6 +940,12 @@ case study; each is expanded in section 4, family C:
       no-op -- it is a DURATION, and the player sees it as a hesitation at
       the lip of a platform.
 
+[BB] added three more. Each is a misreading rather than a mistranslation,
+so each bites before you have written a line: one body with two entries,
+run twice from one call site (C8); a loop whose extent is set by a
+displacement, not by the layout (C9); and a flag result that nothing
+reads (C10). Phase 4's disassembler marks all three.
+
 WHEN THE CODE WILL NOT ANSWER, ASK THE SIMULATOR. Construct the scenario by
 poking state and observe: put the player in free fall by writing his
 position, airborne flag, velocity and phase, then record T-states per pixel
@@ -850,7 +985,10 @@ OUTPUT: a parameter model for every effect, verified by measurement, AND a
        boundaries land exactly on the candidate. In the case study there
        were exactly two speaker writes in 18,900 bytes and both were in one
        routine ($9CA4); a third byte-pattern hit was a relative jump's
-       displacement byte followed by the next opcode.
+       displacement byte followed by the next opcode. This works for
+       OPCODE hits. For a hit on an address -- operand bytes -- the same
+       back-off can settle on the wrong alignment in either direction
+       (A8); there, trust execution roles (12.5) over any backward decode.
   11.3 DECIDE THE ARCHITECTURE BY MEASUREMENT, NOT BY ASSUMPTION. Beeper
        pitch is set by the interval between speaker writes, so whoever
        produces those writes owns the CPU for that interval -- but that
@@ -934,15 +1072,16 @@ the beeper method above is the wrong tool because the CPU does not time
 the waveform at all. Procedure:
 
   - Log (T-state, register, value) for every write to $FFFD (register
-    select) and $BFFD (data) over driven play. Bucket by 50 Hz frame. You
-    now have a standard per-frame register dump -- the same thing a .psg
-    or .ay file holds.
+    select) and $BFFD (data) -- or to the interface's own pair, 3.5 --
+    over driven play. Bucket by 50 Hz frame. You now have a standard
+    per-frame register dump -- the same thing a .psg or .ay file holds.
   - Reproduce with an AY emulator in the port, or convert the dump.
-    Constants you need: AY clock 1,773,400 Hz on 128K/+2/+3 (CPU/2); tone
-    frequency = clock / (16 * TP) where TP is a 12-bit period from R0/R1,
-    R2/R3, R4/R5; noise = clock / (16 * NP); envelope period =
-    clock / (256 * EP); R7 is a mixer whose enable bits are INVERTED
-    (0 = on); volume is 0-15 with bit 4 selecting the envelope.
+    Constants you need: AY clock 1,773,400 Hz on 128K/+2/+3 (CPU/2; other
+    interfaces clock theirs differently); tone frequency =
+    clock / (16 * TP) where TP is a 12-bit period from R0/R1, R2/R3,
+    R4/R5; noise = clock / (16 * NP); envelope frequency =
+    clock / (256 * EP), one full ramp; R7 is a mixer whose enable bits are
+    INVERTED (0 = on); volume is 0-15 with bit 4 selecting the envelope.
   - VERIFY AS A REGISTER-LEVEL DIFFERENTIAL: does your player write the
     same 14 registers with the same values on the same frames as the
     original? That is strictly stronger than a frequency round-trip.
@@ -997,8 +1136,9 @@ The strongest check available to you. Full recipe in section 6.9.
 
 GATE: N/N transitions match, WITH A PRINTED BRANCH HISTOGRAM showing every
 branch exercised at least once, AND with the model that was tested being
-the code you ship (6.9's cross-language step). In the case study 900/900
-matched, with the census reading:
+the code you ship (6.9's cross-language step), AND with the gate shown
+able to fail (6.9 step 9). In the case study 900/900 matched, with the
+census reading:
 
     empty slot                 540
     state 1  walking           127
@@ -1056,7 +1196,9 @@ Four parts, each of which earns its place:
 
   - THE ROUTINE MAP: original address -> what it does -> which function
     implements it. Thirty rows is plenty. This is what makes review
-    possible.
+    possible. GENERATE it from the engine's address tags and the ledger
+    (7.1, 12.2) rather than keeping it by hand; a hand-kept map drifts
+    away from the code it describes.
   - THE FAITHFUL/ADDED BOUNDARY, stated and ENFORCED BY A TEST.
   - THE LOG OF WHAT THE ORIGINAL PROVED WRONG: a table of Assumption /
     Reality / Caught by. This is the single highest-value artifact for
@@ -1206,8 +1348,9 @@ MEASURE:
 INVARIANT: eight half-rows, read from port $FE where the HIGH address byte
 selects the half-row (one bit clear per half-row: $FE, $FD, $FB, $F7, $EF,
 $DF, $BF, $7F). A CLEAR BIT MEANS PRESSED. Always AND $1F first: bits 5-7
-are not keyboard (bit 6 is the EAR input). Two half-rows read
-right-to-left ("0 9 8 7 6" and "P O I U Y").
+are not keyboard (bit 6 is the EAR input). The four right-hand half-rows
+read right-to-left, bit 0 being the outermost key: "0 9 8 7 6",
+"P O I U Y", "ENTER L K J H" and "SPACE SYM M N B".
 
 The read can be IN A,($FE) (DB FE), or IN A,(C) / IN r,(C) (ED 78, ED 40,
 ED 48, ...) with BC = $xxFE. Grep all forms, and confirm with the dynamic
@@ -1250,12 +1393,15 @@ WHAT IS *NOT* AN INVARIANT: that sound therefore blocks the game. That is
 a design choice, and there are four common designs -- see 11.3. Measure
 which you have before you build an audio architecture around it.
 
-The AY-3-8912 sits at ports $FFFD (register select) and $BFFD (data). A
-128K always has one; a 48K MAY have one via a Fuller Box, Melodik or Timex
-interface, and several 48K-era games probe for it. Many 128K games ship
-BOTH a beeper and an AY path chosen at start-up. So: THE PRESENCE OF AY
-WRITES IS A PROPERTY OF THE CODE, found by logging every OUT port (Q2),
-not of the target machine.
+On the 128K the AY-3-8912 sits at ports $FFFD (register select) and $BFFD
+(data), and a 128K always has one. A 48K MAY have one via an interface,
+and NOT ALWAYS AT THOSE PORTS: the Melodik uses the same pair, but the
+Fuller Box uses $3F/$5F, and the Timex TS2068 -- a Spectrum-derived
+machine with the chip built in -- uses $F5/$F6. Several 48K-era games
+probe for one or another, and many 128K games ship BOTH a beeper and an
+AY path chosen at start-up. So: THE PRESENCE OF AY WRITES IS A PROPERTY
+OF THE CODE, found by logging every OUT port (Q2), not of the target
+machine.
 
 MEASURE:
   - Count the confirmed speaker-write sites (11.1-11.2). One routine is a
@@ -1395,6 +1541,12 @@ instruction. The other twelve are the letter "v" inside "objective", "game
 over player 1 level" and "you have beaten", two font glyph bitmaps, and a
 word inside an address table. A 13-to-1 false positive rate is normal.
 
+AND THE CONFIRMATION HAS A BLIND SPOT [BB]. For a search on an ADDRESS --
+two operand bytes -- a backward decode can lock onto the wrong alignment
+in either direction, because an operand byte is often a complete
+instruction on its own. See A8. Once a byte-usage map exists (12.5),
+confirm against what the running game actually fetched.
+
 3.10 Z80 IDIOMS THAT ARE SEMANTICS, NOT STYLE
 ..............................................
 
@@ -1411,7 +1563,13 @@ where most of this is false. Full treatment in section 4, family C.
   - LD (nn),HL writes TWO bytes; the second lands on whatever variable is
     next in the memory map, and adjacency is often deliberate.
   - Routines that FALL THROUGH into each other are common, and a
-    disassembler's routine boundaries will hide it.
+    disassembler's routine boundaries will hide it -- including the
+    pattern where a routine CALLs a body and then falls into the same
+    body, so one call site runs it twice (C8).
+  - AN OPERAND CAN BE A VARIABLE. State kept in an instruction's own
+    immediate operand -- LD A,n with n rewritten elsewhere -- is the
+    fastest read the machine has, so games do it. That byte is code AND
+    data; Q3 and 12.5 are how you find every one.
   - A whole entity's state is usually ONE CONTIGUOUS BLOCK addressed via IX
     with small offsets. Finding the LD IX,nnnn at the top of a movement
     routine hands you the entire variable map at once and turns a scavenger
@@ -1525,10 +1683,11 @@ In the case study, thirteen assumptions were knocked down by the original.
 SIX OF THE THIRTEEN were reported by a human playing the port, not found by
 an engineer reading code. Budget for that.
 
-(Entries are cited elsewhere as A1..A7, B1..B7, C1..C7, D1..D10, E1..E3,
-F1..F3, G1..G10. The diagnostic battery in section 8 uses Q numbers, so
+(Entries are cited elsewhere as A1..A8, B1..B7, C1..C10, D1..D10, E1..E3,
+F1..F3, G1..G14. The diagnostic battery in section 8 uses Q numbers, so
 there is no collision: "D5" is always a failure mode, "Q5" always a
-diagnostic.)
+diagnostic. Entries marked [BB] come from the Bubble Bobble port, and
+their addresses and numbers are that game's, not the case study's.)
 
 ==============================================================================
 FAMILY A -- DATA LAYOUT: SILENT CORRUPTION, NOT CRASHES
@@ -1648,6 +1807,29 @@ RULE: byte-pattern hits are CANDIDATES. Confirm each. Once confirmed, a
   a dynamic port trace where one exists (11.1), because it cannot miss the
   opcode forms your grep did not think of.
 
+A8  THE CONFIRMATION THAT CONFIRMS THE WRONG ALIGNMENT  [BB]
+------------------------------------------------------------
+ASSUMPTION: A7's cure -- decode forward from a few bytes back and keep the
+  window whose boundaries land on the hit (11.2) -- settles every
+  byte-pattern hit.
+WHY IT LOOKS RIGHT: it is exactly how A7's false positives were caught,
+  and it did good work in [BB] too. Asked whether a written-to ADDRESS is
+  itself an instruction boundary, it showed $87B2 to be an opcode position
+  holding a deliberate $00 -- a NOP the game patches as an item-collection
+  switch -- and $9AB3 to be plain data, character 10 of a banner string.
+THE TRUTH: asked whether a hit on REFERENCE bytes is real, it fails in
+  both directions. The pair D5 FE is a little-endian reference to $FED5,
+  and D5 is also a complete instruction, PUSH DE, so the forward decode
+  can resynchronise on it: genuine references to $FED5 came back
+  "unconfirmed", and a spurious alignment elsewhere came back
+  "confirmed".
+DETECTED BY: references known to be real reading "unconfirmed".
+RULE: a backward-decode verdict is a HINT, never an answer, and a tool
+  that prints one should label it as a hint. Confirm against execution
+  roles (12.5) -- whether the bytes at the hit were ever fetched as an
+  operand, fetched as an opcode, or read as data -- and where the code
+  never ran, fall back to recursive descent from a known entry point.
+
 ==============================================================================
 FAMILY B -- TIME: THE MOST EXPENSIVE FAMILY
 ==============================================================================
@@ -1682,6 +1864,13 @@ THE TRUTH: cost depends on the branch taken. Grounded 406 T-states,
   airborne 560 -- 1.38x -- because the airborne path runs the whole
   $A21C/$A2B5 chain every pass. THE GAME SLOWS DOWN WHILE THE PLAYER IS IN
   THE AIR. The mean is fine for walking speed and lethal for falls.
+  AND CHECK THE ARITHMETIC OF YOUR OWN FIGURES, because these do not close:
+  a mean of 399 cannot come from passes that all cost 406 or 560. Some
+  passes in that live level cost LESS than 406 -- a path, or a spread
+  below the grounded mode, that the two-constant model in 7.2 does not
+  carry. The case study never ran it down, so it stays OPEN. A mean that
+  falls outside the range of your modes means your path table is
+  incomplete.
 DETECTED BY: falls being about 1.4x too fast, and CHARACTERISTICALLY so --
   the fall delay shrinks toward a floor, so the error reads as "slow, then
   suddenly very fast". No gravity constant fixes it; the error is in the
@@ -1900,6 +2089,50 @@ RULE: treat third-party labels as HYPOTHESES WITH A USEFUL PRIOR. Confirm
   by call sites and by watching the variables change in a live run. Prepare
   corrections and send them upstream.
 
+C8  ONE CALL SITE, TWO EXECUTIONS  [BB]
+---------------------------------------
+ASSUMPTION: a CALL in the listing is one execution of its target.
+WHY IT LOOKS RIGHT: every other CALL you have read works that way, and a
+  routine's boundaries in a disassembly look like its extent.
+THE TRUTH: two entries, one body. $9AFC CALLs $9B07, loads IY with $5B0A,
+  and then drops into $9B07 itself, so the body runs twice -- once as a
+  subroutine and once by falling in. $994F does the same to $995A, which
+  is why one entry paints TWO attribute rows.
+RULE: find every address that is both a call target and a fall-through
+  destination (phase 4 marks them), and count executions by RUNNING the
+  code -- a PC histogram over the caller -- never by counting call sites.
+  In the ledger, give such a body an entries list, not one address (12.2).
+
+C9  THE LOOP IS WHERE THE DISPLACEMENT SAYS  [BB]
+-------------------------------------------------
+ASSUMPTION: a backward JR closes the loop you can see on the page.
+WHY IT LOOKS RIGHT: the loop body sits above the jump, and so do the two
+  CALLs that precede it; read top to bottom, they all look inside.
+THE TRUTH: $9561 BIT 7,(IY+$2A) / DEC (IX+$63) / JR nz. The JR at $9568
+  has displacement $F7, which lands on $9561 -- PAST the two CALLs above
+  it. Read the other way, with the CALLs inside the loop, the routine runs
+  for minutes; as written it takes 4.9 seconds. A sub-agent reading the
+  range made exactly that misreading (G13).
+DETECTED BY: resolving the displacement: $9568 + 2 - 9 = $9561.
+RULE: resolve every backward displacement to its absolute target and draw
+  the loop's bracket (phase 4). Loop extent is arithmetic, not layout.
+
+C10 READ THE FLAGS, NOT THE MNEMONICS  [BB]
+-------------------------------------------
+ASSUMPTION: an instruction that sets a flag is there to set that flag.
+WHY IT LOOKS RIGHT: a BIT followed a few lines later by JR nz reads as
+  "test the bit, branch on it".
+THE TRUTH: the Z80's flags are last-writer-wins. In C9's loop the BIT's Z
+  is overwritten by the DEC before the JR reads it, so the BIT decides
+  nothing: it is a timed memory read that changes no state. The same
+  discipline cuts the other way. At $A091 three RRAs rotate the carry-in
+  into bit 5, and the AND 3 that follows masks it off, so the routine is
+  CARRY-INDEPENDENT -- which was worth proving rather than assuming.
+RULE: for every flag-setting instruction, find the reader of each flag it
+  sets before giving it a meaning (phase 4 marks the dead ones). Where an
+  input flag might matter, make it a swept input of the measurement
+  (6.11), so independence is shown by a fixture rather than argued.
+
 ==============================================================================
 FAMILY D -- RULE SHAPE: THE PREDICATE IS SUBTLY DIFFERENT
 ==============================================================================
@@ -1914,7 +2147,7 @@ ASSUMPTION: "walk past the end of a platform and you fall" -- so check for
   ground under the feet each step, and if there is none, start falling.
 WHY IT LOOKS RIGHT: it is what any designer would specify, it is what the
   game appears to do, and it produces a playable game.
-THE TRUTH: the real routine is $B34C, twenty-one instructions, and three of
+THE TRUTH: the real routine is $B34C, twenty-seven instructions, and three of
   its properties a reimplementation will never produce -- a gate that skips
   the check entirely on cell-aligned positions (giving one pixel of
   overhang per edge), a support test that is ">= 5" so that a decorative
@@ -2317,6 +2550,75 @@ RULE: enumerate simulation state BY MEASUREMENT, not memory: fingerprint
   exactly, run 90 again, state == later exactly. A DETERMINISM PROPERTY IS
   ALWAYS STRONGER THAN AN EQUALITY PROPERTY.
 
+G11 SIX WAYS A MEASUREMENT OF A ROUTINE LIES  [BB]
+--------------------------------------------------
+Six real instances, all from oracles that armed one routine in the
+harness and counted what it did. Each looked like a result.
+  (a) THE PROBE MEASURED ITSELF. A snapshot taken BEFORE arming counted the
+      probe's own sentinel pushes as the routine's writes: "128 writes",
+      when the routine made 112. Snapshot after arming, always.
+  (b) THE WORLD WAS MEASURED, NOT THE ROUTINE. Both round-start call sites
+      measured ZERO writes, because they wrote values that were already
+      there, and a snapshot diff cannot see a write of an unchanged value.
+      Poison the target first, with a value the routine cannot produce.
+  (c) THE HALF-LINE EXCLUSION. An exclusion written as "if (ad < floor)"
+      silently dropped the whole display file -- and with it the one byte
+      the branch under test existed to write. Exclude NAMED windows from
+      one shared table, never by a one-sided comparison.
+  (d) THE SWEEP THAT NEVER STRADDLED. SUB 3 / CP C / RET c refuses nothing
+      at index 0; it bites only at index 6. A sweep that never drives a
+      comparison to both outcomes "proves" the refusal does not exist.
+  (e) RUNNING WHAT YOU ONLY NEEDED TO SEE. The accepted path was a
+      4.9-second cutscene. To learn that $94C8 is reached, observe $94C8
+      being reached and stop; do not run the cutscene 512 times.
+  (f) THE SECOND WRITER THAT WASN'T. 283 changed bytes against a loop of
+      320 writes looked like a second writer somewhere. Splitting the
+      writes by PC put both writers inside the loop and refuted the guess
+      in one run.
+RULE: do not rely on remembering any of the six. Build all of them into
+  the ONE function every oracle calls (6.11), so that the careless
+  measurement is the one you cannot write.
+
+G12 THE FIX THAT BELONGED IN THE WORLD  [BB]
+--------------------------------------------
+Twice the port and the machine disagreed for reasons that were not
+transliteration at all. Item ageing is gated on ($86CD) AND ($86CF), so the
+same records survived as $24 on one saved state and aged to $25 on
+another. And $FDE4 bit 0 -- the player-number bit -- was set on EVERY
+measured state and zero after the port's reset(), which is why the banner
+named player one twice; that fix belonged in the world the port starts
+from, not in the gate. A third hazard sits in the roster itself: one test
+($8DC4 == $C9) separates 48K states from pre-patch ones, and two entries
+were hung 128K captures that would silently poison any claim "measured on
+all states".
+RULE: before changing code to match, diff the two WORLDS. A disagreement
+  that splits along a state variable is a world difference. Keep the
+  roster as a manifest whose tags are computed from the snapshots (12.6),
+  and let "all states" mean "all usable states, listed in the fixture".
+
+G13 THE SUB-AGENT'S ASIDE  [BB]
+-------------------------------
+A sub-agent reading a range corrected the lead's own listing -- $9521 to
+$9524 is FOUR ADD A,A, not three -- and was right; the disassembler was
+re-run before the correction was believed. The same agent remarked in
+passing that the two CALLs above $9561 sat inside its loop, and was wrong
+(C9); the displacement settled it. Being right on one point said nothing
+about the next.
+RULE: every finding is re-derived against the tools, whoever produced
+  it -- and cheaply, by having delegated work come back as typed claims a
+  script can check (12.7) rather than as prose the lead must re-read the
+  whole range to verify.
+
+G14 THE GATE THAT HAS NEVER BEEN RED  [BB]
+------------------------------------------
+A new gate block that goes green on its first run has not yet shown that
+it CAN fail. Everything-green on a first run is a warning, not a result.
+RULE: break the engine on purpose, watch a NAMED row go red, restore --
+  for every new gate block, before believing it (6.9 step 9). Then give
+  each mutation that survived one of exactly three labels -- a real hole,
+  a provable equivalent (withdrawn with its reason written down), or a
+  mutation that mutated nothing -- and never let one kind pass as another.
+
 ==============================================================================
 4.99 THE SHORT LIST -- WHAT THE ORIGINAL PROVED WRONG, IN ONE PAGE
 ==============================================================================
@@ -2495,7 +2797,33 @@ A rule is NOT done because:
 ANYTHING NOT DONE IS AN ASSUMPTION. Assumptions live in a table with their
 status and with what would settle them. When one is knocked down it moves
 to the assumption-versus-reality table with its "caught by" column filled
-in.
+in. On a long project that table is the ledger's open entries (12.2), one
+file per routine, where a script can count them.
+
+5.4 DONE MUST BE COMPUTED, NOT REMEMBERED
+..........................................
+
+The done rule says what counts as evidence. It does not say where the
+record of it lives, and on a long project that is where it fails: the
+evidence for a rung existed once, and nobody can now say, without
+re-running it, whether it still holds.
+
+  - EVERY RUNG CLAIM POINTS AT AN ARTIFACT. "R8 for $911E" is not a
+    sentence in the notes. It is a fixture, a gate result, a frozen test:
+    a file a script can find.
+  - EVERY ARTIFACT CARRIES HASHES OF WHAT MADE IT -- the tool, the
+    harness, the memory image or state roster, and for anything touching
+    the port, the engine source (12.3).
+  - A RUNG IS HELD ONLY WHILE THOSE HASHES MATCH. Fix the harness and
+    every measurement it made drops a rung by itself; the list of what to
+    re-run is computed, not guessed.
+  - FACTS ABOUT BYTES DO NOT GO STALE, BUT THE TOOLS THAT READ THEM DO.
+    "The JR at $B373 lands on $B377" stays true unless the disassembler
+    that said so was wrong. Record each fact with the command that
+    establishes it, and a tool fix can find every fact it touched.
+
+A status typed by hand -- "done", "verified", "R8" -- is a claim nobody
+re-checks. Let a script say it (12.4).
 
 
 ------------------------------------------------------------------------------
@@ -2632,7 +2960,9 @@ This generalises exactly, so learn it once:
     config={'fast_djnz': True, 'fast_ldir': True} and a 4,000,000
     instruction limit on the boot, which takes tens of seconds. Budget for
     that: a differential test that reboots per transition will not finish.
-    Boot once, then poke.
+    Boot once, then poke -- and across sessions, cache the booted state on
+    disk with a stamp (12.3), so a new session loads it in a moment and a
+    harness change invalidates it by itself.
   - A MEMORY-WRITE TRACER IS NOT USUALLY PROVIDED and you will need one
     (phase 2, Q3, and the display-file read-watch in 3.11). SkoolKit's
     tracer interface exposes read_port and write_port only. Either subclass
@@ -2640,7 +2970,11 @@ This generalises exactly, so learn it once:
     snapshot-and-diff at intervals. The subclass costs roughly 2x on speed;
     the snapshot diff costs nothing per instruction but misses writes that
     are later overwritten. Use the subclass for the one-off scans and the
-    snapshot diff for "what changed across this transition".
+    snapshot diff for "what changed across this transition". Note what a
+    snapshot diff cannot see at all: a write of the value already there
+    (G11b). And build the read side at the same time: the byte-usage map
+    (12.5) needs every read tagged as a fetch or a data read, and it
+    replaces several one-off scans with one.
 
 6.5 THE PORTS TRACER (INPUT AND MEASUREMENT IN ONE OBJECT)
 ...........................................................
@@ -2651,19 +2985,17 @@ correct read handler:
 
     def read_port(self, registers, port):
         if port & 0xFF == 0xFE:                  # keyboard / EAR
-            hi = port >> 8
-            if hi == 0:                          # B=0: ALL half-rows
-                return AND of every stored value, else 0xFF
+            hi = port >> 8                       # a 0 bit selects a row
             v = 0xFF
-            for select, val in self.pressed.items():
-                if hi & select == 0 or hi == select:
-                    v &= val                     # only matching half-rows
+            for select, val in self.pressed.items():  # select: $FE..$7F
+                if (hi | select) != 0xFF:        # this row's line is low
+                    v &= val                     # B=0 selects all eight
             return v
         if port & 0xFF == 0x1F:                  # Kempston: ACTIVE HIGH
             return self.kempston                 # default 0x00, not 0xFF
         return 0xFF
 
-Four things there, each of which is a real trap:
+Five things there, each of which is a real trap:
 
   - THE HALF-ROW DISPATCH IS NOT OPTIONAL. Return the stored mask for every
     keyboard read and you press phantom keys on all eight half-rows.
@@ -2675,6 +3007,13 @@ Four things there, each of which is a real trap:
     game probes for the absence of the interface, in which case $FF is what
     tells it there is none. Q2 tells you whether $1F is even read.
   - TO PRESS A KEY, RETURN THE MASK THE GAME STORED, VERBATIM (3.4).
+  - TEST THE MATCH OVER ALL 256 HIGH BYTES against the rule "a half-row
+    answers when its address line is low". The first revision of this
+    manual printed it as "hi & select == 0 or hi == select", which gets
+    single rows and B=0 right and 1,016 of the 2,048 (high byte, half-row)
+    pairs wrong: every read that selects more than one half-row but fewer
+    than all eight. Precise, plausible and wrong -- the very trap this
+    section opened by describing.
 
 UNATTACHED PORTS AND ENTROPY. A constant $FF is a lie that degenerates some
 games silently. If the game draws entropy from the floating bus
@@ -2763,8 +3102,8 @@ Once you can reach a live level, you can ask the original almost anything:
     register partway through a draw routine is what turned "I think the
     sub-cell x is discarded" into a fact.
 
-6.9 THE DIFFERENTIAL TEST, IN EIGHT STEPS
-..........................................
+6.9 THE DIFFERENTIAL TEST, IN NINE STEPS
+.........................................
 
 This is the strongest check available to you. Build one for every subsystem
 that has a clean call boundary.
@@ -2798,11 +3137,30 @@ that has a clean call boundary.
      $91F3, not the shipped artifact. The fix is half a page:
         - dump every captured (before, after) transition to JSON;
         - in Node, load the BUILT artifact, reach the engine's update
-          function through the phase-7.6 test hook, seed it from each
+          function through section 7.6's test hook, seed it from each
           "before" record, run one update, and read back the same fields;
         - diff there, and print the same histogram.
      Do that and R8 covers your artifact. Skip it and you must report the
      result as "the model is exact", never "the engine is exact".
+  9. THEN TRY TO BREAK IT [BB]. A gate that has only ever been green has
+     never been shown able to go red (G14). Mutate the engine on purpose
+     -- flip one comparison, drop one mask, delete one early exit -- and
+     require a NAMED row of the gate to go red; then restore. Do it for
+     every new gate block before you believe it. Every mutation that
+     survives is one of exactly three things, and conflating them is
+     expensive:
+        - A REAL HOLE: no scenario exercises that path. Add one (G3) and
+          re-run.
+        - A PROVABLE EQUIVALENT: the mutant cannot behave differently --
+          masking a value that is already 8 bits, say. Withdraw it WITH
+          THE PROOF WRITTEN DOWN.
+        - A MUTATION THAT MUTATED NOTHING: the edit never reached the code
+          that runs. Catch it mechanically -- if the mutant's BUILT
+          artifact is identical to the original's, the mutation did not
+          happen -- rather than by surprise.
+     A gate block is PROVED when a deliberate break has turned a named row
+     red and every survivor carries one of those labels. The status
+     script reports PROVED separately from passing (12.4).
 
 WHAT IT PROVES: your model is exact on the paths exercised, transition by
 transition, with an oracle at every step and a realistic input
@@ -2827,6 +3185,45 @@ diffed directly and kept as a regression test. In the case study
 rows each, and the twelve rows are identical. This is cheap, it is
 cross-language by construction, and it is the poor relation of 6.9 step 8
 that you can build in an afternoon.
+
+6.11 ONE MEASUREMENT ENTRY POINT THAT ENFORCES THE DISCIPLINE
+.............................................................
+
+Every instance in G11 was learned by forgetting a rule once. Do not rely
+on remembering them. Put them in the one function every oracle calls, so
+that the careless measurement is the one you cannot write:
+
+    measure(routine, sweep, poison=True, exclude=(), stop_at=(),
+            interrupts=False, flags_in=("C",))
+
+The signature is illustrative. The defaults are the point:
+
+  - IT ARMS, THEN SNAPSHOTS: the baseline is taken after the sentinels
+    (6.6) and the registers are in place, never before (G11a).
+  - IT POISONS THE TARGET unless told not to, with a value the routine
+    cannot write, and reports writes against the poison (G11b).
+  - IT GROUPS WRITES BY NAMED WINDOW -- display file, attributes, stack,
+    sentinel run, from one shared table -- and excludes only by name. A
+    lint rejects raw address comparisons in oracle scripts (G11c).
+  - IT RECORDS BRANCH COVERAGE: for every conditional jump, call and
+    return inside the routine, whether the sweep took it, skipped it, or
+    both, and it flags every one-way branch in its output (G11d). Input
+    flags are swept like any other input, which is how a claim like C10's
+    carry-independence comes to be proved by a fixture.
+  - IT TAKES STOP_AT ADDRESSES, so an accepted path is observed at its
+    first instruction and abandoned rather than run (G11e).
+  - IT LOGS EVERY WRITE WITH ITS PC, always, so the attribution already
+    exists when a count does not add up (G11f).
+  - INTERRUPTS ARE OFF BY DEFAULT for a routine called in isolation. That
+    does not contradict 6.3, which is about running the GAME. But a
+    routine that spins on an ISR-maintained counter -- the case study's
+    death-wait, 3.6 -- deadlocks without them, and its oracle must say so
+    by passing interrupts=True.
+  - IT STAMPS AND FREEZES ITS OUTPUT (12.3): a fixture file whose stamp
+    says exactly what produced it.
+
+A measurement that needs to break a default says so in its call, where a
+reviewer can see it.
 
 
 ------------------------------------------------------------------------------
@@ -2868,6 +3265,14 @@ Quote the original beside the code it became:
 
 This makes review possible, makes quirks survive refactoring, and is the
 only way a later reader can distinguish a faithful oddity from a mistake.
+
+Tag each function with the address it came from in one fixed, greppable
+form -- "// @z80 $B34C" -- so that a script can build the routine map
+(phase 15) and the ledger can find the port of any routine (12.2). And
+give every number in a comment its source: the fixture or tool invocation
+that measured it, or the word PROVISIONAL. The status script can then list
+every provisional constant in the engine, which is the list of what is
+still a guess.
 
 7.2 TIME: SPEND T-STATES, NOT FRAMES AND NOT PASSES
 ....................................................
@@ -3036,6 +3441,8 @@ Q2  THE PORT INVENTORY                                   [RUN THIS FIRST]
         $1F          Kempston joystick, ACTIVE HIGH
         $FFFD/$BFFD  AY-3-8912 -- present on a 48K game too, via an
                      interface (3.5)
+        $3F/$5F      AY on a Fuller Box (3.5)
+        $F5/$F6      AY on a Timex TS2068 (3.5)
         $7FFD        128K paging
         $FF          floating bus -- raster sync or entropy
         anything else  Interface 1/2, speech, printer, a peripheral you
@@ -3051,6 +3458,13 @@ Q3  SELF-MODIFICATION AND RUNTIME DECRYPTION
         has ever been executed. (b) Flag EXECUTION of any region that was
         not present in your static image. Run both over driven play.
     CASE STUDY ANSWER: neither fires. The binary is static.
+    [BB] ANSWER: (a) fired constantly. Operands were rewritten as live
+        state in six recurring shapes, and at least one opcode position
+        ($87B2) was patched as a switch. For a game like that, (a) is not
+        enough: you need to know, per byte, whether it was fetched as an
+        opcode, fetched as an operand, read as data, or written -- the
+        byte-usage map of 12.5, which answers this diagnostic and Q13 in
+        one run.
     WHAT CHANGES: everything downstream, silently. If (a) fires, the
         routine's own bytes are part of the mutable world, so 6.9's
         per-transition replay re-seeds the wrong code; a coverage-based
@@ -3214,14 +3628,19 @@ Q13 CODE VERSUS DATA, FROM EXECUTION COVERAGE
     DO: run the game and mark every byte of every instruction executed --
         not just the PC byte, because operands are never a PC and marking
         only the PC fragments everything into single bytes. Then coalesce
-        adjacent marks into regions.
+        adjacent marks into regions. BETTER: record each byte's ROLE, not
+        just "executed" -- opcode, operand, data read, written -- which is
+        the byte-usage map of 12.5. It answers this and Q3 in one run, and
+        self-modifying code stops making it lie, because a patched operand
+        is simply a byte with two roles.
     RULE: COVERAGE IS A LOWER BOUND AND ONLY AS GOOD AS THE PLAY THAT DROVE
         IT. Idle play will report the entire jump, fall and landing
         machinery as "data", because the player never jumped. Drive it:
         walk, jump, walk back, climb, die, complete a level. If the game
         ships an RZX recording, replay it for a free full-playthrough
-        coverage map. And run Q3 first -- self-modifying code makes this
-        diagnostic lie in both directions.
+        coverage map (SkoolKit's rzxplay.py can write the execution map
+        directly). And if you mark "executed" only, run Q3 first --
+        self-modifying code makes that version lie in both directions.
     NOTE: the case study never built this tool; it had a reference
         disassembly instead. There are no case-study numbers to quote here
         and you should distrust any that appear.
@@ -3308,7 +3727,8 @@ Q19 THE STACK-IMBALANCE SCAN
 
     Tape protected/packed?       yes / no ->  snapshot route? R3 lost?
     Ports touched?               list, with defaults chosen for each
-    Self-modifying/decrypting?   yes / no -> which diagnostics invalid
+    Self-modifying/decrypting?   yes / no -> which diagnostics invalid;
+                                 byte-usage map (12.5) built?
     ROM called at runtime?       yes -> real ROM in the harness
     Loader-left state?           list it
     Clock model?                 free-running / frame-synced / ISR / hybrid
@@ -3329,6 +3749,8 @@ Q19 THE STACK-IMBALANCE SCAN
     Paging / multi-load?         yes / no
     Hand-written Z80?            yes / interpreted BASIC / compiled BASIC
     Scope of "faithful"?         0.4's list, decided
+    Save-state roster?           one state / several -> manifest (12.6)
+    Tracking in place?           ledger, stamps, status script (12.10)
 
 
 ------------------------------------------------------------------------------
@@ -3360,7 +3782,7 @@ fix. Nobody tuned a constant.
 STEP 3 -- FIND THE ROUTINE AND READ ITS BYTES
 
 From the annotated disassembler: $B34C, called from $99D6, and only when
-the on-lift flag is zero. Twenty-one instructions, $B34C-$B380. This is the
+the on-lift flag is zero. Twenty-seven instructions, $B34C-$B380. This is the
 real disassembly, not a paraphrase (tools/adis.py 0xB34C 40):
 
     $B34C  3ad872     LD A,(farmer_pos_x)
@@ -3445,7 +3867,7 @@ right-hand end of the memory-row-4 platform, y = 55:
     tools/sim_edgejump.py 55 228 240
 
 drives the real Z80: boot to the level, poke the player to (x, 55), press
-jump, run until he lands, record the landing y. Its three printed columns
+jump, run until he lands, record the landing y. Its four printed columns
 are x, x&7, support and the landing y; the "verdict" column below is an
 ANNOTATION added when writing this up, not tool output:
 
@@ -3565,8 +3987,9 @@ HARNESS
       real ROM used locally and not shipped
   [ ] interrupts disabled at start, armed after the mode is selected, mode
       asserted; all 257 vector bytes checked if IM 2
-  [ ] port handler dispatches half-rows, handles B=0, defaults Kempston to
-      active-low-correct, and declares what it feeds unattached ports
+  [ ] port handler matches half-rows by the line-low rule, tested over all
+      256 high bytes (B=0 included); Kempston defaults to $00, because it
+      is active HIGH; what unattached ports return is declared
   [ ] key presses return the game's own stored mask VERBATIM; direction
       assertion run before any measurement that uses input
   [ ] memory-write tracer available; display-file read-watch run once
@@ -3576,6 +3999,9 @@ HARNESS
   [ ] working-RAM structures located by content search / transition diff,
       not guessed
   [ ] live RAM cross-checked against every static table
+  [ ] one measurement entry point (6.11) that every oracle calls: arm then
+      snapshot, poison, named windows only, branch coverage, stop_at,
+      writes by PC, stamped output
 
 MEASUREMENT
   [ ] pass cost histogrammed before being characterised
@@ -3613,6 +4039,8 @@ PROOF
       as such, every branch hit
   [ ] the differential run against the SHIPPED artifact, not only against a
       harness-language model
+  [ ] every gate block PROVED: a deliberate break turned a named row red,
+      and every surviving mutation is labelled (6.9 step 9)
   [ ] point-differential tables printed from BOTH sides with the same
       arguments
   [ ] exhaustive static enumeration where two predicates read the same data
@@ -3628,13 +4056,28 @@ PROOF
       never from the code under test
 
 RECORD
-  [ ] routine map: original address -> behaviour -> your function
+  [ ] routine map: original address -> behaviour -> your function,
+      generated from the @z80 tags and the ledger
   [ ] assumption / reality / caught-by table maintained
   [ ] open questions named
   [ ] your own inventions named AS YOURS
   [ ] faithful/added boundary enforced by an assertion, not by intent
   [ ] legal position stated; no ROM shipped; assets not published
   [ ] original authors credited; corrections sent upstream
+
+KEEPING TRACK
+  [ ] a ledger entry per routine: facts as typed claims, refuted claims
+      and open questions, each with the command that establishes it
+  [ ] every evidence artifact stamped; the status script derives rungs,
+      lists what is stale and what is next, and opens every session
+  [ ] byte-usage map built; byte-pattern verdicts confirmed against it
+  [ ] roster manifest with computed tags, if there is more than one state
+  [ ] delegated findings returned as typed claims and verified by script
+  [ ] operating card in CLAUDE.md with a tools table marking each tool
+      EXISTS or PLANNED; the card shrinks as its rules move into tools
+  [ ] hooks installed and each tested once: the status block reappears
+      after /compact, a whole-file read of the manual is refused, and a
+      sub-agent knows about tools/manual.py
 
 HUMAN
   [ ] someone who knows the original has played it
@@ -3643,7 +4086,7 @@ HUMAN
 
 
 ------------------------------------------------------------------------------
-11. THE FIVE HABITS, IF YOU REMEMBER NOTHING ELSE
+11. THE SIX HABITS, IF YOU REMEMBER NOTHING ELSE
 ------------------------------------------------------------------------------
 
   1. BUILD THE VERIFICATION HARNESS FIRST. Every plausible-looking routine
@@ -3667,6 +4110,404 @@ HUMAN
   5. WHEN THE CODE LOOKS WRONG, ASSUME IT IS RIGHT AND FIND OUT WHY. The
      original shipped. The thing you are about to correct is load-bearing
      until proved otherwise.
+
+  6. MAKE PROGRESS SOMETHING A SCRIPT CAN READ. Every rung you reach
+     leaves a stamped artifact; every judgment goes into the ledger with
+     the command that proves it; every session starts from the status
+     script, not from memory. What exists only in a context window will be
+     paid for twice.
+
+
+------------------------------------------------------------------------------
+12. KEEPING TRACK: STATE, TOOLS AND TOKENS ACROSS MANY SESSIONS
+------------------------------------------------------------------------------
+
+Everything before this section is about getting the answer right. This
+one is about not paying for the same answer twice.
+
+On the Bubble Bobble port [BB] the dominant waste was not wrong answers but
+LOST ones. The work ran across many sessions, context compactions and
+sub-agents, and each started cold. What had been established lived in two
+lossy places: the agent's context, which the next session does not have, and
+prose notes, which must be read end to end before they can answer "is $A091
+done?". So sessions re-derived state that already existed, re-measured
+results nobody could tell were still valid, and re-proposed ideas that had
+already been refuted.
+
+12.1 TWO PRINCIPLES
+...................
+
+  1. DONE-NESS IS COMPUTED FROM ARTIFACTS BY A SCRIPT, NEVER REMEMBERED
+     (5.4). A session learns where the project stands from twenty lines
+     of generated status, not from rereading anything.
+  2. A LESSON YOU WOULD HAVE TO REMEMBER BELONGS IN A TOOL. A rule that
+     lives only in prose is paid for in reading every session and is still
+     forgotten at the worst moment; a rule that is a tool's default costs
+     nothing and cannot be forgotten. 6.11 is the model: six instances
+     from G11 became six defaults of one function. Delete each rule from
+     the project notes on the day a tool starts enforcing it, so the notes
+     an agent must read get SHORTER as the project matures.
+
+In this kit, docs/TRAPS-MAP.md applies the second principle to every trap
+recorded so far: each is mapped to the mechanism that should make it
+impossible, and to whether that mechanism exists yet.
+
+None of the machinery below is clever. All of it pays back within the
+first week, and the first pieces within the first session.
+
+12.2 THE LEDGER
+...............
+
+One small file per routine -- or table, or effect -- named by its first
+entry address and holding ONLY WHAT NEEDS JUDGMENT. Everything mechanical
+is derived (12.4). One file per routine keeps parallel sub-agents from
+colliding and keeps every change a readable diff. For section 9's
+routine:
+
+    # ledger/B34C.toml -- judgments only; tools/status.py derives the rest
+    entries = ["$B34C"]            # every way in, fall-through included
+    name    = "MovePlayerToEndOfPlatform"
+    oracle  = "tools/sim_edgejump.py"     # writes a stamped fixture
+    gate    = "tools/cmp_edgejump.js"     # same arguments, same table
+    port    = "movePlayerToEndOfPlatform" # carries // @z80 $B34C
+    manual  = ["D1", "D4", "D5", "C3"]    # entries that govern it (12.8)
+
+    [[fact]]                       # a typed claim (12.7), re-checkable
+    kind = "insn"
+    at   = "$B351"
+    insn = "RET Z"
+    why  = "after AND 7: no check at all on cell-aligned x"
+
+    [[fact]]
+    kind = "insn"
+    at   = "$B361"
+    insn = "RET NC"
+    why  = "after CP 5: support is tile >= 5, the cage included"
+
+    [[refuted]]
+    says = "walking off an edge checks the ground on every step"
+    by   = "RET Z at $B351; tools/sim_edgejump.py 55 228 240"
+
+    # [[open]] entries, when there are any: ask, tried, and settle --
+    # the question, what has been tried, and what would settle it
+
+Three kinds of judgment live here and nowhere else:
+
+  - FACTS, each a typed claim a script can re-check, so that a fix to the
+    disassembler can find every fact it might have touched. The game's
+    bytes never change; the tools that read them do.
+  - REFUTED CLAIMS, each with what refuted it. Phase 4's disassembler
+    prints them at their addresses, so last week's wrong idea -- yours or
+    a sub-agent's -- cannot return from a cold start.
+  - OPEN QUESTIONS, each with what was tried and what would settle it:
+    5.3's assumptions table, one file per routine.
+
+What does NOT live here: rungs, "done", dates, anything a script can work
+out for itself. A status field typed by hand is a claim nobody re-checks.
+
+12.3 STAMPS
+...........
+
+Every tool that produces evidence -- an oracle's fixture, a gate's result,
+a headless suite's run -- writes a stamp into its output:
+
+    "_stamp": {
+      "tool":     ["tools/sim_edgejump.py", "3f2a9c01d4e7"],
+      "harness":  ["tools/harness.py",      "91be0c7718aa"],
+      "image":    ["build/image.bin",       "5d03e1f2c9b4"],
+      "engine":   null,
+      "roster":   null,
+      "args":     "55 228 240",
+      "branches": {"$B351": "both", "$B361": "both",
+                   "$B364": "never taken", "$B367": "never taken"}
+    }
+
+Each hash is the first twelve hex digits of the SHA-256 of that file's
+bytes when the tool ran. "engine" is filled for anything that exercised
+the port; "roster" for anything measured across save states (12.6);
+"branches" is 6.11's coverage record. A stamp is FRESH while every hash
+still matches the file on disk, and STALE from the moment one does not.
+
+The branches record earns its place on this very example. Across x =
+228..239 the tile under the feet is only ever 0 or 5, so the ladder-half
+tests at $B364 and $B367 never fire: the sweep proves the platform-edge
+rule, not the ladder half of the same predicate. A fixture that says so
+cannot later be mistaken for one that covers both.
+
+Stamps remove the most expensive dilemma of a long project. After a
+harness fix -- G11(a)'s snapshot-after-arm, say -- you need to know which
+measurements predate it. Without stamps nobody can say, so you either
+re-measure everything or keep trusting something you should not. With
+them the stale list is printed for you, and it is exactly the list to
+re-run.
+
+12.4 THE STATUS SCRIPT, AND THE FRONTIER
+........................................
+
+tools/status.py reads the ledger, the stamps and the engine's @z80 tags
+(7.1). It never runs the simulator, so it takes a second or two, which is
+what lets it run at the start of every session. It derives, per routine,
+the highest rung (5.1) whose artifact is present and FRESH, plus two
+engineering states the ladder does not name: PORTED (an engine function
+carries the routine's tag) and PROVED (its gate block went red under a
+deliberate break and its survivors are labelled, 6.9 step 9).
+
+"status.py --brief" prints about twenty lines:
+
+  - how much of the loaded code region has a known role (12.5), and the
+    largest ranges that do not;
+  - how many routines hold each rung;
+  - everything STALE, with the file whose hash changed;
+  - the FRONTIER: routines whose callees have all reached the rung you are
+    working towards, so they can be taken next without waiting on
+    anything. The call graph behind it is the disassembly's PLUS
+    fall-through edges (C8) PLUS targets observed through rewritten
+    operands (12.5). A graph built from CALL instructions alone is wrong
+    in exactly the games where you most need it;
+  - open questions, unlabelled mutation survivors and PROVISIONAL
+    constants in the engine, as counts, with the oldest few of each.
+
+"status.py ADDR" prints everything known about one routine in a dozen
+lines: its ledger entry, its evidence and freshness, its callers and
+callees. It is how every unit of work begins (0.8).
+
+"status.py --check" asserts consistency and exits non-zero with a list:
+every fixture named by a ledger entry exists; every @z80 tag has a ledger
+entry; every stamp parses; no delegated claim is awaiting verification
+(12.7). The Stop hook runs it at the end of every response (12.8), so
+keep it fast, and keep it to things that are never legitimately left
+half-done between one response and the next.
+
+12.5 THE BYTE-USAGE MAP
+.......................
+
+One instrument answers both Q3 and Q13. Build it once, and every later
+question about what a byte IS becomes a lookup.
+
+  - At each step, before executing, decode the instruction at PC and tag
+    its bytes by role: OPCODE (prefixes included), or OPERAND
+    (displacement or immediate).
+  - Wrap memory access (6.4). A read inside the current instruction's own
+    bytes is its fetch; any other read is DATA. Record every write with
+    its PC.
+  - Accumulate the set of roles per address, and the writer PCs of every
+    written byte, over driven play and over every usable state in the
+    roster. Coverage is a lower bound (Q13): union across states, drive
+    the rare paths, and replay a recorded playthrough if there is one.
+
+The intersections are the findings:
+
+    WRITTEN + fetched as OPERAND    an operand used as a variable (3.10):
+                                    list it with its writers, under its
+                                    shape -- [BB] found six recurring ones
+    WRITTEN + fetched as OPCODE     a patched instruction -- [BB]'s $87B2,
+                                    a NOP rewritten as a switch
+    fetched + read as DATA          code read as data: checksums and
+                                    self-checking code (6.6 (c))
+    no role at all                  what reading still has to classify,
+                                    by recursive descent
+
+Consumers: the byte-pattern tools confirm hits against it instead of
+decoding backwards (A8); the status script's coverage line is its
+unclassified remainder; the frontier takes its rewritten-operand edges
+from its writer lists; and its code/data split exports as a SkoolKit
+control file, so the SkoolKit tools can render and cross-reference it.
+
+12.6 THE ROSTER MANIFEST
+........................
+
+If you measure on more than one saved state, the roster is a table, not a
+directory, and its columns are COMPUTED from the snapshots wherever a
+test exists:
+
+    file, hash, machine (48K / 128K), build (e.g. pre-patch), usable,
+    and one column per world variable that has ever mattered
+
+In [BB] that meant a column for the $8DC4 == $C9 test that separates 48K
+states from pre-patch ones, a usable flag that keeps the two hung 128K
+captures out, and columns for $FDE4 bit 0 (the player number) and for
+($86CD) AND ($86CF) (the item-ageing gate). Oracles take "all usable
+states" from the manifest and write the list into their stamp, so a claim
+"measured on all states" can be checked. The differ that compares port
+with machine groups its mismatches by manifest column, so a world
+difference (G12) shows up as a split rather than a hunt.
+
+12.7 DELEGATION: BRIEFS OUT, CLAIMS BACK
+........................................
+
+Sub-agents are the cheapest way to read wide, and G13 is why their prose
+cannot be taken on trust. But re-reading the range yourself to check them
+spends exactly what delegating saved. So change what goes out and what
+comes back.
+
+  - THE BRIEF IS GENERATED. "tools/brief.py $9500 $95FF" packs the folded
+    listing (phase 4), the ledger's facts and refuted claims for the
+    range, and its open questions. The sub-agent starts where you are,
+    including knowing what has already been ruled out.
+  - FINDINGS COME BACK AS TYPED CLAIMS, from a small vocabulary a script
+    can check against the disassembler or the harness:
+
+        insn        at, insn [, count]   the decode shows it there
+        jr_target   at, target           the displacement resolves there
+        falls_into  at, target           nothing terminates in between
+        flags_dead  at [, flag]          overwritten before any reader
+        in_loop     at, loop, inside     the loop's bracket agrees
+        writes      routine, window      measured through 6.11
+        reads       routine, address     measured through 6.11
+
+    G13's correct finding comes back as
+
+        {"kind": "insn", "at": "$9521", "insn": "ADD A,A", "count": 4}
+
+    and its wrong one would have come back as two in_loop claims, one per
+    CALL, each failing against the bracket of the $9561 loop. Anything
+    that fits no type comes back labelled HYPOTHESIS, and the size of that
+    pile is itself a measure of what the reading actually established.
+  - "tools/verify_claims.py" checks every claim. Verified claims become
+    [[fact]] entries; failed ones become [[refuted]] entries carrying the
+    check's output. The lead reads a one-line summary, not the range.
+
+12.8 WHAT SURVIVES A COMPACTION, AND HOW TO WIRE IT IN
+......................................................
+
+Everything an agent reads -- listings, tool output, this manual -- enters
+its context as conversation, and a compaction replaces the conversation
+with a summary. So nothing that lives only in the conversation can
+guarantee its own survival, and THIS FILE IS THE FIRST THING LOST: it is
+read, never edited, and far too large to be re-read automatically. An
+instruction inside the manual cannot protect the manual. Every rule has
+to live where compaction cannot reach it. In Claude Code, at the time of
+writing:
+
+  - RE-INJECTED from disk after every compaction: the project-root
+    CLAUDE.md, and rule files that carry no paths: filter. SessionStart
+    hooks run again, with the source "compact", and their output is added
+    to the compacted context.
+  - RELOADED ONLY ON DEMAND: path-scoped rules and nested CLAUDE.md files
+    come back when a matching file is next read.
+  - SUMMARISED AWAY: the rest of the conversation, including every file
+    read and anything hooks added earlier. At most a few recently
+    modified files are re-read afterwards, and a large one comes back
+    only as a path.
+  - NEVER NEEDED IN CONTEXT: anything a hook enforces at the moment it
+    applies. A hook fires whatever the agent remembers.
+
+That gives a rule three possible homes, in order of strength:
+
+  1. ENFORCED WHERE IT APPLIES. A PreToolUse hook refuses a whole-file
+     read of this manual, and its refusal tells the agent how to read by
+     ID -- so the rule arrives at exactly the moment it is about to be
+     broken, compaction or not. The Stop hook refuses to end a response
+     while the record is inconsistent. A check on oracle scripts can
+     refuse a measurement that bypasses 6.11. Any rule that attaches to
+     an action belongs here.
+  2. RE-INJECTED. An OPERATING CARD in the project's CLAUDE.md: how to
+     read this manual, the routine of 0.8, the tools table of 12.10, and
+     the few rules that must never be broken, in well under two hundred
+     lines. And a SessionStart hook that prints the status brief (12.4),
+     the uncommitted changes -- which ARE the unit in progress, derived
+     rather than remembered -- the last few commits, and the manual IDs
+     named by the ledger entries being changed (12.2), so the agent
+     re-reads exactly those entries and nothing else.
+  3. LOOKED UP. Everything else, this manual included. It does not have
+     to survive, only to be findable, and that costs one line of the
+     card.
+
+SUB-AGENTS start without the conversation, and in current Claude Code the
+built-in Explore and Plan agents do not load CLAUDE.md either. The
+generated brief (12.7) is their main channel. A SubagentStart hook can add
+a short block -- read the manual by ID, return typed claims -- as a
+backstop, but test that it arrives: ask a sub-agent what it knows about
+tools/manual.py. A hook that fails silently looks exactly like one that
+works.
+
+LOSE CONTEXT ON PURPOSE. Once the status comes back by itself, a context
+cleared at a unit boundary costs almost nothing, while an automatic
+compaction lands wherever the window happens to fill -- often mid-unit,
+summarising exactly the reasoning that has not reached the ledger yet.
+The agent cannot clear its own context, so the routine is to finish the
+unit, commit, and tell the operator that a /clear is safe. The automatic
+pass can be set to run earlier but not usefully later, so this is the
+lever that works.
+
+WIRING. The kit ships this machinery: CLAUDE.md (the card),
+.claude/settings.json, four hook scripts in .claude/hooks/, and
+tools/manual.py. Keep these design rules when you adapt it:
+
+  - POINT EVERY HOOK AT A SCRIPT THAT EXISTS FROM DAY ONE, and let that
+    script call status.py only once status.py exists. A Stop hook that
+    exits with code 2 blocks the response, and python3 itself exits with
+    code 2 when the script it is given does not exist -- so a Stop hook
+    aimed straight at a tool not yet written blocks every response.
+  - FAIL OPEN. A crash inside a hook must exit 0 or 1, never 2. Only a
+    deliberate refusal, with its reason stated, may block.
+  - STOP FIRES AT THE END OF EVERY RESPONSE, not only at the end of a
+    session. Check only what should never be left dangling between one
+    response and the next, and block at most once per turn: when the
+    hook's input has stop_hook_active set, the agent is already
+    continuing because of this hook, so let it stop.
+  - KEEP HOOK OUTPUT SHORT AND FACTUAL. It is capped at 10,000
+    characters, and text framed as system commands can trip the model's
+    prompt-injection defences, in which case it is shown to you rather
+    than used. State facts -- "the manual is read by ID with
+    tools/manual.py" -- rather than issuing orders in capitals.
+  - TEST EACH HOOK ONCE, on purpose: run /compact and check that the
+    status block reappears; ask for the whole manual and check the
+    refusal; start a sub-agent and ask it about tools/manual.py.
+
+Check these specifics against the current Claude Code documentation --
+the hooks reference, and the page on what survives compaction -- before
+relying on them; they have changed before and will again. In any other
+harness the principle holds unchanged: the status is the first thing
+every fresh context sees, the check is the last thing every response
+passes, and a rule that attaches to an action is enforced at the action.
+
+12.9 TOKEN ECONOMY
+..................
+
+On a long port the budget that runs out first is context, and most of it
+goes on reading. Rules for spending it:
+
+  - TOOLS ARE TERSE BY DEFAULT: a summary line first, detail behind a
+    --full flag, never more than a screenful unless asked.
+  - QUERY, DO NOT LIST. "Who calls $9B07?", "is $FED5 ever an operand?",
+    "which fixtures are stale?" are one-line answers from the call graph,
+    the byte-usage map and the status script. Rereading a listing to
+    answer them is the most expensive way there is.
+  - FOLD WHAT IS KNOWN (phase 4). Context for a new routine should cost
+    only the new routine.
+  - READ THIS MANUAL BY ID (0.7).
+  - DELEGATE WIDE READS AND VERIFY NARROWLY (12.7).
+  - ONE UNIT AT A TIME (0.8), recorded as it finishes, so that a /clear
+    or a compaction loses nothing that matters.
+
+12.10 BUILD ORDER, AND THE TOOLS TABLE
+......................................
+
+In this order, each paying for the next:
+
+  1. The session machinery the kit ships -- the operating card in
+     CLAUDE.md, the hooks, tools/manual.py -- is in place from the first
+     commit; adapting the card's tools table is the first half-hour. It
+     needs nothing else to exist, and it is what keeps every rule below
+     alive through a compaction.
+  2. Stamps, the ledger directory and status.py -- the first hour. The
+     hooks start using status.py the moment it exists, and every later
+     tool is worth more for reporting through it.
+  3. The measurement entry point (6.11), before the second oracle is
+     written, so that no oracle ever bypasses it.
+  4. The byte-usage map (12.5), as soon as the harness can drive play.
+  5. Phase 4's marks and folding, as soon as the ledger has content.
+  6. The roster manifest, the moment there is a second saved state.
+  7. Briefs and typed claims, the first time you delegate a reading.
+
+Keep the TOOLS TABLE on the operating card, one line per tool, marked
+EXISTS or PLANNED, with what it replaces. NEVER CALL A PLANNED TOOL --
+build it, or use the manual procedure it will replace. When a tool lands,
+update the table and delete from the card every rule it now enforces. The
+card should shrink as the tools grow; if it only ever grows, the rules
+are still living in prose, and every session is still paying to read
+them.
 
 ==============================================================================
                                 END OF MANUAL
