@@ -940,6 +940,112 @@ def t_blitforensics():
     eq(run(MASKED, [b for m, d in zip([0xFF] * 8, [0] * 8) for b in (m, d)])['mode'], 'EMPTY', 'all-transparent: EMPTY')
 
 
+# ---------------------------------------------------------------------------
+# the session machinery (manual 12.8): tools/manual.py, the trap-to-check map
+# and the .claude hooks.  These read the kit's real docs/, which hold no tape
+# data, and run each script the way Claude Code does: JSON on stdin.
+# ---------------------------------------------------------------------------
+REPO = os.path.dirname(HERE)
+
+
+def run_py(script, stdin='', env=None, cwd=None):
+    import subprocess
+    e = dict(os.environ)
+    e.update(env or {})
+    r = subprocess.run([sys.executable] + script, input=stdin, capture_output=True,
+                       text=True, cwd=cwd or REPO, env=e, timeout=60)
+    return r.returncode, r.stdout, r.stderr
+
+
+def t_manual_ids():
+    tool = os.path.join(HERE, 'manual.py')
+    code, out, _ = run_py([tool, 'c9', 'T146', 'PHASE', '9'])
+    eq(code, 0, 'exit status')
+    for want in ('== C9 ', 'THE LOOP IS WHERE THE DISPLACEMENT SAYS', '== T146 ', 'map: ', '== P9 '):
+        if want not in out:
+            raise AssertionError(f'{want!r} missing from the output')
+    eq(run_py([tool, 'Z99'])[0], 1, 'unknown ID exits 1')
+    eq(run_py([tool, 'T9999'])[0], 1, 'unknown trap exits 1')
+    lines = run_py([tool, '--index'])[1].splitlines()
+    if len(lines) < 160:
+        raise AssertionError(f'index has {len(lines)} entries, want >= 160')
+    out = run_py([tool, '--grep', 'straddle'])[1]
+    if 'G11' not in out or 'T143' not in out:
+        raise AssertionError('--grep must search the manual and the traps')
+
+
+def t_traps_map():
+    import re
+    traps = open(os.path.join(REPO, 'docs', 'TRAPS.md'), encoding='utf-8').read()
+    nums = [int(n) for n in re.findall(r'^(\d+)\. \*\*', traps, re.M)]
+    rows = mod('manual').load_map()
+    eq(len(nums), len(set(nums)), 'each trap number used once')
+    missing = sorted(set(nums) - set(rows))
+    extra = sorted(set(rows) - set(nums))
+    eq((missing, extra), ([], []), 'traps without a map row, map rows without a trap')
+    bad = [n for n, (_, mech, state) in rows.items() if state not in ('KIT', 'BB', 'BUILD', 'READ')
+           or (state == 'READ') != (mech in ('manual', 'game'))]
+    eq(bad, [], 'rows whose state and mechanism disagree')
+
+
+def t_hooks():
+    hooks = os.path.join(REPO, '.claude', 'hooks')
+    guard = os.path.join(hooks, 'pretool_guard.py')
+    manual = os.path.join(REPO, 'docs', 'PORTING-ZX-TO-JS.txt')
+
+    def decision(payload):
+        code, out, _ = run_py([guard], json.dumps(payload))
+        eq(code, 0, 'the guard always exits 0')
+        return json.loads(out)['hookSpecificOutput']['permissionDecision'] if out.strip() else 'allow'
+
+    def bash(cmd):
+        return decision({'tool_name': 'Bash', 'tool_input': {'command': cmd}})
+
+    eq(decision({'tool_name': 'Read', 'tool_input': {'file_path': manual}}), 'deny', 'whole manual')
+    eq(decision({'tool_name': 'Read', 'tool_input': {'file_path': manual, 'offset': 90, 'limit': 150}}),
+       'allow', 'a ranged read')
+    eq(decision({'tool_name': 'Read', 'tool_input': {'file_path': '/p/docs/TRAPS.md', 'limit': 900}}),
+       'deny', 'traps, limit too large')
+    eq(bash('cd /p && cat docs/TRAPS.md'), 'deny', 'cat of the traps')
+    eq(bash('cat docs/TRAPS.md | grep -n straddle'), 'allow', 'a filtered read')
+    eq(bash('python tools/manual.py T146'), 'allow', 'manual.py')
+    eq(bash("cat > tools/x.py << 'EOF'\nprint(1)\nEOF"), 'deny', 'a heredoc into a .py file')
+    eq(bash("python - << 'EOF'\nprint(1)\nEOF"), 'allow', 'a script run from a heredoc')
+    eq(run_py([guard], 'not json'), (0, '', ''), 'garbage in: silent pass')
+
+    stop = os.path.join(hooks, 'stop_check.py')
+    with tempfile.TemporaryDirectory() as d:
+        env = {'CLAUDE_PROJECT_DIR': d}
+        eq(run_py([stop], '{}', env, d)[0], 0, 'no status.py: never blocks')
+        os.makedirs(os.path.join(d, 'tools'))
+        with open(os.path.join(d, 'tools', 'status.py'), 'w') as f:
+            f.write('import sys\nprint("fixture named by no ledger entry")\nsys.exit(1)\n')
+        code, _, err = run_py([stop], '{"stop_hook_active": false}', env, d)
+        eq(code, 2, 'a failing --check blocks')
+        if 'fixture named by no ledger entry' not in err:
+            raise AssertionError('the block must carry the check output')
+        eq(run_py([stop], '{"stop_hook_active": true}', env, d)[0], 0, 'blocks at most once per turn')
+
+        code, out, _ = run_py([os.path.join(hooks, 'session_context.py')], '{"source": "compact"}', env, d)
+        eq(code, 0, 'session hook exit status')
+        if 'source: compact' not in out or 'tools/manual.py' not in out or len(out) >= 10000:
+            raise AssertionError('session context must name its source and manual.py, under the cap')
+
+    out = run_py([os.path.join(hooks, 'subagent_context.py')], '{}')[1]
+    spec = json.loads(out)['hookSpecificOutput']
+    eq(spec['hookEventName'], 'SubagentStart', 'sub-agent hook event')
+    if 'tools/manual.py' not in spec['additionalContext']:
+        raise AssertionError('sub-agent context must name manual.py')
+
+    settings = json.load(open(os.path.join(REPO, '.claude', 'settings.json')))
+    for event, groups in settings['hooks'].items():
+        for g in groups:
+            for h in g['hooks']:
+                script = h['command'].split('/.claude/hooks/')[1]
+                if not os.path.isfile(os.path.join(hooks, script)):
+                    raise AssertionError(f'{event} runs a script that does not exist: {script}')
+
+
 CHECKS = [
     ('tzx: parse synthetic tape', t_tzx_parse),
     ('tzx: file parse + report', t_tzx_file_and_report),
@@ -975,6 +1081,9 @@ CHECKS = [
     ('portconfig: manifest, defaults, need()', t_portconfig),
     ('stackscan: slot-based frames, discards, fake return, LD SP reset vs switch, ISR', t_stackscan),
     ('blitforensics: two-background differential on known sprites + guards', t_blitforensics),
+    ('manual: entries, traps, index, grep across both documents', t_manual_ids),
+    ('traps: every trap has exactly one row in the trap-to-check map', t_traps_map),
+    ('hooks: read and heredoc guards, stop check, session and sub-agent context', t_hooks),
 ]
 
 

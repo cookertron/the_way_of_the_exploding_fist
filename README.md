@@ -30,8 +30,11 @@ Starting a port:
 
 1. Copy this repository.  Put the `.tzx` in `tape/` (git-ignored — never
    commit tape-derived material to a public repo) and fill in `port.json`.
-2. Read `docs/PORTING-ZX-TO-JS.txt` — the operating procedure, sixteen
-   phases — and `docs/TRAPS.md`, the things that cost real effort to learn.
+2. Read the manual's sections 0.7, 0.8 and 12, then work by ID:
+   `python tools/manual.py --index` lists the manual's entries, and
+   `python tools/manual.py T146` prints a trap from `docs/TRAPS.md` with its
+   row in `docs/TRAPS-MAP.md`.  Read the failure catalogue (section 4) once
+   before phase 5.  Neither document is read end to end after that.
 3. Work the phases with the tools (`tools/README.md` maps each tool to its
    phase).  Your extractors write `build/*.json`; `port.json` lists them;
    `tools/build.py` asserts their shape and inlines them.
@@ -45,9 +48,13 @@ Starting a port:
 | Path | What |
 |---|---|
 | `docs/PORTING-ZX-TO-JS.txt` | The field manual: sixteen phases, what evidence to demand at each |
-| `docs/TRAPS.md` | The recorded lessons, each with the measurement that taught it |
+| `docs/TRAPS.md` | The recorded lessons (196, from three ports), each with the measurement that taught it |
+| `docs/TRAPS-MAP.md` | Every trap mapped to the mechanism that should prevent it, and whether that mechanism exists yet |
+| `CLAUDE.md` | The briefing and operating card, re-read from disk after every context compaction |
+| `.claude/` | Session hooks: status at every start, read-by-ID and heredoc guards, the end-of-response check, sub-agent context |
 | `port.json` | The port's manifest: tape, entry, blocks, contention, assets, includes |
 | `tools/` | Tape/loader/boot, the SkoolKit-based Z80 harness, disassembly and discovery, graphics forensics, `build.py` — see `tools/README.md` |
+| `tools/manual.py` | The manual and the traps by ID: `C9`, `T146`, `--grep TERM`, `--map gate` |
 | `web/platform.js` | The platform runtime, inlined into the page by the build |
 | `web/template.html` | The page: shell, `#include platform.js`, the demo to replace |
 | `test/rig.js` | The headless rig: vm sandbox, recording canvas stub, real localStorage, captured rAF |
@@ -85,9 +92,36 @@ your own boundary an assertion, not an intention (manual 0.3).
 running Z80 or a real browser, and every behaviour in the suite was checked
 by breaking it on purpose and watching the test fail.  Keep doing both.
 
+## Surviving long sessions
+
+A port runs for weeks across many sessions, and every context compaction
+discards what was read so far, this repository's documents included.  The
+kit keeps its rules where compaction cannot reach them (manual 12.8).
+`CLAUDE.md` is re-read from disk after every compaction, and
+`.claude/settings.json` wires four hooks:
+
+- a session-start block with the status, the unit in progress and the
+  manual entries it names;
+- a guard that refuses whole-file reads of the manual and the traps, and
+  source files written through shell heredocs;
+- a consistency check at the end of every response, once `tools/status.py`
+  exists;
+- a short block of rules for every sub-agent.
+
+The hooks run `python`; change the four commands in `.claude/settings.json`
+if your system calls it `python3`.  Test each once, because a silent hook
+looks exactly like a working one: ask Claude what the session context says;
+ask it to read the manual in full and check the refusal; run `/compact` and
+ask again; start a sub-agent and ask what it knows about `tools/manual.py`.
+
 ## Provenance
 
 Extracted 2026-08-30 from `cookertron/Gauntlet-JS` (the tools, runtime and
 rig) and the Chuckie Egg port (the manual).  The Z80 core is SkoolKit's, a
 dependency, not vendored; it also supplies the 48K ROM at run time.  Nothing
 here contains any game's tape data.
+
+Revised 2026-09-26 from the Bubble Bobble port, then in its third week: the
+manual's revision 2 (reading by ID, the session protocol, section 12 and the
+[BB] catalogue entries), TRAPS #26-196 with `docs/TRAPS-MAP.md`, and the
+session machinery in `.claude/` and `tools/manual.py`.

@@ -21,6 +21,7 @@ phase 1, not in phase 8.
 | tool | purpose | typical invocation | manual phase |
 |---|---|---|---|
 | `portconfig.py` | the manifest reader every tool uses; run it to print the merged config and which `port.json` was found | `python tools/portconfig.py` | all |
+| `manual.py` | the manual and `docs/TRAPS.md` by ID, never end to end: entries (`C9`, `6.11`, `P9`), traps with their map rows (`T146`), `--index`, `--grep TERM` across both, `--map` for the trap-to-check map | `python tools/manual.py C9 T146` | all |
 | `selftest.py` | self-test with NO tape: synthetic TZX, ROM-only harness, tiny images; exit status non-zero on failure | `python tools/selftest.py [-v]` | 7 the simulator harness (run before anything) |
 | `tzx.py` | TZX parser: prints and STOPS on any unhandled block, verifies every ROM-format checksum, decodes headers, checks body length against header, dumps block bodies | `python tools/tzx.py tape/game.tzx --dump build/blocks` | 1 read the tape |
 | `basic.py` | BASIC detokeniser; reports each USR target from the 5-byte binary form the ROM actually acts on, not the printed digits | `python tools/basic.py build/blocks/game.b01.body.bin` | 1 read the tape |
