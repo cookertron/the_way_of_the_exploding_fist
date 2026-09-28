@@ -16,3 +16,7 @@ node_modules/
 *.z80
 *.szx
 *.sna
+# scratch space: cleared at unit end; status.py warns about anything that survives a commit
+scratch/
+# personal session files, not project records
+claude-resume.txt

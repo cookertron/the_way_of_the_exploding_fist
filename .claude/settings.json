@@ -1,4 +1,8 @@
 {
+  "env": {
+    "ZX_HANDOVER_TOKENS": "150000",
+    "ZX_HANDOVER_STEP": "50000"
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -17,6 +21,16 @@
           {
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pretool_guard.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context_watch.py"
           }
         ]
       }

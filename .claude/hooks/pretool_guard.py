@@ -8,7 +8,8 @@ PreToolUse hook (matcher "Read|Bash"): two guards that replace remembering
    discards.  A Read of docs/PORTING-ZX-TO-JS.txt or docs/TRAPS.md with no
    limit, or a limit above MAX_LINES, is refused, as is cat, less, more, nl,
    tac or bat of either with no pipe; the refusal says how to read by ID.
-   tools/manual.py, grep, sed -n ranges, head and tail all pass.
+   tools/manual.py, grep, sed -n ranges, head and tail all pass.  Anything
+   frozen under docs/archive/ is guarded the same way (manual 12.11).
 2. Source files are written with the Write or Edit tool, never through a
    shell heredoc.  Bubble Bobble lost fifteen edits to shell escaping before
    that became a rule (TRAPS #149, #168).  A cat or tee heredoc into a .py,
@@ -41,6 +42,13 @@ def refuse(reason):
         'permissionDecisionReason': reason}}))
 
 
+ARCHIVE = 'docs/archive/'
+ARCHIVE_REASON = (
+    'docs/archive/ holds frozen history, read by search and line range, never whole '
+    '(manual 12.11): grep -n TERM docs/archive/FILE, then a Read with an offset and a '
+    'limit of at most %d lines around the match.' % MAX_LINES)
+
+
 def read_reason(name):
     return ('%s is read by ID, not whole (manual 0.7 and 12.8). Use %s; '
             'python tools/manual.py --grep TERM names the entries and traps that '
@@ -60,7 +68,16 @@ def main():
     tool = data.get('tool_name')
     args = data.get('tool_input') or {}
     if tool == 'Read':
-        name = str(args.get('file_path', '')).replace('\\', '/').split('/')[-1]
+        path = str(args.get('file_path', '')).replace('\\', '/')
+        name = path.split('/')[-1]
+        if '/' + ARCHIVE in '/' + path.lstrip('./') or path.startswith(ARCHIVE):
+            try:
+                limit = int(args.get('limit'))
+            except (TypeError, ValueError):
+                limit = None
+            if limit is None or limit > MAX_LINES:
+                refuse(ARCHIVE_REASON)
+            return
         if name in GUARDED:
             try:
                 limit = int(args.get('limit'))
@@ -74,6 +91,9 @@ def main():
             refuse(HEREDOC_REASON)
             return
         if 'manual.py' in cmd or '|' in cmd or not WHOLE_FILE.search(cmd):
+            return
+        if ARCHIVE in cmd:
+            refuse(ARCHIVE_REASON)
             return
         for name in GUARDED:
             if name in cmd:

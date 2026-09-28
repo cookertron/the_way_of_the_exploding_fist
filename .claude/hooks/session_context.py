@@ -94,10 +94,12 @@ def main():
                    'it before extending a tool or writing a new one: ' + listed)
 
     status = os.path.join(ROOT, 'tools', 'status.py')
+    status_text = ''
     if os.path.isfile(status):
         code, text = run([sys.executable, status, '--brief'], timeout=30)
+        status_text = text.strip()
         out.append('Project status (tools/status.py --brief):')
-        out.append(text.strip() or '(no output)')
+        out.append(status_text or '(no output)')
     else:
         out.append('tools/status.py does not exist yet. It is PLANNED and is '
                    'the first tool to build (manual 12.10). Until it exists, '
@@ -115,7 +117,7 @@ def main():
             if len(changed) > MAX_CHANGED:
                 out.append('  ... and %d more' % (len(changed) - MAX_CHANGED))
             ids = manual_ids([changed_path(l) for l in changed])
-            if ids:
+            if ids and not all(i in status_text for i in ids):   # else the status said it
                 out.append('Manual entries and traps named by the ledger entries '
                            'in progress: %s (python tools/manual.py %s)'
                            % (' '.join(ids), ' '.join(ids)))

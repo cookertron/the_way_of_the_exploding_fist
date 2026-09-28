@@ -3080,3 +3080,6 @@ its row in the map, and `python tools/selftest.py` checks that it has.
     **clobbered** the existing `$840A` execution counter of the same name, which the
     composition-trace gate caught on the first build.  New observability can collide with
     old observability; grep the name before adding it.
+
+<!-- budget: entries below this line are 20 lines at most, each with its row in
+docs/TRAPS-MAP.md (tools/status.py --check, tools/selftest.py). -->

@@ -1029,6 +1029,11 @@ def t_hooks():
     eq(bash("cat > tools/x.py << 'EOF'\nprint(1)\nEOF"), 'deny', 'a heredoc into a .py file')
     eq(bash("python - << 'EOF'\nprint(1)\nEOF"), 'allow', 'a script run from a heredoc')
     eq(run_py([guard], 'not json'), (0, '', ''), 'garbage in: silent pass')
+    eq(decision({'tool_name': 'Read', 'tool_input': {'file_path': '/p/docs/archive/LOG.md'}}),
+       'deny', 'a whole archived file')
+    eq(decision({'tool_name': 'Read', 'tool_input': {'file_path': '/p/docs/archive/LOG.md',
+                                                     'offset': 10, 'limit': 100}}),
+       'allow', 'an archive read by line range')
 
     stop = os.path.join(hooks, 'stop_check.py')
     with tempfile.TemporaryDirectory() as d:
@@ -1063,6 +1068,143 @@ def t_hooks():
                 script = h['command'].split('/.claude/hooks/')[1]
                 if not os.path.isfile(os.path.join(hooks, script)):
                     raise AssertionError(f'{event} runs a script that does not exist: {script}')
+
+
+def make_port(d):
+    """A throwaway port with one oracle, one fixture, one tagged function and
+    one test that reads the fixture -- enough for record.py and status.py."""
+    import shutil
+    import subprocess
+    for rel in ('tools/record.py', 'tools/status.py', 'tools/manual.py',
+                'docs/PORTING-ZX-TO-JS.txt', 'docs/TRAPS.md', 'docs/TRAPS-MAP.md'):
+        os.makedirs(os.path.join(d, os.path.dirname(rel)), exist_ok=True)
+        shutil.copy(os.path.join(REPO, rel), os.path.join(d, rel))
+    files = {
+        'port.json': json.dumps({'name': 'demo', 'assets': [
+            {'key': 'edgejump', 'file': 'build/edgejump_fixture.json', 'note': 'test'}]}),
+        'build/edgejump_fixture.json': '{"rows": []}\n',
+        'tools/sim_edge.py': '"""oracle for $B34C (selftest)"""\n',
+        'web/game.js': '// @z80 $B34C\nfunction movePlayer(s) {\n  return s;\n}\n',
+        'test/game.test.js': "check('edge: A.edgejump rows', 1, 1);\n",
+        'docs/DECISIONS.md': '# Decisions\n\nPurpose: selftest\nRead by: selftest\n',
+    }
+    for rel, text in files.items():
+        os.makedirs(os.path.join(d, os.path.dirname(rel)) or d, exist_ok=True)
+        with open(os.path.join(d, rel), 'w', encoding='utf-8', newline='\n') as f:
+            f.write(text)
+    try:
+        for args in (['init', '-q'], ['add', '-A'],
+                     ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base']):
+            subprocess.run(['git', *args], cwd=d, capture_output=True, check=True)
+        return True
+    except Exception:
+        return False                              # no git: skip the git-derived parts
+
+
+def rec(d, *args, stdin=''):
+    return run_py([os.path.join(d, 'tools', 'record.py'), *args], stdin, cwd=d)
+
+
+def stat(d, *args):
+    return run_py([os.path.join(d, 'tools', 'status.py'), *args], cwd=d)
+
+
+def t_records():
+    with tempfile.TemporaryDirectory() as d:
+        has_git = make_port(d)
+        eq(rec(d, 'new', 'B34C', stdin='name: MovePlayer\n')[0], 0, 'new')
+        code, _, _ = rec(d, 'fact', 'B34C', stdin="kind: insn\nat: $B351\nsays: RET Z -- $8D22's caller\nby: adis\n")
+        eq(code, 0, 'fact with $ and an apostrophe')
+        code, _, err = rec(d, 'fact', 'B34C', stdin='kind: never\nsays: no writes\nby: sim\n')
+        if code != 1 or '#48' not in err:
+            raise AssertionError('a negative claim without window and n must be refused')
+        eq(rec(d, 'fact', 'B34C', stdin='kind: never\nsays: no writes\nby: sim\nwindow: 12 jumps\nn: 12\n')[0],
+           0, 'a negative claim with window and n')
+        eq(rec(d, 'open', 'B34C', stdin='ask: ladder?\ntried: sweep\nsettle: ladder sweep\n')[0], 0, 'open')
+        eq(rec(d, 'link', 'B34C', stdin='fixture: nosuch\n')[0], 1, 'an unregistered fixture is refused')
+        eq(rec(d, 'link', 'B34C', stdin='port: nosuch\n')[0], 1, 'an undefined port function is refused')
+        eq(rec(d, 'link', 'B34C', stdin='oracle: tools/sim_edge.py\nfixture: edgejump\nport: movePlayer\n'
+                                        'manual: c9 #141\n')[0], 0, 'real links')
+        eq(rec(d, 'close', 'B34C', '1', stdin='kind: measured\nsays: ladder tops support\nby: sim\n')[0],
+           0, 'close an open question as a fact')
+        sys.path.insert(0, os.path.join(d, 'tools'))
+        try:
+            import importlib
+            R = importlib.import_module('record')
+            data = R.load(os.path.join(d, 'ledger', 'B34C.toml'))
+        finally:
+            sys.path.pop(0)
+            sys.modules.pop('record', None)
+            sys.modules.pop('manual', None)
+        eq((len(data['fact']), 'open' in data, data['manual']), (3, False, ['C9', 'T141']),
+           'the ledger file round-trips')
+        eq(data['fact'][0]['says'], "RET Z -- $8D22's caller", 'text survives the heredoc untouched')
+        eq(rec(d, 'next', stdin='unit: $B34C gate next\nstep: write the gate\n')[0], 0, 'next')
+        eq(rec(d, 'decide', stdin='title: No ROM glyphs\ntext: substitute cells\n')[0], 0, 'decide')
+        with open(os.path.join(d, 'test', 'game.test.js'), 'a') as f:
+            f.write("checkTrue('edge: second row', true);\n")
+        if has_git:
+            out = rec(d, 'draft')[1]
+            if '1 check rows added' not in out or 'B34C +3 facts' not in out or not out.startswith('$B34C'):
+                raise AssertionError('draft must derive the gate rows and ledger deltas: ' + out[:200])
+
+
+def t_status():
+    with tempfile.TemporaryDirectory() as d:
+        has_git = make_port(d)
+        rec(d, 'new', 'B34C', stdin='name: MovePlayer\n')
+        rec(d, 'link', 'B34C', stdin='fixture: edgejump\nport: movePlayer\n')
+        rec(d, 'next', stdin='unit: $B34C gate next\nstep: write the gate\n')
+        code, out, _ = stat(d, '--check')
+        eq(code, 0, 'a clean port passes: ' + out)
+        out = stat(d, '--brief')[1]
+        for want in ('1 routines', '1 measured, 1 ported, 1 gated', 'Unit $B34C MovePlayer'):
+            if want not in out:
+                raise AssertionError('--brief is missing %r' % want)
+        if 'evidence: measured, ported, gated' not in stat(d, 'b34c')[1]:
+            raise AssertionError('the per-routine view must show its evidence')
+        planted = {'notes.md': 'orphan\n'}
+        for rel, text in planted.items():
+            with open(os.path.join(d, rel), 'w') as f:
+                f.write(text)
+        code, out, _ = stat(d, '--check')
+        if code != 1 or 'notes.md is not a record home' not in out:
+            raise AssertionError('an unregistered record must block: ' + out)
+        with open(os.path.join(d, 'notes.md'), 'w') as f:
+            f.write('Purpose: selftest\nRead by: selftest\n')
+        eq(stat(d, '--check')[0], 0, 'a record with a Purpose/Read by header is registered')
+        with open(os.path.join(d, 'web', 'game.js'), 'w') as f:
+            f.write('function renamed() {}\n')
+        code, out, _ = stat(d, '--check')
+        if code != 1 or "port function 'movePlayer'" not in out:
+            raise AssertionError('a broken link must block: ' + out)
+        with open(os.path.join(d, 'NEXT.md'), 'a') as f:
+            f.write('x\n' * 20)
+        if 'NEXT.md is' not in stat(d, '--check')[1]:
+            raise AssertionError('an oversized NEXT.md must warn')
+
+
+def t_context_watch():
+    hook = os.path.join(REPO, '.claude', 'hooks', 'context_watch.py')
+    with tempfile.TemporaryDirectory() as d:
+        tr = os.path.join(d, 't.jsonl')
+        sid = 'selftest-%d' % os.getpid()
+
+        def at(tokens):
+            with open(tr, 'a') as f:
+                f.write(json.dumps({'message': {'usage': {'input_tokens': 10,
+                                    'cache_read_input_tokens': tokens - 10}}}) + '\n')
+            code, out, _ = run_py([hook], json.dumps({'session_id': sid, 'transcript_path': tr}),
+                                  {'ZX_HANDOVER_TOKENS': '1000', 'ZX_HANDOVER_STEP': '500'})
+            eq(code, 0, 'the watch always exits 0')
+            return 'additionalContext' in out
+
+        eq([at(900), at(1100), at(1200), at(1600), at(300), at(1050)],
+           [False, True, False, True, False, True],
+           'notes once per crossing, again after the context shrinks and regrows')
+        state = os.path.join(tempfile.gettempdir(), 'zx-context-watch-%s.json' % sid)
+        if os.path.exists(state):
+            os.remove(state)
 
 
 CHECKS = [
@@ -1102,6 +1244,9 @@ CHECKS = [
     ('blitforensics: two-background differential on known sprites + guards', t_blitforensics),
     ('manual: entries, traps, index, grep across both documents', t_manual_ids),
     ('tools: every script in tools/ has a row in tools/README.md', t_tools_registry),
+    ('records: record.py writes each record to its home, refuses what it cannot check', t_records),
+    ('status: orientation, per-routine view, check blocks orphans and broken links', t_status),
+    ('hooks: the context watch notes each handover crossing once', t_context_watch),
     ('traps: every trap has exactly one row in the trap-to-check map', t_traps_map),
     ('hooks: read and heredoc guards, stop check, session and sub-agent context', t_hooks),
 ]
