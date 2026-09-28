@@ -8,9 +8,9 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 
 | State | Meaning | All 196 | #61 onward |
 |---|---|---|---|
-| KIT | the kit already prevents it | 24 | 3 |
+| KIT | the kit already prevents it | 27 | 4 |
 | BB | built in the Bubble Bobble repo and generic; move it into the kit | 20 | 18 |
-| BUILD | no mechanism yet; build it | 128 | 97 |
+| BUILD | no mechanism yet; build it | 125 | 96 |
 | READ | knowledge only; read by ID when relevant | 24 | 18 |
 
 | Mechanism | Traps | Still to build |
@@ -22,7 +22,7 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 | `harness`: Harness defaults and API in tools/harness.py | 10 | 8 |
 | `roster`: Save-state manifest and census rules (manual 12.6) | 8 | 8 |
 | `codemap`: adis, walk, grepbytes and the byte-usage map (phase 4, 12.5) | 8 | 8 |
-| `status`: Ledger and status script (manual 12.2-12.4) | 5 | 5 |
+| `status`: Ledger and status script (manual 12.2-12.4) | 5 | 2 |
 | `build`: Build-time checks in tools/build.py | 6 | 3 |
 | `platform`: Runtime in web/platform.js | 19 | 3 |
 | `rig`: Test runner behaviour in test/rig.js | 4 | 0 |
@@ -62,7 +62,7 @@ Traps: #28, #31, #67, #84, #150, #165, #183, #188
 
 Traps: #51, #52, #58, #68, #74, #80, #83, #121
 
-**`status`: Ledger and status script (manual 12.2-12.4)** (5 traps; BUILD 5). Facts carry their conditions and the command that settles them; counts are derived, never typed; every artifact has a reader; fixtures come only from their tool (stamps).
+**`status`: Ledger and status script (manual 12.2-12.4)** (5 traps; KIT 3, BUILD 2). Ledger facts carry the command that settles them, and a negative fact its window and n (record.py refuses it otherwise; status.py --check validates every ledger file); every fixture has a reader (warned); counts are derived, never typed; fixtures come only from their tool (stamps, still to build).
 
 Traps: #32, #48, #65, #97, #116
 
@@ -125,7 +125,7 @@ Traps: #178, #179, #184
 | 29 | Frame stepping overshoots cumulatively; add an absolute-target mode. | `harness` | BUILD |
 | 30 | A self-modifying PRNG's cycle depends on its seed; don't reuse it elsewhere. | `manual` | READ |
 | 31 | Distribution claims come from natural play; forced scenarios only reach paths. | `roster` | BUILD |
-| 32 | Scope a 'nothing reads it' claim to the sites actually measured. | `status` | BUILD |
+| 32 | Scope a 'nothing reads it' claim to what was watched: its window. | `status` | KIT |
 | 33 | A gate that re-implements its subject can't fail; the battery exposes it. | `battery` | BB |
 | 34 | Sample fixtures at structural boundaries (ISR entry, RET), not T offsets. | `measure` | BUILD |
 | 35 | Bracket a routine's cost by control flow, never by the stack pointer. | `measure` | BUILD |
@@ -141,7 +141,7 @@ Traps: #178, #179, #184
 | 45 | Transliterate DJNZ as an 8-bit decrement with its exit test, not a for loop. | `lint` | BUILD |
 | 46 | Enumerate a deterministic quantity's inputs rather than sampling it. | `measure` | BUILD |
 | 47 | Trace every shipped range to exactly one source in the tape image. | `build` | BUILD |
-| 48 | A negative claim carries its window and N; a grep can't prove it. | `status` | BUILD |
+| 48 | A negative claim carries its window and N; a grep can't prove it. | `status` | KIT |
 | 49 | Vary a walk's start position (page edges, alignments), not just contents. | `gate` | BUILD |
 | 50 | Seed so a routine's effect is visible, and gate loop counts too. | `gate` | BUILD |
 | 51 | For patched code, list every writer, including the one that restores it. | `codemap` | BUILD |
@@ -209,7 +209,7 @@ Traps: #178, #179, #184
 | 113 | Flag duplicated constants; a copy can't be mutation-tested. | `lint` | BUILD |
 | 114 | Two spellings of one rule drift apart; the census finds the dead copy. | `lint` | BB |
 | 115 | Test worlds must be states the machine can actually reach. | `gate` | BUILD |
-| 116 | Every artifact a tool writes has a reader, checked by script. | `status` | BUILD |
+| 116 | Every artifact a tool writes has a reader, checked by script. | `status` | KIT |
 | 117 | Counts in a check's text are derived from the code, never typed. | `lint` | BUILD |
 | 118 | Verify each mutation actually applied; NOT-APPLIED is its own verdict. | `battery` | BB |
 | 119 | Runners take paths from config; empty-list checks need a control. | `battery` | BUILD |

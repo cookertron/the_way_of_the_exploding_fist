@@ -229,7 +229,7 @@ THE MAP, for choosing what to read:
     11  the six habits
     12  keeping track across many sessions: the ledger, stamps, the status
         script, the byte-usage map, delegation, what survives a
-        compaction, token economy
+        compaction, token economy, where every record lives
 
 0.8 IF YOU ARE RESUMING: THE SESSION PROTOCOL
 
@@ -239,23 +239,25 @@ established is lost to the next unless it was written where a script can
 find it. Section 12 is the machinery; this is the routine.
 
   AT THE START, READ THE STATUS SCRIPT'S OUTPUT, NOT YOUR NOTES (12.4):
-  what is classified, which rung each routine holds, what has gone stale,
-  what can be taken next. A session-start hook prints it unasked, after
-  every compaction too (12.8). If the project has no status script yet,
-  building it is the next task (12.10). Never reread listings to find out
-  where you are.
+  the records, NEXT.md -- the unit in progress and its next step -- the
+  current unit's summary and what to read for it, and whatever the check
+  found. A session-start hook prints it unasked, after every compaction
+  and /clear too (12.8, 12.11). Never reread listings to find out where
+  you are.
 
   WORK IN UNITS. A unit is one routine -- or one table, one effect --
   taken up one rung of the ladder (5.1). Begin it by printing everything
-  the ledger holds for that address. End it by producing the artifact that
-  proves the new rung -- a fixture, a gate result, a frozen test -- through
-  a tool that stamps it (12.3). A unit that ends without an artifact did
-  not happen, however much was learned during it.
+  the ledger holds for that address (status.py ADDR). End it by producing
+  the artifact that
+  proves the new rung -- a fixture, a gate result, a frozen test --
+  through a tool that stamps it (12.3). A unit that ends without an
+  artifact did not happen, however much was learned during it.
 
   WRITE A JUDGMENT DOWN THE MOMENT IT IS SETTLED: a fact about the bytes,
   a refuted hypothesis, an open question, each in the routine's ledger
-  entry with the command that settles it (12.2). Whatever is left only in
-  context is gone at the next compaction.
+  entry with the command that settles it, through tools/record.py, which
+  puts it in its one home (12.2, 12.11). Whatever is left only in context
+  is gone at the next compaction.
 
   WHEN A UNIT STALLS, RECORD AND MOVE ON. When a measurement surprises you
   twice, the next move is to check the instrument (G1, G11), not to run it
@@ -264,11 +266,13 @@ find it. Section 12 is the machinery; this is the routine.
   frontier. Coming back cold to a written question is cheaper than a
   fourth attempt in a context full of the first three.
 
-  AT THE END OF A UNIT, commit -- one commit per unit, with the address
-  and the rung in the message -- and tell the operator that a /clear is
-  now safe: a context cleared at a unit boundary loses nothing, while an
-  automatic compaction lands wherever the window fills (12.8). The status
-  script's consistency check runs by itself at the end of every response.
+  AT THE END OF A UNIT, roll up any record the check says is over
+  budget, write NEXT.md (record.py next), draft the commit message
+  (record.py draft) and commit -- one commit per unit -- then tell the
+  operator that a /clear is now safe: a context cleared at a unit
+  boundary loses nothing, while an automatic compaction lands wherever
+  the window fills (12.8). The status script's consistency check runs by
+  itself at the end of every response.
 
 
 ------------------------------------------------------------------------------
@@ -4166,24 +4170,24 @@ colliding and keeps every change a readable diff. For section 9's
 routine:
 
     # ledger/B34C.toml -- judgments only; tools/status.py derives the rest
-    entries = ["$B34C"]            # every way in, fall-through included
-    name    = "MovePlayerToEndOfPlatform"
-    oracle  = "tools/sim_edgejump.py"     # writes a stamped fixture
-    gate    = "tools/cmp_edgejump.js"     # same arguments, same table
-    port    = "movePlayerToEndOfPlatform" # carries // @z80 $B34C
-    manual  = ["D1", "D4", "D5", "C3"]    # entries that govern it (12.8)
+    name     = "MovePlayerToEndOfPlatform"
+    entries  = ["$B34C"]           # every way in, fall-through included
+    oracle   = "tools/sim_edgejump.py"      # writes the fixture below
+    fixtures = ["edgejump"]        # port.json keys; a gate reads each
+    port     = "movePlayerToEndOfPlatform"  # carries // @z80 $B34C
+    manual   = ["D1", "D4", "D5", "C3"]     # what governs it (12.8)
 
-    [[fact]]                       # a typed claim (12.7), re-checkable
+    [[fact]]                       # a claim a script can re-check
     kind = "insn"
     at   = "$B351"
-    insn = "RET Z"
-    why  = "after AND 7: no check at all on cell-aligned x"
+    says = "RET Z after AND 7: no check at all on cell-aligned x"
+    by   = "python tools/adis.py 0xB351 3"
 
     [[fact]]
     kind = "insn"
     at   = "$B361"
-    insn = "RET NC"
-    why  = "after CP 5: support is tile >= 5, the cage included"
+    says = "RET NC after CP 5: support is tile >= 5, the cage included"
+    by   = "python tools/adis.py 0xB35F 2"
 
     [[refuted]]
     says = "walking off an edge checks the ground on every step"
@@ -4205,6 +4209,14 @@ Three kinds of judgment live here and nowhere else:
 
 What does NOT live here: rungs, "done", dates, anything a script can work
 out for itself. A status field typed by hand is a claim nobody re-checks.
+
+In the kit, tools/record.py writes these files, and status.py --check
+validates them however they were written. A fact needs kind, says and
+by; a NEGATIVE fact -- kind never, absent, unread, unused or unreachable
+-- also needs its window and n, or it cannot be checked (TRAPS #32, #48).
+The files are a small TOML subset, parsed the same way on every Python,
+and record.py rewrites a file whole, so a comment added by hand does not
+survive it: put anything worth keeping in a field.
 
 12.3 STAMPS
 ...........
@@ -4252,6 +4264,13 @@ the highest rung (5.1) whose artifact is present and FRESH, plus two
 engineering states the ladder does not name: PORTED (an engine function
 carries the routine's tag) and PROVED (its gate block went red under a
 deliberate break and its survivors are labelled, 6.9 step 9).
+
+The kit's first version reports evidence as PRESENT rather than FRESH:
+MEASURED (the routine's fixtures are registered and exist), PORTED (its
+port function is defined), GATED (a test reads each of its fixtures).
+Freshness arrives with stamps (12.3); the frontier, the coverage line and
+PROVED arrive with the tools they depend on. What follows is the whole
+design.
 
 "status.py --brief" prints about twenty lines:
 
@@ -4490,13 +4509,14 @@ goes on reading. Rules for spending it:
 In this order, each paying for the next:
 
   1. The session machinery the kit ships -- the operating card in
-     CLAUDE.md, the hooks, tools/manual.py -- is in place from the first
-     commit; adapting the card's tools table is the first half-hour. It
-     needs nothing else to exist, and it is what keeps every rule below
-     alive through a compaction.
-  2. Stamps, the ledger directory and status.py -- the first hour. The
-     hooks start using status.py the moment it exists, and every later
-     tool is worth more for reporting through it.
+     CLAUDE.md, the hooks, tools/manual.py, and the records of 12.11:
+     NEXT.md, the ledger, tools/record.py and tools/status.py -- is in
+     place from the first commit; adapting the card's tools table is the
+     first half-hour. It is what keeps every rule below alive through a
+     compaction.
+  2. Stamps (12.3), so that status.py reports evidence as fresh and not
+     merely present -- the first day. Every later tool is worth more for
+     reporting through it.
   3. The measurement entry point (6.11), before the second oracle is
      written, so that no oracle ever bypasses it.
   4. The byte-usage map (12.5), as soon as the harness can drive play.
@@ -4511,6 +4531,106 @@ update the table and delete from the card every rule it now enforces. The
 card should shrink as the tools grow; if it only ever grows, the rules
 are still living in prose, and every session is still paying to read
 them.
+
+12.11 WHERE EVERY RECORD LIVES, AND HOW IT STAYS SMALL
+......................................................
+
+A long port writes a great deal, and two things go wrong with it. Records
+GROW until reading them costs more than they are worth: Bubble Bobble's
+progress log reached 364 KB, about 90,000 tokens, and was read to find
+out where things stood [BB]. And records get LOST -- written somewhere and
+never found again, or found again saying something that stopped being
+true. The false claim of TRAPS #165 reached a check label, the spec, the
+log and very nearly a commit message: one fact, four copies, all wrong.
+
+The cure is structural, so that neither depends on anyone remembering.
+
+ONE HOME PER KIND OF RECORD, each with one reader and a budget:
+
+    NEXT.md              where things stand: unit, step, then,    20 lines
+                         blocked, notes; overwritten, never
+                         appended; read at every session start
+    ledger/ADDR.toml     current truth about one routine: facts   80 lines
+                         with their commands, refuted claims,
+                         open questions, links (12.2); read by
+                         address. ledger/topics/NAME.toml holds
+                         a system that spans several routines
+    the commit message   what happened in the unit, in fixed      15 lines
+                         fields; queried with git log, never
+                         read end to end
+    docs/TRAPS.md        a genuinely new lesson, with its row in  20 lines
+                         TRAPS-MAP; read by number
+    docs/DECISIONS.md    a project-level choice; read by number   12 lines
+    tools/README.md and  tools and fixtures, registered where
+    port.json            they already were
+
+Anything else is scratch, in scratch/, which git ignores; anything worth
+keeping moves to a home before the unit ends. Logs and specs from before
+this system go to docs/archive/, read by search and line range, never
+whole. The budgets live at the top of tools/record.py, to be tuned.
+
+THREE RULES, CHECKED BY status.py --check AT THE END OF EVERY RESPONSE:
+
+  - REGISTERED. Every record is in a home, or is a file whose first lines
+    say "Purpose:" and "Read by:". Anything else blocks the response.
+  - PURPOSEFUL. Every home says what it is for and who reads it.
+  - LINKED. A ledger entry's oracle, fixtures, port function and manual
+    IDs must exist, or the response is blocked. A fixture nothing reads,
+    a tagged function with no ledger entry, a NEXT.md unit with no entry
+    and a record over budget are warnings.
+
+WRITTEN THROUGH ONE TOOL. tools/record.py puts each record in its home,
+checks each link before writing it, refuses a negative claim without its
+window and N, and keeps every value to one line. Its fields arrive on
+stdin through a quoted heredoc, so the shell never mangles a "$" or an
+apostrophe (TRAPS #149, #168). "record.py draft" writes the mechanical
+lines of the unit's commit message from git -- check rows added,
+fixtures added, ledger changes, files -- and leaves the judgment lines.
+
+ROLLED UP, NOT DELETED. Git keeps every version, so trimming a live
+record loses nothing: its history is one "git log -p" away. When the
+check warns that a record is over budget, the end of the unit rolls it
+up -- current truth kept, superseded detail dropped, the commit that
+holds it named in the commit message. A record that keeps outgrowing its
+budget is usually mixing kinds, and the fix is to split it.
+
+RESTORED AT THREE MOMENTS. At every session start, and after every
+compaction or /clear, the session hook prints the orientation, which is
+"status.py --brief": the records, NEXT.md, the current unit's summary and
+what to read for it, and the check's result. At the start of a unit,
+"status.py ADDR" prints everything known about one routine. And past a
+context threshold -- 150,000 tokens by default, set in the env block of
+.claude/settings.json -- a hook tells the agent to hand over at the next
+clean point, before compaction arrives.
+
+THE TEST OF ALL THIS IS A COLD START: after a /clear, can the agent say
+what it is doing, what comes next and what is known about the routine in
+hand, without reading anything beyond the orientation? Run it on purpose
+from time to time; it is the acceptance test for this section.
+
+WORKED EXAMPLE. Bubble Bobble's increment M7.36 -- the HUD's two text
+rows, $7FE2-$7FFB -- produced these records, and every one has a home:
+
+    what M7.36 produced                     where it lives now
+    the oracle phase                        tools/, with a README row
+    the fixture                             port.json, linked from the
+                                            ledger entry
+    "the second row's pointer is never      ledger/7FE2.toml, a fact
+     loaded: $802E's INC IX carries IX"      with the oracle's command
+    "$85C1-$85FB is a static template:      a fact of kind never,
+     zero writes over 17,400 frames"         window and n filled in
+    "$7FFC is reached only from $8D22"      ledger/7FFC.toml, refuted
+    the five gate rows                      test/, reading the fixture
+    the JavaScript for both call sites      web/, tagged // @z80 $7FE2
+    the lesson "poison around NULs"         TRAPS #189, with its row
+    the five mistakes made on the way       the commit's Surprise line,
+                                            or TRAPS when one is new
+    a 10.9 KB progress-log entry            a 15-line commit message
+
+ADOPTING THIS MID-PORT. Do not migrate: rewriting a large log or spec
+costs more than it saves. Move them to docs/archive/, copy the live to-do
+list into NEXT.md once, and create each routine's ledger entry the next
+time a unit touches it, pulling what it needs from the archive by search.
 
 ==============================================================================
                                 END OF MANUAL

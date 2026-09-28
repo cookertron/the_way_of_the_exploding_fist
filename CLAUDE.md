@@ -32,21 +32,42 @@ a result surprises you.
 ## Session routine (manual 0.8)
 
 1. Start from the status block printed at session start and again after
-   every compaction.  If it says `tools/status.py` does not exist, build it
-   before the next unit of porting work (manual 12.10).
+   every compaction or /clear: NEXT.md, the current unit, what to read for
+   it, and anything `tools/status.py --check` found.
 2. Work in units: one routine taken up one rung of the evidence ladder
-   (manual 5.1).  Begin with `python tools/status.py $ADDR`; end with an
-   artifact written by a tool that stamps it: a fixture, a gate result, a
-   frozen test.
-3. Write each judgment into `ledger/<ADDR>.toml` the moment it is settled
-   — facts, refuted claims, open questions — with the command that settles
-   it, and list the manual entries and traps that govern the routine in its
-   `manual = [...]` line (manual 12.2).
+   (manual 5.1).  Begin with `python tools/status.py B34C`; end with an
+   artifact written by a tool: a fixture, a gate result, a frozen test.
+3. Record each judgment the moment it is settled, with
+   `python tools/record.py` (fact, refute, open, close, link): it goes to
+   the routine's ledger file with the command that settles it.  Link the
+   manual entries and traps that govern the routine (manual 12.2).
 4. A measurement that surprises you twice means checking the instrument
    (G1, G11), not running it a third time.  Still stuck: record the open
-   question in the ledger and take the next item from the frontier.
-5. End of unit: commit, then tell the user the unit is committed and a
-   /clear is safe.
+   question and take the next item from NEXT.md.
+5. End of unit: roll up anything the check says is over budget, write
+   NEXT.md (`record.py next`), draft the commit (`record.py draft`),
+   commit, then tell the user the unit is committed and a /clear is safe.
+   The same handover applies whenever the context-watch note appears.
+
+## Records: one home each (manual 12.11)
+
+`NEXT.md` where things stand · `ledger/ADDR.toml` current truth about a
+routine (`ledger/topics/` for systems) · the commit message what happened ·
+`docs/TRAPS.md` new lessons, each with its map row · `docs/DECISIONS.md`
+project-level choices · `scratch/` everything else, cleared at unit end.
+Write them with `record.py`: fields go on stdin through a quoted heredoc,
+one line each, so the shell never touches a `$`:
+
+    python tools/record.py fact B34C <<'EOF'
+    kind: insn
+    at: $B351
+    says: RET Z after AND 7 -- no check at all on cell-aligned x
+    by: python tools/adis.py 0xB351 3
+    EOF
+
+Any other record file needs "Purpose:" and "Read by:" in its first lines,
+or the end-of-response check blocks.  History lives in git, so rolling a
+record up loses nothing.
 
 ## What is already here (don't rebuild it)
 
@@ -68,9 +89,14 @@ a result surprises you.
   needs the tape.
 - `.claude/` and `tools/manual.py` — the session machinery (manual 12.8): a
   status block at every start and after every compaction, a guard that
-  refuses whole-file reads of the manual and the traps and source written
-  through shell heredocs, a consistency check at the end of every response
-  once `tools/status.py` exists, and a short block for every sub-agent.
+  refuses whole-file reads of the manual, the traps and `docs/archive/`,
+  and source written through shell heredocs, a consistency check at the
+  end of every response, a note when the context passes the handover mark,
+  and a short block for every sub-agent.
+- `tools/record.py` and `tools/status.py` — the records (manual 12.11):
+  record.py writes each to its home and checks its links; status.py gives
+  the orientation, `status.py ADDR`, `--check` and `--index`.  Evidence is
+  reported as present, not yet as fresh.
 
 ## Still to build
 
@@ -80,7 +106,7 @@ each must prevent.
 
 | Tool | Replaces |
 |---|---|
-| `tools/status.py` (build first) | notes about what is done (manual 12.4) |
+| stamps for status.py (build first) | trusting evidence that predates a harness fix (manual 12.3) |
 | `measure()` in the harness | the measurement checklist (manual 6.11, G11) |
 | gate helpers in `test/rig.js` | remembering how gates fail (map: `gate`) |
 | a kit mutation runner | Bubble Bobble's runner is the starting point (map: `battery`) |
@@ -127,4 +153,5 @@ on this card that it now enforces.
 
 Scoped commits, one per unit of work, each with a message that says what
 was measured and what the mutation battery covered.  Suite count in the
-message.
+message.  `python tools/record.py draft` writes the mechanical lines; the
+body stays within 15 lines.

@@ -50,11 +50,18 @@ Starting a port:
 | `docs/PORTING-ZX-TO-JS.txt` | The field manual: sixteen phases, what evidence to demand at each |
 | `docs/TRAPS.md` | The recorded lessons (196; 26-196 from Bubble Bobble), each with the measurement that taught it |
 | `docs/TRAPS-MAP.md` | Every trap mapped to the mechanism that should prevent it, and whether that mechanism exists yet |
+| `docs/DECISIONS.md` | Project-level choices, numbered D1, D2, ... and read by number |
+| `docs/archive/` | Frozen logs and specs from before the record system: read by search, never whole |
 | `CLAUDE.md` | The briefing and operating card, re-read from disk after every context compaction |
+| `NEXT.md` | Where things stand: the unit, its next step, the queue; overwritten at every unit end |
+| `ledger/` | Current truth, one TOML file per routine (`ledger/topics/` for systems spanning routines) |
+| `scratch/` | Anything else, git-ignored and cleared at unit end |
 | `.claude/` | Session hooks: status at every start, read-by-ID and heredoc guards, the end-of-response check, sub-agent context |
 | `port.json` | The port's manifest: tape, entry, blocks, contention, assets, includes |
 | `tools/` | Tape/loader/boot, the SkoolKit-based Z80 harness, disassembly and discovery, graphics forensics, `build.py` — see `tools/README.md` |
 | `tools/manual.py` | The manual and the traps by ID: `C9`, `T146`, `--grep TERM`, `--map gate` |
+| `tools/record.py` | Writes every record to its one home and checks its links before writing |
+| `tools/status.py` | Where things stand, derived from the records: `--brief`, `B34C`, `--check`, `--index` |
 | `web/platform.js` | The platform runtime, inlined into the page by the build |
 | `web/template.html` | The page: shell, `#include platform.js`, the demo to replace |
 | `test/rig.js` | The headless rig: vm sandbox, recording canvas stub, real localStorage, captured rAF |
@@ -96,23 +103,29 @@ by breaking it on purpose and watching the test fail.  Keep doing both.
 
 A port runs for weeks across many sessions, and every context compaction
 discards what was read so far, this repository's documents included.  The
-kit keeps its rules where compaction cannot reach them (manual 12.8).
-`CLAUDE.md` is re-read from disk after every compaction, and
-`.claude/settings.json` wires four hooks:
+kit keeps its rules where compaction cannot reach them (manual 12.8), and
+gives everything Claude writes one home, so nothing is filed and forgotten
+(manual 12.11).  `CLAUDE.md` is re-read from disk after every compaction,
+and `.claude/settings.json` wires five hooks:
 
-- a session-start block with the status, the unit in progress and the
-  manual entries it names;
-- a guard that refuses whole-file reads of the manual and the traps, and
-  source files written through shell heredocs;
-- a consistency check at the end of every response, once `tools/status.py`
-  exists;
+- a session-start block with the status, NEXT.md, the unit in progress and
+  what to read for it;
+- a guard that refuses whole-file reads of the manual, the traps and
+  `docs/archive/`, and source files written through shell heredocs;
+- a consistency check at the end of every response (`status.py --check`),
+  which blocks on unregistered records and broken links;
+- a note when the context passes the handover mark (150,000 tokens by
+  default, set in the `env` block of `.claude/settings.json`);
 - a short block of rules for every sub-agent.
 
-The hooks run `python`; change the four commands in `.claude/settings.json`
+The hooks run `python`; change the five commands in `.claude/settings.json`
 if your system calls it `python3`.  Test each once, because a silent hook
 looks exactly like a working one: ask Claude what the session context says;
 ask it to read the manual in full and check the refusal; run `/compact` and
 ask again; start a sub-agent and ask what it knows about `tools/manual.py`.
+The acceptance test for the whole arrangement is a cold start: after a
+`/clear`, can Claude say what it is doing, what comes next and what is known
+about the routine in hand, from the session block alone?
 
 ## Provenance
 
