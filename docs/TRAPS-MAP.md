@@ -42,7 +42,7 @@ Traps: #24, #37, #40, #44, #49, #50, #54, #55, #57, #60, #61, #62, #63, #66, #77
 
 Traps: #27, #34, #35, #46, #59, #64, #71, #87, #89, #90, #94, #102, #143, #144, #146, #147, #152, #153, #154, #160, #172, #182, #189, #193
 
-**`battery`: Kit mutation runner in tools/** (22 traps; BB 13, BUILD 9). Checks each mutation applied; requires the positive N/N baseline; keeps anchors live, unique and counted (listed, live, killed); syntax-checks each mutant; gives timeouts their own verdict and drains FAIL lines; runs one battery at a time; reads paths from config; records a reason for every withdrawn case; runs only the affected cases per increment.
+**`battery`: Kit mutation runner in tools/** (22 traps; BB 13, BUILD 9). Checks each mutation applied; requires the positive N/N baseline; keeps anchors live, unique and counted (listed, live, killed); syntax-checks each mutant; gives timeouts their own verdict and drains FAIL lines; runs one battery at a time; reads paths from config; records a reason for every withdrawn case; runs only the affected cases per increment (new cases, cases whose anchor lines changed, cases whose killing row changed), records each case's killing row and the last full run, so status.py can warn when a full run is due.
 
 Traps: #23, #33, #70, #73, #106, #107, #118, #119, #126, #130, #137, #145, #158, #162, #166, #167, #177, #185, #186, #194, #195, #196
 

@@ -109,7 +109,7 @@ each must prevent.
 | stamps for status.py (build first) | trusting evidence that predates a harness fix (manual 12.3) |
 | `measure()` in the harness | the measurement checklist (manual 6.11, G11) |
 | gate helpers in `test/rig.js` | remembering how gates fail (map: `gate`) |
-| a kit mutation runner | Bubble Bobble's runner is the starting point (map: `battery`) |
+| a kit mutation runner, with `--affected` | re-running the whole battery after every increment; it records each case's killing row and the last full run, so `status.py` can warn when a full run is due. Bubble Bobble's runner is the starting point (map: `battery`) |
 | the byte-usage map and roster manifest | backward-decode verdicts; guessing how saved states differ (12.5, 12.6) |
 | `tools/brief.py`, `tools/verify_claims.py` | re-reading a range to check a sub-agent (12.7) |
 
@@ -127,7 +127,11 @@ on this card that it now enforces.
    names the bug.
 3. **Mutation-test every behaviour you add.**  Break it on purpose, watch
    the named test fail, restore, re-run.  A test that cannot fail is not a
-   test (see the localStorage lesson in TRAPS).
+   test (see the localStorage lesson in TRAPS).  After an increment, run
+   only the affected cases: its new ones, and older ones whose anchor lines
+   or killing rows it changed.  Run the full battery at each milestone,
+   after any change to the harness, rig or runner, and before a release
+   (manual 6.9 step 9).  Say which kind of run it was in the commit.
 4. **The built artifact is what is tested.**  `tools/build.py` first, then
    `node test/kit.test.js`.  Never import source modules into a test.
 5. **Faithful first, added layer declared.**  Every departure from the

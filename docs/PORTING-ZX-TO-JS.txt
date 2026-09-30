@@ -3167,6 +3167,22 @@ that has a clean call boundary.
      red and every survivor carries one of those labels. The status
      script reports PROVED separately from passing (12.4).
 
+     KEEP EACH RUN THE SIZE OF THE CHANGE [BB]. A battery that grows with
+     every increment and is re-run whole after each one costs more every
+     time: Bubble Bobble's reached 2,213 cases, 16 minutes on 30 workers
+     per run, and paid it after every increment. After an increment, run
+     only the AFFECTED cases:
+        - the increment's own new cases;
+        - older cases whose anchor lines the increment changed;
+        - older cases whose KILLING ROW the increment changed. Editing a
+          gate can quietly stop a row catching an old mutant, and running
+          only the cases anchored in changed engine code never notices.
+     Run the FULL battery at each milestone (the end of a phase), after
+     any change to the harness, the rig or the runner itself, and before
+     a release. The third kind needs to know which named row killed each
+     case: until the kit's runner records it, keep it with the case, and
+     write the kind of run -- affected or full -- in the commit message.
+
 WHAT IT PROVES: your model is exact on the paths exercised, transition by
 transition, with an oracle at every step and a realistic input
 distribution.
