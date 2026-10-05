@@ -221,7 +221,8 @@ THE MAP, for choosing what to read:
         D rule shape, E substitution, F "improvement", G method;
         4.99 the one-page short list
     5   the evidence ladder R0-R9, the done rule, done as a computation
-    6   the harness, the differential test, one measurement entry point
+    6   the harness, the differential test, one measurement entry point,
+        and the mutation runner that keeps a full battery cheap
     7   structuring the JavaScript engine
     8   the diagnostic battery Q1-Q19 and the decision checklist 8.20
     9   one rule carried end to end
@@ -3182,6 +3183,7 @@ that has a clean call boundary.
      a release. The third kind needs to know which named row killed each
      case: until the kit's runner records it, keep it with the case, and
      write the kind of run -- affected or full -- in the commit message.
+     6.12 is how the runner keeps each case, and so each full run, cheap.
 
 WHAT IT PROVES: your model is exact on the paths exercised, transition by
 transition, with an oracle at every step and a realistic input
@@ -3245,6 +3247,63 @@ The signature is illustrative. The defaults are the point:
 
 A measurement that needs to break a default says so in its call, where a
 reviewer can see it.
+
+6.12 THE MUTATION RUNNER: MAKING A FULL RUN CHEAP
+.................................................
+
+[BB] Bubble Bobble's battery later passed 5,000 cases, and a full run
+took nearly five hours on a 16-core machine: about a minute of CPU per
+case, spent rebuilding the page, reloading it and running the whole
+suite of over 1,244 checks against a mutant that most of those checks
+never touch. A battery grows with every increment, so a runner that pays
+for the whole suite on every case gets slower every week. Build the
+kit's runner to pay only for what can matter, in this order. Each step
+is worth having on its own, and the first is a measurement:
+
+  1. MEASURE ONE CASE FIRST. Time the rebuild, the page load and the
+     suite separately for a single case, and list the slowest gates. The
+     split decides which of the steps below pays most.
+  2. RUN THE KILLING ROW FIRST, AND STOP AT THE FIRST FAILURE. Every case
+     records the named row expected to kill it (6.9 step 9). Run that row
+     first; if it fails, the case is killed in seconds. If another row
+     kills it instead, record that -- TRAPS #145 -- rather than letting it
+     pass unnoticed.
+  3. RUN ONLY THE ROWS THAT CAN KILL IT. During each full run, record
+     which source lines each gate row executes -- the V8 coverage built
+     into Node, taken per row by the rig. For each case, run only the
+     rows that execute its anchored line: a row that never runs the
+     mutated line cannot kill it, and a mutant that no row executes is a
+     survivor without anything being run. Established tools work this
+     way (PIT for Java, Stryker for JavaScript). It needs the suite in
+     named blocks that can run on their own, which is the gate helpers'
+     job (map: gate).
+  4. STAMP EVERY VERDICT (12.3). A verdict goes stale only when one of
+     its inputs changes: the killing row's test code, the source that row
+     executed, or the rig, harness, build and runner. A milestone run
+     re-runs the stale verdicts only; a truly full run is needed only
+     when the rig, harness, build or runner changes.
+  5. BUILD ONCE FOR ALL MUTANTS. Compile every case into one build behind
+     a switch -- "if (MUTANT === 1234) { mutated line } else { original
+     line }", what Stryker calls mutation switching -- so that a warm
+     worker loads the page once and runs case after case by changing one
+     number. The build with every switch off must pass the suite
+     identically: that is a check, not an assumption.
+  6. PRUNE WHAT ADDS NOTHING. From a full run's kill matrix, a case that
+     is killed by every row that kills another case adds nothing to it.
+     Research on such subsumed mutants finds that the minimal set is
+     often a small fraction of the whole. Leave the rest out of routine
+     runs, and re-check them before a release.
+
+THE CASE FORMAT CARRIES WHAT THESE NEED, FROM THE FIRST CASE: an id, the
+file, the anchor line, the replacement, the increment that wrote it, the
+named row expected to kill it, and, for a withdrawn case, the reason.
+Cases written that way are ready for every step above, whichever runner
+the port starts with.
+
+AND A FULL RUN IS NOBODY'S CONVERSATION. Start it as a script or a
+scheduled job that writes a one-line summary to a file, and let a session
+read that line afterwards. A session that waits on a run of hours, or
+polls it, pays for its whole context every time it looks.
 
 
 ------------------------------------------------------------------------------
@@ -4535,10 +4594,13 @@ In this order, each paying for the next:
      reporting through it.
   3. The measurement entry point (6.11), before the second oracle is
      written, so that no oracle ever bypasses it.
-  4. The byte-usage map (12.5), as soon as the harness can drive play.
-  5. Phase 4's marks and folding, as soon as the ledger has content.
-  6. The roster manifest, the moment there is a second saved state.
-  7. Briefs and typed claims, the first time you delegate a reading.
+  4. The mutation runner (6.12): steps 1 to 3 before the first gate
+     block, and the rest as the battery grows -- by the time a full run
+     takes an hour, it should already have them all.
+  5. The byte-usage map (12.5), as soon as the harness can drive play.
+  6. Phase 4's marks and folding, as soon as the ledger has content.
+  7. The roster manifest, the moment there is a second saved state.
+  8. Briefs and typed claims, the first time you delegate a reading.
 
 Keep the TOOLS TABLE on the operating card, one line per tool, marked
 EXISTS or PLANNED, with what it replaces. NEVER CALL A PLANNED TOOL --

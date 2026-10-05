@@ -109,12 +109,27 @@ each must prevent.
 | stamps for status.py (build first) | trusting evidence that predates a harness fix (manual 12.3) |
 | `measure()` in the harness | the measurement checklist (manual 6.11, G11) |
 | gate helpers in `test/rig.js` | remembering how gates fail (map: `gate`) |
-| a kit mutation runner, with `--affected` | re-running the whole battery after every increment; it records each case's killing row and the last full run, so `status.py` can warn when a full run is due. Bubble Bobble's runner is the starting point (map: `battery`) |
+| a kit mutation runner (manual 6.12) | a whole-suite run per case -- nearly five hours for Bubble Bobble's 5,000 cases.  Built in 6.12's order, from Bubble Bobble's runner (map: `battery`) |
 | the byte-usage map and roster manifest | backward-decode verdicts; guessing how saved states differ (12.5, 12.6) |
 | `tools/brief.py`, `tools/verify_claims.py` | re-reading a range to check a sub-agent (12.7) |
 
 When one lands, move it into "What is already here" and delete every rule
 on this card that it now enforces.
+
+## The mutation battery (manual 6.9 step 9, 6.12)
+
+- Every case records its id, file, anchor line, replacement, the increment
+  that wrote it, and the named row expected to kill it.
+- After an increment, run only the affected cases: its new ones, and older
+  ones whose anchor lines or killing rows it changed.
+- Run the full battery at each milestone, after any change to the harness,
+  rig, build or runner, and before a release -- as a background script
+  that writes a one-line summary.  Never wait on it or poll it.
+- Say in the commit which kind of run it was.
+- Build the runner in manual 6.12's order: measure one case first; run the
+  killing row first and stop at the first failure; run only the rows that
+  execute the mutated line; stamp verdicts so only stale ones re-run; one
+  build for all mutants, behind a switch; prune subsumed cases.
 
 ## House rules
 
@@ -127,11 +142,8 @@ on this card that it now enforces.
    names the bug.
 3. **Mutation-test every behaviour you add.**  Break it on purpose, watch
    the named test fail, restore, re-run.  A test that cannot fail is not a
-   test (see the localStorage lesson in TRAPS).  After an increment, run
-   only the affected cases: its new ones, and older ones whose anchor lines
-   or killing rows it changed.  Run the full battery at each milestone,
-   after any change to the harness, rig or runner, and before a release
-   (manual 6.9 step 9).  Say which kind of run it was in the commit.
+   test (see the localStorage lesson in TRAPS).  How much to run, and how
+   to keep it cheap: "The mutation battery", above.
 4. **The built artifact is what is tested.**  `tools/build.py` first, then
    `node test/kit.test.js`.  Never import source modules into a test.
 5. **Faithful first, added layer declared.**  Every departure from the
