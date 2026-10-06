@@ -18,6 +18,7 @@ and present), PORTED (its port function is defined in web/), GATED (every one
 of its fixtures is read by a test).  Freshness -- whether that evidence
 predates a harness fix -- needs stamps (manual 12.3), not built yet.
 """
+import json
 import os
 import re
 import subprocess
@@ -223,6 +224,22 @@ def check(ctx):
     for addr in sorted(set(m.upper() for m in re.findall(r'@z80\s+\$([0-9A-Fa-f]{4})', ctx['web']))):
         if '$' + addr not in have:
             warn.append('web/ tags @z80 $%s but no ledger entry covers it' % addr)
+
+    # the mutation battery (manual 6.12): is a full run due?
+    mlast = read('build/mutants/last.json')
+    if mlast:
+        try:
+            rev = json.loads(mlast).get('full_rev')
+        except ValueError:
+            rev = None
+        if not rev:
+            warn.append('no full mutation run on record: python tools/mutants.py --background')
+        else:
+            moved = [f for f in ('test/rig.js', 'tools/build.py', 'tools/mutants.py', 'tools/mutants.js')
+                     if git('diff', '--quiet', rev, '--', f) is None]
+            if moved:
+                warn.append('a full mutation run is due: %s changed since the last one '
+                            '(python tools/mutants.py --background)' % ', '.join(moved))
 
     scratch = os.path.join(ROOT, 'scratch')
     last = git('log', '-1', '--format=%ct')

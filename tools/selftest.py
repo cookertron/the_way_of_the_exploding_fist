@@ -1184,6 +1184,99 @@ def t_status():
             raise AssertionError('an oversized NEXT.md must warn')
 
 
+def make_mutport(d):
+    """A synthetic port for the mutation runner: the kit's own page with a tiny
+    engine included, a three-block suite, and six cases that between them reach
+    every verdict path (manual 6.12)."""
+    import io
+    import shutil
+    import subprocess
+    for rel in ('tools/build.py', 'tools/mutants.py', 'tools/mutants.js', 'test/rig.js',
+                'web/platform.js', 'build/assets.json'):
+        os.makedirs(os.path.join(d, os.path.dirname(rel)), exist_ok=True)
+        shutil.copy(os.path.join(REPO, rel), os.path.join(d, rel))
+    shutil.copytree(os.path.join(REPO, 'tools', 'vendor'), os.path.join(d, 'tools', 'vendor'))
+    tpl = io.open(os.path.join(REPO, 'web', 'template.html'), encoding='utf-8').read()
+    marker = '/*#include platform.js*/'
+    assert marker in tpl, 'the template lost its platform include marker'
+    port = json.load(io.open(os.path.join(REPO, 'port.json'), encoding='utf-8'))
+    port['out'] = 'web/demo.html'
+    port['includes'] = {'platform.js': 'web/platform.js', 'game.js': 'web/game.js'}
+    port['mutants'] = {'cases': 'test/mutants.json', 'suite': 'test/demo.test.js'}
+    files = {
+        'web/template.html': tpl.replace(marker, marker + '\n/*#include game.js*/'),
+        'port.json': json.dumps(port, indent=1),
+        'web/game.js': ('const DEMO_K = 7;\n'
+                        'globalThis.__DEMO = {\n'
+                        '  add(a, b) { return a + b; },\n'
+                        '  twice(x) { return x * 2; },\n'
+                        '  unused(x) { return x - 1; },\n'
+                        '  k() { return DEMO_K; },\n'
+                        '};\n'),
+        'test/demo.test.js': ("'use strict';\nconst rig = require('./rig');\nconst { check } = rig;\n"
+                              "const { sandbox } = rig.loadBuilt();\nconst D = sandbox.__DEMO;\n"
+                              "{ check('add', D.add(2, 3), 5); }\n"
+                              "{ check('twice', D.twice(4), 8); }\n"
+                              "{ check('k', D.k(), 7); }\n"
+                              "rig.done();\n"),
+        'test/mutants.json': json.dumps([
+            {'file': 'game.js', 'label': 'add subtracts', 'old': 'return a + b;', 'new': 'return a - b;'},
+            {'file': 'game.js', 'label': 'twice triples', 'old': 'return x * 2;', 'new': 'return x * 3;'},
+            {'file': 'game.js', 'label': 'unused is never called', 'old': 'return x - 1;', 'new': 'return x - 2;'},
+            {'file': 'game.js', 'label': 'the constant', 'old': 'const DEMO_K = 7;', 'new': 'const DEMO_K = 8;'},
+            {'file': 'game.js', 'label': 'a dead anchor', 'old': 'return a * b;', 'new': 'return a / b;'},
+            {'file': 'demo.test.js', 'label': 'the test expects 6',
+             'old': "check('add', D.add(2, 3), 5);", 'new': "check('add', D.add(2, 3), 6);"},
+        ], indent=1),
+    }
+    for rel, text in files.items():
+        with open(os.path.join(d, rel), 'w', encoding='utf-8', newline='\n') as f:
+            f.write(text)
+    try:
+        for args in (['init', '-q'], ['add', '-A'],
+                     ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base']):
+            subprocess.run(['git', *args], cwd=d, capture_output=True, check=True)
+        return True
+    except Exception:
+        return False
+
+
+def t_mutants():
+    import io
+    import subprocess
+    with tempfile.TemporaryDirectory() as d:
+        has_git = make_mutport(d)
+        pristine = io.open(os.path.join(d, 'web', 'game.js'), encoding='utf-8').read()
+        r = subprocess.run([sys.executable, 'tools/mutants.py', '--jobs', '1'], cwd=d,
+                           capture_output=True, text=True, timeout=600)
+        eq(r.returncode, 1, 'a survivor and a dead anchor make the run red: ' + r.stdout[-300:])
+        state = json.load(io.open(os.path.join(d, 'build', 'mutants', 'last.json'), encoding='utf-8'))
+        got = {k: v['verdict'] for k, v in state['cases'].items()}
+        eq(got, {'add subtracts': 'KILLED', 'twice triples': 'KILLED', 'unused is never called': 'SURVIVED',
+                 'the constant': 'KILLED', 'a dead anchor': 'ANCHOR', 'the test expects 6': 'KILLED'},
+           'verdicts on the synthetic port')
+        for k in ('add subtracts', 'twice triples', 'the constant'):
+            if not state['cases'][k]['killer_sha']:
+                raise AssertionError('no killing block recorded for %r' % k)
+        if 'LISTED 6' not in io.open(os.path.join(d, 'build', 'mutants', 'summary.txt'), encoding='utf-8').read():
+            raise AssertionError('the one-line summary is missing or wrong')
+        eq(io.open(os.path.join(d, 'web', 'game.js'), encoding='utf-8').read(), pristine,
+           'the real tree is never written')
+        if has_git:
+            cases = json.load(io.open(os.path.join(d, 'test', 'mutants.json'), encoding='utf-8'))
+            cases.append({'file': 'game.js', 'label': 'twice quadruples',
+                          'old': 'return x * 2;', 'new': 'return x * 4;'})
+            with open(os.path.join(d, 'test', 'mutants.json'), 'w', encoding='utf-8') as f:
+                json.dump(cases, f)
+            r = subprocess.run([sys.executable, 'tools/mutants.py', '--jobs', '1', '--affected'], cwd=d,
+                               capture_output=True, text=True, timeout=600)
+            if 'affected: 2 cases (1 new, 0 anchor lines, 0 killing block, 1 dead anchor)' not in r.stdout:
+                raise AssertionError('--affected must pick the new case and keep the dead anchor: '
+                                     + r.stdout[-400:])
+            if 'LISTED 2  KILLED 1' not in r.stdout:
+                raise AssertionError('the new case must be killed: ' + r.stdout[-300:])
+
+
 def t_context_watch():
     hook = os.path.join(REPO, '.claude', 'hooks', 'context_watch.py')
     with tempfile.TemporaryDirectory() as d:
@@ -1247,6 +1340,7 @@ CHECKS = [
     ('records: record.py writes each record to its home, refuses what it cannot check', t_records),
     ('status: orientation, per-routine view, check blocks orphans and broken links', t_status),
     ('hooks: the context watch notes each handover crossing once', t_context_watch),
+    ('mutants: selection, killing block, survivor confirmed, dead anchor, test-file case, --affected', t_mutants),
     ('traps: every trap has exactly one row in the trap-to-check map', t_traps_map),
     ('hooks: read and heredoc guards, stop check, session and sub-agent context', t_hooks),
 ]

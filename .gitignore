@@ -20,3 +20,5 @@ node_modules/
 scratch/
 # personal session files, not project records
 claude-resume.txt
+# the mutation runner's local state: last verdicts, cache, summary
+build/mutants/
