@@ -968,6 +968,126 @@ function p1HitsP2(m){
   return hitTest(m, 0xAA00, 0xAA40, 17 + 52);
 }
 
+/* ---- fighter_motion $95D4: step each fighter's motion script ----------
+   Per fighter (A = $AA00 P1, $AA40 P2), skipped while A+$0C is 0.  A+$0B
+   = 0 starts script A+$0C: its bounds come from the word pair at
+   $9368+2*A+$0C, the pointer A+$14 starts at one end (the far end, 4
+   back, when the facing A+$16 is set) and A+$0E/A+$0F count its 4-byte
+   frames.  Each pass the hold A+$10 runs down (facing clear) or up to
+   A+$11 (set); when it expires the pointer steps 4 bytes and frame
+   [hold, 2 bytes, 18 x $FF] is loaded into A+$10..A+$2B -- the ROM bytes
+   $95D4 copies there are all $FF (ledger/95D4.toml), so no ROM is read.
+   Facing A+$17 = 1 swaps three pairs of those $FF bytes ($971E).  Every
+   pass then adds frame byte 2 to A+$18 and moves x A+$19 by byte 3,
+   clamped to 0..$5F.  Returns the uncontended T from the CALL at $978D to
+   $9790 (python tools/callio.py --capture --call 0x978D 0x9790). */
+function fighterMotion(m){
+  return 17 + 10 + 17 + motion(0xAA00) + 10 + 17 + motion(0xAA40) + 10;
+
+  function motion(A){
+    const f = m[A + 0x16];
+    m[0x9743] = f;
+    let t = 60;
+    if (!m[A + 0x0C]) return t + 11;
+    t += 5 + 33;
+    if (!m[A + 0x0B]) return t + start();
+    t += 53;
+    if (!f){
+      t += 7 + 4;
+      if (m[A + 0x10]){ m[A + 0x10]--; return t + 7 + 11 + 10 + tail(); }
+      t += 12 + 6 + 6 + 7 + 4;
+      if (!m[A + 0x0E]) return t + 12 + done();
+      m[A + 0x0E]--;
+      return t + 7 + 11 + 10 + step();
+    }
+    t += 12 + 6 + 7 + 6;
+    if (m[A + 0x10] !== m[A + 0x11]){ m[A + 0x10]++; return t + 7 + 11 + 10 + tail(); }
+    t += 12 + 6 + 7 + 4 + 6 + 7;
+    if (((m[A + 0x0F] - 1) & 0xFF) === m[A + 0x0E]) return t + 12 + done();
+    m[A + 0x0E]++;
+    return t + 7 + 11 + step();
+
+    function done(){                               // $9613
+      m[A + 0x0D] = 1; m[A + 0x0C] = 0;
+      return 42;
+    }
+    function step(){                               // $962B: next 4-byte frame
+      let t = 61;
+      m[A + 0x13] = 0;
+      if (m[0x9743]){
+        const v = m[A + 0x14] - 4;
+        m[A + 0x14] = v;
+        t += 7 + 7 + 7 + 6;
+        if (v < 0){ m[A + 0x15]--; t += 7 + 11 + 12; } else t += 12;
+      } else {
+        const v = m[A + 0x14] + 4;
+        m[A + 0x14] = v;
+        t += 12 + 7 + 7 + 6;
+        if (v > 0xFF){ m[A + 0x15]++; t += 7 + 11; } else t += 12;
+      }
+      return t + load();
+    }
+    function load(){                               // $9649
+      const p = m[A + 0x14] | m[A + 0x15] << 8;
+      let t = 73;
+      m[A + 0x10] = 1;
+      const a = m[p];
+      if (m[0x9743]) t += 12;
+      else { m[A + 0x10] = a - 1; t += 26; }
+      m[A + 0x11] = a;
+      const b = m[(p + 1) & 0xFFFF];
+      m[A + 0x12] = b; m[A + 0x13] = b;
+      t += 108;
+      for (let i = 0x1A; i <= 0x2B; i++) m[A + i] = 0xFF;   // ROM $39xx/$3Axx: all $FF
+      m[0x9744] = 0;
+      t += 8 * (88 + 38) + 88 + 12;
+      t += 66;
+      if (m[A + 0x17] === 1){                      // $971E: swap three pairs
+        for (const b of [0x1A, 0x20, 0x26]) for (const k of [0, 1]){
+          const x = m[A + b + k]; m[A + b + k] = m[A + b + k + 4]; m[A + b + k + 4] = x;
+        }
+        t += 17 + 39 + 3 * 138 + 12 + 12 + 7 + 10;
+      } else t += 10;
+      return t + tail();
+    }
+    function start(){                              // $96CE: begin script A+$0C
+      const c = m[A + 0x0C];
+      m[A + 0x0B] = c;
+      m[A + 0x0D] = 0;
+      const w = 0x9368 + 2 * c;
+      const w0 = m[w] | m[w + 1] << 8, w1 = m[w + 2] | m[w + 3] << 8;
+      let t = 213;
+      let p = w0;
+      if (m[0x9743]){ p = (w1 - 4) & 0xFFFF; t += 55; } else t += 12;
+      m[A + 0x14] = p & 0xFF; m[A + 0x15] = p >> 8;
+      const n = (((w1 - w0) & 0xFFFF) >> 2) & 0xFF;
+      m[A + 0x0E] = 0;
+      t += 111;
+      if (m[0x9743]) t += 12;
+      else { m[A + 0x0E] = n - 1; t += 22; }
+      m[A + 0x0F] = n;
+      return t + 33 + load();
+    }
+    function tail(){                               // $9698: y and x each pass
+      const p = m[A + 0x14] | m[A + 0x15] << 8;
+      const back = m[A + 0x16] ^ m[A + 0x17];
+      m[0x9743] = back;
+      m[A + 0x18] += m[(p + 2) & 0xFFFF];
+      const d = m[(p + 3) & 0xFFFF];
+      let t = 166;
+      let x;
+      if (back){ x = (m[A + 0x19] - d) & 0xFF; t += 23; }
+      else { x = (m[A + 0x19] + d) & 0xFF; t += 16; }
+      t += 4 + 12 + 7;                             // AND A clears carry: JR NC always
+      if (x < 0x5F){ m[A + 0x19] = x; return t + 12 + 7 + 10; }
+      t += 7 + 7;
+      if (x >= 0xC8){ m[A + 0x19] = 0; return t + 12 + 10 + 10; }
+      m[A + 0x19] = 0x5F;
+      return t + 7 + 10 + 10;
+    }
+  }
+}
+
 /* ---- the demo "game"------------------------------------------------- */
 const TONE_HZ = 440;
 class Demo {
@@ -1048,5 +1168,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, font, fontMiss };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, font, fontMiss };
 </script>

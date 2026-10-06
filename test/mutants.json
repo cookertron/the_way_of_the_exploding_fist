@@ -910,5 +910,197 @@
   "new": "+ m[A + 0x12]) & 0xFFFF];",
   "increment": "9D29-port",
   "kills": "p1HitsP2 writes every byte the real $9D29 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: idle test on A+$0B",
+  "old": "if (!m[A + 0x0C]) return t + 11;",
+  "new": "if (!m[A + 0x0B]) return t + 11;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: start when A+$0B set",
+  "old": "if (!m[A + 0x0B]) return t + start();",
+  "new": "if (m[A + 0x0B]) return t + start();",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: hold counts up when facing clear",
+  "old": "if (m[A + 0x10]){ m[A + 0x10]--;",
+  "new": "if (m[A + 0x10]){ m[A + 0x10]++;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: hold limit from A+$12",
+  "old": "if (m[A + 0x10] !== m[A + 0x11])",
+  "new": "if (m[A + 0x10] !== m[A + 0x12])",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: done leaves the script set",
+  "old": "m[A + 0x0D] = 1; m[A + 0x0C] = 0;",
+  "new": "m[A + 0x0D] = 1;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: last frame test off by one",
+  "old": "if (((m[A + 0x0F] - 1) & 0xFF) === m[A + 0x0E])",
+  "new": "if (m[A + 0x0F] === m[A + 0x0E])",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: step 2 bytes forward",
+  "old": "const v = m[A + 0x14] + 4;",
+  "new": "const v = m[A + 0x14] + 2;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: step back borrow ignored",
+  "old": "if (v < 0){ m[A + 0x15]--;",
+  "new": "if (v < 0){ m[A + 0x15] += 0;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: step forward carry ignored",
+  "old": "if (v > 0xFF){ m[A + 0x15]++;",
+  "new": "if (v > 0xFF){ m[A + 0x15] += 0;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: hold loaded without the -1",
+  "old": "else { m[A + 0x10] = a - 1; t += 26; }",
+  "new": "else { m[A + 0x10] = a; t += 26; }",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: frame fill 0 not $FF",
+  "old": "m[A + i] = 0xFF;",
+  "new": "m[A + i] = 0;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: frame fill one short",
+  "old": "for (let i = 0x1A; i <= 0x2B; i++)",
+  "new": "for (let i = 0x1A; i < 0x2B; i++)",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: $9744 left at 9",
+  "old": "m[0x9744] = 0;",
+  "new": "m[0x9744] = 9;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: swap on A+$17 = 0",
+  "old": "if (m[A + 0x17] === 1){",
+  "new": "if (m[A + 0x17] === 0){",
+  "increment": "95D4-port",
+  "kills": "fighterMotion tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: start at w1 not w1-4",
+  "old": "p = (w1 - 4) & 0xFFFF;",
+  "new": "p = w1 & 0xFFFF;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: frame count /2",
+  "old": ">> 2) & 0xFF;",
+  "new": ">> 1) & 0xFF;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: start count without -1",
+  "old": "m[A + 0x0E] = n - 1;",
+  "new": "m[A + 0x0E] = n;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: y from frame byte 1",
+  "old": "m[A + 0x18] += m[(p + 2) & 0xFFFF];",
+  "new": "m[A + 0x18] += m[(p + 1) & 0xFFFF];",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: x sense ignores A+$17",
+  "old": "const back = m[A + 0x16] ^ m[A + 0x17];",
+  "new": "const back = m[A + 0x16];",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: x kept up to $5F inclusive",
+  "old": "if (x < 0x5F){ m[A + 0x19] = x;",
+  "new": "if (x <= 0x5F){ m[A + 0x19] = x;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: wrap edge $C0",
+  "old": "if (x >= 0xC8){ m[A + 0x19] = 0;",
+  "new": "if (x >= 0xC0){ m[A + 0x19] = 0;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: clamp to $5E",
+  "old": "m[A + 0x19] = 0x5F;",
+  "new": "m[A + 0x19] = 0x5E;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: load loop T as 9 full",
+  "old": "t += 8 * (88 + 38) + 88 + 12;",
+  "new": "t += 9 * (88 + 38);",
+  "increment": "95D4-port",
+  "kills": "fighterMotion tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "motion: idle T",
+  "old": "if (!m[A + 0x0C]) return t + 11;",
+  "new": "if (!m[A + 0x0C]) return t + 5;",
+  "increment": "95D4-port",
+  "kills": "fighterMotion tallies the uncontended T of every case exactly"
  }
 ]

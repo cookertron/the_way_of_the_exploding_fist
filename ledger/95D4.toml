@@ -1,8 +1,12 @@
-# ledger/95D4.toml -- current truth about rom_effect (manual 12.2, 12.11).
+# ledger/95D4.toml -- current truth about fighter_motion (manual 12.2, 12.11).
 # Written with tools/record.py; history is in git.
 
-name     = "rom_effect"
+name     = "fighter_motion"
 entries  = ["$95D4"]
+oracle   = "tools/callio.py"
+fixtures = ["motion95d4"]
+port     = "fighterMotion"
+manual   = ["Q11", "7.2", "5.1"]
 
 [[fact]]
 kind   = "measured"
@@ -13,3 +17,19 @@ by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x978D
 kind   = "measured"
 says   = "no ROM bytes needed: $9673 reads $3100-$3312 (FP calculator code) only as the low byte C of (BC) at $9674/$9678, B=$39/$3A; ROM $3900-$3AFF is all $FF, so every byte copied is $FF whatever C is"
 by     = "python tools/adis.py 0x9664 20 ; python tools/hexdump.py SKOOLKIT/resources/48.rom --offset 0x3900 --len 0x200 (32 rows, all FF)"
+
+[[fact]]
+kind   = "insn"
+at     = "$95E1"
+says   = "per fighter A: motion script A+$0C stepped 4 bytes per expiry of hold A+$10 (from words $9368+2c); loads hold, A+$12/$13, 18 x ROM $FF; $971E swaps 3 pairs if A+$17=1; each pass A+$18 += ptr[2], x A+$19 +/- ptr[3] clamped to 0..$5F"
+by     = "python tools/adis.py 0x95D4 120 ; python tools/adis.py 0x968B 90 ; python tools/adis.py 0x9708 30"
+
+[[fact]]
+kind   = "measured"
+says   = "fixture build/callio_95d4.json: 137 play cases (s1, p1 x 7 key scripts, p1b W; 6000 frames, per 1) + 6 derived from case 6 ($AA14=2 for the $963F borrow; $AA59 at the $5F and $C8 clamp edges); --check 143/143, T 223-4834"
+by     = "python tools/callio.py --capture --state p1 --keys W --call 0x978D 0x9790 --frames 6000 --per 1 --out build/callio_95d4.json --append ; python tools/callio.py --check --state s1 --fixture build/callio_95d4.json"
+
+[[fact]]
+kind   = "gated"
+says   = "fighterMotion writes every byte of all 143 cases, reads no ROM (the $FF copy is written as $FF), and tallies the exact uncontended T; every branch reached; 24 mutants killed"
+by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"

@@ -755,4 +755,37 @@ const mockCtx = (state) => ({
           .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
 }
 
+/* ---- fighter_motion $95D4 against its frozen oracle (callio) ----------
+   Bracketed from the CALL at $978D to $9790 (python tools/callio.py
+   --capture --call 0x978D 0x9790).  The ROM bytes it copies are all $FF
+   and the fixture keeps its ROM reads as addresses (D5), so the port
+   reads no ROM: the poison there would show (ledger/95D4.toml). */
+{
+  const fx = P.assets.motion95d4;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.fighterMotion(m);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
+    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
+  }
+  check('fighterMotion writes every byte the real $95D4 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('fighterMotion tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const pcs = fx.cases.map(c => { const s = new Set();
+    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  check('the callio cases reach every branch of $95D4 and its swap $971E',
+        [0x95EE, 0x9605, 0x960F, 0x9613, 0x961F, 0x9623, 0x962A, 0x9639, 0x963F, 0x9642, 0x9648, 0x9658, 0x965C,
+         0x971E, 0x9697, 0x96B7, 0x96BA, 0x96BE, 0x96C9, 0x96CC, 0x96CE, 0x96F3, 0x96FC, 0x9714, 0x9717]
+          .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+  /* the RET Z at $95ED taken for both fighters: a case without $95EE */
+  check('the callio cases include a pass with both fighters idle',
+        pcs.some(s => s.has(0x95ED) && !s.has(0x95EE)), true);
+}
+
 rig.done();

@@ -53,6 +53,12 @@
       "file": "build/callio_9d29.json",
       "required": true,
       "note": "oracle for p1_hits_p2 $9D29: python tools/callio.py --capture --call 0x974B 0x974E"
+    },
+    {
+      "key": "motion95d4",
+      "file": "build/callio_95d4.json",
+      "required": true,
+      "note": "oracle for fighter_motion $95D4: python tools/callio.py --capture --call 0x978D 0x9790 (its ROM reads kept as addresses, D5)"
     }
   ],
   "tape": {
