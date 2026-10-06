@@ -1235,15 +1235,17 @@ def make_mutport(d):
     import io
     import shutil
     import subprocess
-    for rel in ('tools/build.py', 'tools/mutants.py', 'tools/mutants.js', 'test/rig.js',
-                'web/platform.js', 'build/assets.json'):
+    port = json.load(io.open(os.path.join(REPO, 'port.json'), encoding='utf-8'))
+    assets = [a['file'] for a in port.get('assets', [])          # every asset the build needs
+              if os.path.exists(os.path.join(REPO, a['file']))]
+    for rel in ['tools/build.py', 'tools/mutants.py', 'tools/mutants.js', 'test/rig.js',
+                'web/platform.js'] + assets:
         os.makedirs(os.path.join(d, os.path.dirname(rel)), exist_ok=True)
         shutil.copy(os.path.join(REPO, rel), os.path.join(d, rel))
     shutil.copytree(os.path.join(REPO, 'tools', 'vendor'), os.path.join(d, 'tools', 'vendor'))
     tpl = io.open(os.path.join(REPO, 'web', 'template.html'), encoding='utf-8').read()
     marker = '/*#include platform.js*/'
     assert marker in tpl, 'the template lost its platform include marker'
-    port = json.load(io.open(os.path.join(REPO, 'port.json'), encoding='utf-8'))
     port['out'] = 'web/demo.html'
     port['includes'] = {'platform.js': 'web/platform.js', 'game.js': 'web/game.js'}
     port['mutants'] = {'cases': 'test/mutants.json', 'suite': 'test/demo.test.js'}

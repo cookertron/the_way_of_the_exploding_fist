@@ -11,6 +11,12 @@
       "file": "build/assets.json",
       "required": true,
       "note": "written by your extractor (manual phase 4); the starter ships a stub"
+    },
+    {
+      "key": "sprdec",
+      "file": "build/sprdec_cases.json",
+      "required": true,
+      "note": "oracle for the sprite decoder $8803: python tools/sprdec.py --capture (see its --help)"
     }
   ],
   "tape": {

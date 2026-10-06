@@ -30,6 +30,8 @@
  "0x604F": "Background_3_Addresses",
  "0x605F": "Background_3_Attribute_Data",
  "0x8000": "Shadow_Buffer",
+ "0x8803": "sprite_decoder",
+ "0x8AD1": "sprite_recolour",
  "0x8BD2": "Player_1_Controls",
  "0x8BD4": "Player_1_Up",
  "0x8BD6": "Player_1_Up_Right",

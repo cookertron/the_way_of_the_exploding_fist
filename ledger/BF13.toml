@@ -3,3 +3,4 @@
 
 name     = "render_fighters"
 entries  = ["$BF13"]
+manual   = ["7.2", "Q11"]
