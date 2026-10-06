@@ -18,8 +18,8 @@
  {
   "file": "template.html",
   "label": "8803 end-of-sprite T",
-  "old": "return t + 10;",
-  "new": "return t + 11;",
+  "old": "if (m[hl] === 0) return t + 10;",
+  "new": "if (m[hl] === 0) return t + 11;",
   "increment": "8803-js",
   "kills": "spriteDecode tallies the uncontended T of every case exactly"
  },
@@ -174,5 +174,149 @@
   "new": "tally('shift');",
   "increment": "8803-js",
   "kills": "the sprdec cases reach every row path seen in play"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 y-max forced $BE",
+  "old": "m[box + 3] = 0xBE;",
+  "new": "m[box + 3] = r[1];",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 overlap second test",
+  "old": "apart = ((m[0xC435] + 11) & 0xFF) < m[0xC438]; t += 51;",
+  "new": "apart = false; t += 51;",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 draw order $C427",
+  "old": "  if (m[0xC427]){\n    tally('p1-first');",
+  "new": "  if (!m[0xC427]){\n    tally('p1-first');",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 floor-anchored part",
+  "old": "y = (0xBE - m[0xC41A] - 12) & 0xFF;",
+  "new": "y = (0xBE - m[0xC41A] - 11) & 0xFF;",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 flip x",
+  "old": "x = (m[0xC412] + m[0xC416] - m[0xC414] - (m[hl] << 2)) & 0xFF;",
+  "new": "x = (m[0xC412] + m[0xC416] - m[0xC414] - (m[hl] << 1)) & 0xFF;",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 x&3 shift flags",
+  "old": "m[0xC40E] = m[0xC40C] | [0, 2, 4, 8][s];",
+  "new": "m[0xC40E] = m[0xC40C] | [0, 2, 8, 4][s];",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 shadow 64 rows",
+  "old": "if (((c + l - 1) & 0xFF) >= 0x40){",
+  "new": "if (((c + l - 1) & 0xFF) >= 0x76){",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 zero-fill blocks",
+  "old": "for (let i = 0; i < 8; i++){ hl = (hl - 1) & 0xFFFF; m[hl] = 0; }",
+  "new": "for (let i = 0; i < 7; i++){ hl = (hl - 1) & 0xFFFF; m[hl] = 0; }",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 saved SP",
+  "old": "const s = (sp - 2) & 0xFFFF;",
+  "new": "const s = (sp - 4) & 0xFFFF;",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 screen middle third",
+  "old": "const base = hi === 0 ? 0x4000 : hi === 0x40 ? 0x4800 : 0x5000;",
+  "new": "const base = hi === 0 ? 0x4000 : hi === 0x40 ? 0x4000 : 0x5000;",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 copy-out next char row",
+  "old": "if (e > 0xFF){ e &= 0xFF; t += 12; } else { d = (d - 8) & 0xFF; t += 7 + 4 + 7 + 4; }",
+  "new": "if (e > 0xFF){ e &= 0xFF; t += 12; } else { d = (d - 7) & 0xFF; t += 7 + 4 + 7 + 4; }",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 this frame becomes the last",
+  "old": "m[last + 2] = y; m[last + 3]",
+  "new": "m[last + 2] = y + 1; m[last + 3]",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 minmax T",
+  "old": "return d < e ? [d, e, 66] : [e, d, 78];",
+  "new": "return d < e ? [d, e, 66] : [e, d, 66];",
+  "increment": "BF13-js",
+  "kills": "renderFighters tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 multiply T",
+  "old": "222 - [0, 1, 2, 3, 4, 5, 6, 7]",
+  "new": "221 - [0, 1, 2, 3, 4, 5, 6, 7]",
+  "increment": "BF13-js",
+  "kills": "renderFighters tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 part head T",
+  "old": "let t = 17 + 141 + tm;",
+  "new": "let t = 17 + 145 + tm;",
+  "increment": "BF13-js",
+  "kills": "renderFighters tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 copy-out row T",
+  "old": "t += 11 + 11 + 7 + 21 * (w || 0x10000) - 5 + 10 + 10 + 4 + 4 + 7;",
+  "new": "t += 11 + 11 + 7 + 21 * (w || 0x10000) - 5 + 10 + 10 + 4 + 4 + 6;",
+  "increment": "BF13-js",
+  "kills": "renderFighters tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 path tally separate",
+  "old": "tally('separate');",
+  "new": "tally('merged');",
+  "increment": "BF13-js",
+  "kills": "the rendfx cases reach every render path seen in play"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 overlap slack",
+  "old": "let apart = ((m[0xC439] + 11) & 0xFF) < m[0xC434];",
+  "new": "let apart = ((m[0xC439] + 11) & 0xFF) <= m[0xC434] + 40;",
+  "increment": "BF13-js",
+  "kills": "renderFighters writes every byte the real $BF13 wrote (41 rendfx cases)"
  }
 ]

@@ -17,6 +17,12 @@
       "file": "build/sprdec_cases.json",
       "required": true,
       "note": "oracle for the sprite decoder $8803: python tools/sprdec.py --capture (see its --help)"
+    },
+    {
+      "key": "rendfx",
+      "file": "build/rendfx_cases.json",
+      "required": true,
+      "note": "oracle for render_fighters $BF13: python tools/rendfx.py --capture (see its --help)"
     }
   ],
   "tape": {

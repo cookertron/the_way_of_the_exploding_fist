@@ -505,4 +505,37 @@ const mockCtx = (state) => ({
         ['packed', 'edges', 'single', 'recolour', 'mirror', 'shift2', 'shift4', 'shift6'].filter(k => !paths[k]), []);
 }
 
+/* ---- render_fighters $BF13 against its frozen oracle (rendfx) ---------
+   Every case is replayed in a blank 64K holding only the decoder tables and
+   the bytes the real call read; the whole of memory outside the stack must
+   then equal the bytes the real call left -- back buffer, display file,
+   boxes and scratch -- and the T must equal its uncontended T (python
+   tools/rendfx.py --capture). */
+{
+  const fx = P.assets.rendfx;
+  const tables = Buffer.from(fx.tables, 'hex');
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const paths = {};
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000);
+    m.set(tables, 0xB500); put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.renderFighters(m, paths, c.sp);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === c.sp - 64) a = c.sp + 2;
+      if (m[a] !== want[a]){ diff = a; break; }
+    }
+    if (diff >= 0 && !badBytes++)
+      firstBytes = `case ${i} [${c.paths}]: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (t !== c.t && !badT++) firstT = `case ${i} [${c.paths}]: T ${t} want ${c.t}`;
+  }
+  check(`renderFighters writes every byte the real $BF13 wrote (${fx.cases.length} rendfx cases)`, [badBytes, firstBytes], [0, '']);
+  check('renderFighters tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  check('the rendfx cases reach every render path seen in play',
+        ['separate', 'merged', 'p1-first', 'p2-first', 'floor-part', 'flip', 'unflipped'].filter(k => !paths[k]), []);
+}
+
 rig.done();
