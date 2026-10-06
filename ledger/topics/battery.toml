@@ -3,6 +3,7 @@
 
 name     = "section 8 diagnostic battery -- results and the 8.20 checklist"
 routines = ["$9745", "$C3E4", "$B15A"]
+manual   = ["Q19", "C1"]
 
 [[fact]]
 kind   = "measured"
@@ -54,3 +55,20 @@ by     = "python tools/battery.py --state p1 --frames 600 --loop 0x9745"
 kind   = "measured"
 says   = "Q3 and Q15 hold in 1P play: 0 writes on executed bytes; display-file writes $C3F0 LDIR 157825 of 158185, $924B 360; 0 attribute writes"
 by     = "python tools/battery.py --state p1 --frames 600 --loop 0x9745 --script \"40:,60:D,40:W,40:E,60:A,40:C,40:X,40:Z,40:Q,60:D+W,60:A,80:\""
+
+[[fact]]
+kind   = "absent"
+says   = "Q19 no stack imbalance in play -- 0 discards, 0 rewrites, 0 fake returns, 0 LD SP cuts, ODD 0 over ~2.47M frames; window covers points both sides (YY_1UP/2UP), 6 New_Round per state, and 1P game over (Check_HighScore $A647 in p1, p1b)"
+by     = "python tools/stackscan.py --state p1 --frames 15000 --mark 900E,9057,909E,A647 ; same for s1, p1b"
+window = "15000 frames each of p1, s1, p1b"
+n      = 0
+
+[[fact]]
+kind   = "measured"
+says   = "chain live in every saved state: bout loop $AC3E/$AB70 -> $AD18/$ABC8 -> $AE26 -> play_pass $9745 -> $BF13 -> $C1A2 -> $C34F -> $C36E -> $C2B5 -> $8803; the bout frames return only at round end / game over"
+by     = "python tools/stackscan.py --state p1 --frames 15000 ; same for s1, p1b"
+
+[[open]]
+ask    = "does a P1 bout WIN (dan progression, bonus stage) or 2P play use a stack-unwinding idiom?"
+tried  = "Q19 over p1, s1, p1b -- every window has P1 losing; no won bout, no bonus stage, no 2P state"
+settle = "stackscan.py --mark 909E,A647 over a state where P1 wins a bout and over a 2P state, once either exists"

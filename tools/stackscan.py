@@ -27,7 +27,10 @@ Method: a SHADOW CALL STACK kept BY STACK SLOT, not by nesting.
     stack has been rebuilt over them and they are DISCARDED by that LD SP;
     if the scan ends first they are reported as cut and unresolved;
   - a RET that consumes a slot with NO frame is a FAKE RETURN: the game pushed
-    an address and RET into it (RET-as-jump, PUSH-dispatch, inline parameters);
+    an address and RET into it (RET-as-jump, PUSH-dispatch, inline parameters)
+    -- unless it lands on the very word that slot held when the scan began and
+    nothing has pushed over it since: that is an INHERITED return, a frame the
+    saved state was already inside, reported apart and never as an idiom;
   - SP rising under an instruction this scan does not know is ODD.
 
 SELF-CHECK.  frames == balanced + rewritten + discarded + open is bookkeeping
@@ -48,6 +51,7 @@ test report).
 
 Usage (measure a LIVE state; a raw snapshot needs --arm/--warm to reach code):
     python tools/stackscan.py --state NAME  [--frames N] [--script "60:8,60:5"] [--top N]
+                                            [--mark 909E,A647]  frames each PC ran: the events covered
     python tools/stackscan.py --snapshot G.z80 --arm --warm 400  [--frames N]
 """
 import os
@@ -106,7 +110,7 @@ def below(slot, sp):
     return ((slot - sp) & 0xFFFF) >= 0x8000
 
 
-def scan(h, frames, script):
+def scan(h, frames, script, marks=()):
     m = h.memobj.m
     r = h.regs
     shadow = []                 # live frames in push order: [callee, ret, slot]; newest last, lowest slot
@@ -114,6 +118,10 @@ def scan(h, frames, script):
     created = balanced = rewritten = odd = 0
     discards = {}               # (kill_pc, victim_callee, victim_ret) -> count
     fakes = {}                  # ret_pc -> count
+    inherited = {}              # ret_pc -> count: a RET into a frame pushed BEFORE the scan began
+    sp0 = r[SP]                 # the words live at the start, slot -> word; a push over a slot retires it
+    orig = {(sp0 + 2 * i) & 0xFFFF: m[(sp0 + 2 * i) & 0xFFFF] | (m[(sp0 + 2 * i + 1) & 0xFFFF] << 8)
+            for i in range(128)}
     rewrites = {}               # ret_pc -> count
     odds = {}                   # pc -> count
     names = {}                  # pc -> the instruction AS EXECUTED (loaders self-modify; decode at event time)
@@ -132,8 +140,16 @@ def scan(h, frames, script):
             discards[key] = discards.get(key, 0) + 1
         pending.clear()
 
+    marks = set(marks)
+    marked = {}                 # marked pc -> the frame of each visit (a visit: >50 frames after the last)
+    t0 = r[T]
     while r[T] < t_end:
         pc, sp = r[PC], r[SP]
+        if pc in marks:
+            f = (r[T] - t0) // fd
+            v = marked.setdefault(pc, [])
+            if not v or f - v[-1] > 50:
+                v.append(f)
         op = m[pc]
         op2 = m[(pc + 1) & 0xFFFF]
         is_call = op in CALLS or op in RSTS
@@ -160,6 +176,9 @@ def scan(h, frames, script):
         elif diff >= 0x8000:                                     # SP fell: something was pushed
             depth = 0x10000 - diff
             slot = (sp - 2) & 0xFFFF
+            if orig and depth <= 2:                              # PUSH / CALL / DEC SP, not an LD SP
+                for b in range(depth + 1):                       # pushed bytes and the word straddling nsp
+                    orig.pop((nsp - 1 + b) & 0xFFFF, None)
             if is_call and depth >= 2:
                 next_seq = (pc + (1 if op in RSTS else 3)) & 0xFFFF
                 callee = (op & 0x38) if op in RSTS else (m[(pc + 1) & 0xFFFF] | (m[(pc + 2) & 0xFFFF] << 8))
@@ -193,7 +212,11 @@ def scan(h, frames, script):
                     key = (pc, callee, ret)
                     discards[key] = discards.get(key, 0) + 1
             if is_ret and not owned:
-                fakes[pc] = fakes.get(pc, 0) + 1
+                if orig.get(sp) == npc:                          # the start's own word, never pushed over
+                    del orig[sp]
+                    inherited[pc] = inherited.get(pc, 0) + 1
+                else:
+                    fakes[pc] = fakes.get(pc, 0) + 1
             if not sp_rise_known(op, op2):
                 odd += 1
                 odds[pc] = odds.get(pc, 0) + 1
@@ -211,8 +234,8 @@ def scan(h, frames, script):
     unresolved = {}
     for callee, ret, slot, kpc in pending:
         unresolved[(kpc, callee, ret)] = unresolved.get((kpc, callee, ret), 0) + 1
-    return dict(created=created, balanced=balanced, rewritten=rewritten, odd=odd,
-                discards=discards, fakes=fakes, rewrites=rewrites, odds=odds,
+    return dict(marked=marked, created=created, balanced=balanced, rewritten=rewritten, odd=odd,
+                discards=discards, fakes=fakes, inherited=inherited, rewrites=rewrites, odds=odds,
                 open=len(shadow), unresolved=unresolved, m=m, names=names)
 
 
@@ -252,6 +275,9 @@ def report(s, top_n=25):
         print('\nFAKE RETURNS (RET into a pushed address: RET-as-jump, PUSH-dispatch, inline parameters):')
         for rpc, n in sorted(game_fakes.items(), key=lambda kv: -kv[1])[:top_n]:
             print(f'  ${rpc:04X}  {name_of(m, rpc):12s} x{n}')
+    if s.get('inherited'):
+        print(f"\nINHERITED returns (into a frame live before the scan began -- not an idiom): "
+              f"{sum(s['inherited'].values())} at " + ' '.join(f'${k:04X}' for k in sorted(s['inherited'])))
     if rom_fakes:
         print(f"\nROM idioms, not the game's: {sum(rom_fakes.values())} fake returns at {len(rom_fakes)} ROM sites "
               "(the calculator's inline literals, BEEP): "
@@ -273,12 +299,14 @@ def main():
         print(__doc__.strip()); sys.exit(0)
     t = parse_target(args)
     script = None
-    frames, top_n = 120, 25
+    frames, top_n, marks = 120, 25, []
     while args:
         if args[0] == '--frames':
             frames = int(args[1], 0); del args[:2]
         elif args[0] == '--script':
             script = parse_script(args[1]); del args[:2]
+        elif args[0] == '--mark':
+            marks = [int(a, 16) for a in args[1].replace('$', '').split(',')]; del args[:2]
         elif args[0] == '--top':
             top_n = int(args[1], 0); del args[:2]
         else:
@@ -288,7 +316,14 @@ def main():
         frames = sum(s[0] for s in script)
     print(f'stackscan: {frames} frames from {source_label(t)}'
           + (f' with script {script}' if script else ''))
-    ok = report(scan(h, frames, script), top_n)
+    s = scan(h, frames, script, marks)
+    ok = report(s, top_n)
+    if marks:
+        print('\nMARKED PCs -- the events this window covered (frame of each visit):')
+        for a in marks:
+            v = s['marked'].get(a, [])
+            print(f'  ${a:04X}  {len(v)} visits  '
+                  + (' '.join(map(str, v[:12])) + (' ...' if len(v) > 12 else '') if v else 'NOT REACHED'))
     sys.exit(0 if ok else 1)
 
 

@@ -860,6 +860,28 @@ def t_stackscan():
     eq(s['fakes'], {0x800A: 1}, 'the RET into a pushed address')
     eq(s['rewrites'], {0x8074: 1}, 'the EX (SP),HL rewrite')
     eq(h.regs[H.PC], 0x8080, 'the program reached its final loop')
+    # a frame live before the scan is INHERITED; a push over that same slot makes the next RET fake
+    H, h = fresh()
+    h.poke(0xFEFE, 0x90, 0x80)              # the start's stack: one return word -> 8090
+    h.poke(0x8000, 0xC9)                    # 8000 RET                  inherited
+    h.poke(0x8090, 0x21, 0xA0, 0x80,        # 8090 LD HL,80A0
+           0xE5, 0xC9)                      # 8093 PUSH HL / RET        same slot, pushed over -> fake at 8094
+    h.poke(0x80A0, 0x18, 0xFE)              # 80A0 JR $
+    h.regs[H.PC] = 0x8000
+    h.regs[H.SP] = 0xFEFE
+    s = S.scan(h, 1, None)
+    eq((s['inherited'], s['fakes'], h.regs[H.PC]), ({0x8000: 1}, {0x8094: 1}, 0x80A0),
+       'inherited RET at 8000; the pushed-over slot is a fake at 8094')
+    H, h = fresh()                          # the same word PUSHED back over an unconsumed start slot
+    h.poke(0xFEFE, 0x90, 0x80)
+    h.poke(0x8000, 0x33, 0x33,              # 8000 INC SP x2            steps over the start's word
+           0x21, 0x90, 0x80, 0xE5, 0xC9)    # 8002 LD HL,8090 / PUSH HL / RET   equal word, but pushed: fake
+    h.poke(0x8090, 0x18, 0xFE)
+    h.regs[H.PC] = 0x8000
+    h.regs[H.SP] = 0xFEFE
+    s = S.scan(h, 1, None, marks=(0x8002, 0x8090, 0x9000))
+    eq((s['inherited'], s['fakes']), ({}, {0x8006: 1}), 'a push retires the start word: fake at 8006')
+    eq(s['marked'], {0x8002: [0], 0x8090: [0]}, 'marks: one visit each at frame 0, the unrun PC absent')
     # interrupts are frames: a HALT loop under IM 1 with the ROM ISR
     H, h = fresh()
     h.poke(0x8000, 0x76, 0x18, 0xFD)        # HALT / JR $-1
