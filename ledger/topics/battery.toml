@@ -29,3 +29,28 @@ kind   = "insn"
 at     = "$9C2E"
 says   = "start-up: DI, border 5, SP=$5BFF, CALL $B138, then LDIR $6000-$80FF down to $5F00 -- static image below $8100 is pre-relocation"
 by     = "python tools/adis.py 0x9c2e 12"
+
+[[fact]]
+kind   = "measured"
+says   = "Q2 in 1P keyboard play: reads $FBFE $FEFE $FDFE $BFFE $F7FE and never $1F (demo s1 polls Kempston, p1 does not); writes $FE only"
+by     = "python tools/battery.py --state p1 --frames 600 --loop 0x9745 --script \"40:,60:D,40:W,40:E,60:A,40:C,40:X,40:Z,40:Q,60:D+W,60:A,80:\""
+
+[[fact]]
+kind   = "measured"
+says   = "Q10 in 1P play matches demo: p1 driven 148 passes mean 280328 T (4.01 frames, 2.79-5.02); p1 idle and p1b also have the ~14.8-frame tail"
+by     = "python tools/battery.py --state p1b --frames 600 --loop 0x9745 --script \"40:,60:D,40:W,40:E,60:A,40:C,40:X,40:Z,40:Q,60:D+W,60:A,80:\""
+
+[[fact]]
+kind   = "measured"
+says   = "keys in p1: Z X C A D Q W E each change only $AA05 within $AA00-$AA7F; H runs new PCs $982E-$9833; 1 runs $8BA4; the other 29 keys do nothing"
+by     = "python tools/keyprobe.py --state p1 --hold 300000 --vars 0xAA00 0xAA7F"
+
+[[fact]]
+kind   = "measured"
+says   = "Q17 beeper is event-driven: $FE writes per 600 frames are 0 in driven p1, 886 in idle p1, 1644 in driven p1b, 1142 in demo"
+by     = "python tools/battery.py --state p1 --frames 600 --loop 0x9745"
+
+[[fact]]
+kind   = "measured"
+says   = "Q3 and Q15 hold in 1P play: 0 writes on executed bytes; display-file writes $C3F0 LDIR 157825 of 158185, $924B 360; 0 attribute writes"
+by     = "python tools/battery.py --state p1 --frames 600 --loop 0x9745 --script \"40:,60:D,40:W,40:E,60:A,40:C,40:X,40:Z,40:Q,60:D+W,60:A,80:\""
