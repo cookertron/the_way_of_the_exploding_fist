@@ -542,4 +542,31 @@ const mockCtx = (state) => ({
         ['1:0', '1:1', '2:0', '2:1'].filter(k => !fx.cases.some(c => c.margin && c.margin[k[0] - 1] === +k[2])), []);
 }
 
+/* ---- $BF13's T in play: the D4 charges against the contended T --------
+   Each rendfx case also holds the call's T in the contended harness (tc),
+   one sample of frame phase.  Charged, the fixture must pool within 0.25%
+   of it (1.00026 measured; dropping the own-code charge alone gives 0.9954,
+   the decoder's or the copy's 0.97-0.98), and no one call may miss by more
+   than 3% (2.84% the worst of 614 play calls: frame phase). */
+{
+  const fx = P.assets.rendfx;
+  const tables = Buffer.from(fx.tables, 'hex');
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  let ch = 0, tc = 0, worst = 0, at = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000);
+    m.set(tables, 0xB500); put(m, c.in);
+    const cost = { dec: 0, copy: 0, ldir: 0 };
+    const t = P.rfPlayT(P.renderFighters(m, null, c.sp, cost), cost);
+    ch += t; tc += c.tc;
+    const e = Math.abs(t - c.tc) / c.tc;
+    if (e > worst){ worst = e; at = `case ${i} [${c.paths}]: T ${t.toFixed(0)} want ${c.tc}`; }
+  }
+  check('rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)',
+        Math.abs(ch / tc - 1) < 0.0025 ? '' : `charged/contended ${(ch / tc).toFixed(5)}`, '');
+  check('rfPlayT misses no rendfx case by more than 3%',
+        worst < 0.03 ? '' : `${(100 * worst).toFixed(2)}% at ${at}`, '');
+}
+
 rig.done();

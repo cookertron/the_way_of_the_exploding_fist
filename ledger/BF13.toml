@@ -9,12 +9,6 @@ port     = "renderFighters"
 manual   = ["7.2", "Q11"]
 
 [[fact]]
-kind   = "measured"
-at     = "$C3F0"
-says   = "the display-copy LDIR costs 4.72 T per byte over 21n-5 pooled (s1 4.63 over 156336 bytes, p1 4.81 over 160648); charged as that mean (D4)"
-by     = "python tools/callcost.py --state s1 --call 0x9790 0x9793 --key 0xC41B 0xC43C --sub 0xC3F0 0xC3F2 --frames 600 ; same for p1"
-
-[[fact]]
 kind   = "insn"
 at     = "$BFB7"
 says   = "LD A,E is overwritten by LD A,$BE (also at $C001): the y-max of each fighter's box ($C437/$C43B) is always $BE, never the computed max -- every box extends to row 190"
@@ -53,8 +47,8 @@ by     = "python tools/adis.py 0xC091 50 ; python tools/adis.py 0xC234 60"
 [[fact]]
 kind   = "measured"
 at     = "$BF13"
-says   = "JS renderFighters (template.html) gated: all 50 rendfx cases write every byte and tally the uncontended T exactly; saved SP at $C2B0 is entry SP - 2"
-by     = "python tools/build.py ; node test/kit.test.js"
+says   = "gated (template.html): renderFighters writes every byte and the uncontended T of all 50 rendfx cases (saved SP at $C2B0 = entry SP - 2); rfPlayT pools at 1.00026 of their contended T (gate 0.25%), worst 2.43% (gate 3%)"
+by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --match \"BF13 play T||BF13 cost\""
 
 [[fact]]
 kind   = "insn"
@@ -75,3 +69,9 @@ says   = "box tops ($C41A) never leave $67-$7A, so the copy-out always starts in
 by     = "python tools/rendfx.py --capture --state p1 --keys W --per 3 ; same for p1 Q E C Z A+W, p1b W, s1 W"
 window = "600 frames each of 8 state/key runs"
 n      = 548
+
+[[fact]]
+kind   = "measured"
+at     = "$BF13"
+says   = "play contention, D4 means: $C3F0 LDIR +4.72 T/byte (s1 4.63, p1 4.81); own code outside it and $8803 x1.0425 over 614 calls (s1 1.031 .. p1b 1.052); rfPlayT pools within 0.15% per state, one call within 2.9%"
+by     = "python tools/callcost.py --state s1 --call 0x9790 0x9793 --key 0xC41B 0xC43C --sub 0xC3F0 0xC3F2 ; python tools/rendfx.py --capture --state s1 --per 100000 --out scratch/rf_s1.json ; same for p1, p1b, p1 --keys A"

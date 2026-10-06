@@ -342,5 +342,61 @@
   "new": "if (!apart){ apart = ((m[0xC435] + 10) & 0xFF) < m[0xC438];",
   "increment": "BF13-near",
   "kills": "renderFighters writes every byte the real $BF13 wrote (50 rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 play T: no decoder charge",
+  "old": "const RF_DEC = 0.0317, RF_COPY = 4.72, RF_OWN = 0.0425;",
+  "new": "const RF_DEC = 0, RF_COPY = 4.72, RF_OWN = 0.0425;",
+  "increment": "BF13-play",
+  "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 play T: no copy charge",
+  "old": "const RF_DEC = 0.0317, RF_COPY = 4.72, RF_OWN = 0.0425;",
+  "new": "const RF_DEC = 0.0317, RF_COPY = 0, RF_OWN = 0.0425;",
+  "increment": "BF13-play",
+  "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 play T: no own-code charge",
+  "old": "const RF_DEC = 0.0317, RF_COPY = 4.72, RF_OWN = 0.0425;",
+  "new": "const RF_DEC = 0.0317, RF_COPY = 4.72, RF_OWN = 0;",
+  "increment": "BF13-play",
+  "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 play T: own-code charge doubled",
+  "old": "const RF_DEC = 0.0317, RF_COPY = 4.72, RF_OWN = 0.0425;",
+  "new": "const RF_DEC = 0.0317, RF_COPY = 4.72, RF_OWN = 0.085;",
+  "increment": "BF13-play",
+  "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 play T: own code includes the LDIR",
+  "old": "const rfPlayT = (t, c) => t + RF_DEC * c.dec + RF_COPY * c.copy + RF_OWN * (t - c.dec - c.ldir);",
+  "new": "const rfPlayT = (t, c) => t + RF_DEC * c.dec + RF_COPY * c.copy + RF_OWN * (t - c.dec);",
+  "increment": "BF13-play",
+  "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 cost: copy bytes uncounted",
+  "old": "  rfCost.copy += (m[0xC409] || 256) * (w || 0x10000);",
+  "new": "  rfCost.copy += 0;",
+  "increment": "BF13-play",
+  "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 cost: decoder T uncounted",
+  "old": "  rfCost.dec += td;",
+  "new": "  rfCost.dec += 0;",
+  "increment": "BF13-play",
+  "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
  }
 ]
