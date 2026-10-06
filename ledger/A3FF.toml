@@ -1,0 +1,48 @@
+# ledger/A3FF.toml -- current truth about Random_Number (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "Random_Number"
+entries  = ["$A3FF"]
+manual   = ["Q18", "E1"]
+
+[[fact]]
+kind   = "insn"
+at     = "$A3FF"
+says   = "Random_Number is LD A,R / RET -- the R register is the game's only random source; 18 CALL sites ($A155-$A567 AI, $AB77 $AB81 $ACDB rank), no JP to it"
+by     = "python tools/adis.py 0xA3FF 2 ; python tools/grepbytes.py \"CD FF A3\" ; python tools/grepbytes.py \"C3 FF A3\""
+
+[[fact]]
+kind   = "measured"
+says   = "bit 7 clear in all 359 draws (p1 162, s1 197 over 3000 frames each); low 7 bits well spread (92 and 95 distinct values)"
+by     = "python tools/drawlog.py --state p1 --pc 0xA401 ; python tools/drawlog.py --state s1 --pc 0xA401"
+
+[[fact]]
+kind   = "absent"
+says   = "no LD R,A (ED 4F) anywhere in $0000-$FFFF, ROM included, so R bit 7 is never set after power-on and every draw is $00-$7F"
+by     = "python tools/grepbytes.py \"ED 4F\""
+window = "whole 64K image incl. ROM"
+n      = 0
+
+[[fact]]
+kind   = "measured"
+says   = "draws in one pass are CORRELATED by fixed offsets mod 128 -- $A155->$A16D +7 (19/19), $A26A->$A27F +7 (38/38), $A4FE->$A50C +6 (2/2), $A2CE->$A2CE +7 mostly; a substitute must draw once per pass and derive the rest"
+by     = "python tools/drawlog.py --state p1 --pc 0xA401 ; python tools/drawlog.py --state s1 --pc 0xA401"
+
+[[fact]]
+kind   = "insn"
+at     = "$A501"
+says   = "consequence of bit 7 never set -- $A181 and $A567 (AND A / JP m) never branch, $A16D AND ($A646) / JP m never branches, $A4FE CP $80 / JR c always taken so $A505-$A50B is dead on hardware"
+by     = "python tools/adis.py 0xA181 3 ; python tools/adis.py 0xA567 3 ; python tools/adis.py 0xA16D 4 ; python tools/adis.py 0xA4FE 7"
+
+[[fact]]
+kind   = "unread"
+at     = "$A645"
+says   = "$A645, written with LD A,R at $9CAA, is never read -- a dead seed; the only byte-grep reference is that write"
+by     = "python tools/readwatch.py --state p1 --lo 0xA645 --hi 0xA646 --frames 400 ; python tools/grepbytes.py \"45 A6\""
+window = "p1 and s1, 400 frames each (control: $A5F1-$A644 read by $AB42 etc in the same window)"
+n      = 0
+
+[[open]]
+ask    = "what does the JS substitute for R look like -- one 7-bit draw per AI pass with the measured fixed offsets for the later draws, or an M1-count model per path?"
+tried  = "drawlog over p1 and s1 shows the offsets are constant per caller pair (7, 7, 6, 13), so they are instruction counts between the two LD A,R"
+settle = "when the AI pass $A0xx-$A5xx is read in phase 10, count M1 cycles between each caller pair and freeze them; behavioural test asserts bit 7 never set and pair deltas hold"
