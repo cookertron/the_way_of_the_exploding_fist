@@ -4,3 +4,9 @@
 name     = "render_fighters"
 entries  = ["$BF13"]
 manual   = ["7.2", "Q11"]
+
+[[fact]]
+kind   = "measured"
+at     = "$C3F0"
+says   = "the display-copy LDIR costs 4.72 T per byte over 21n-5 pooled (s1 4.63 over 156336 bytes, p1 4.81 over 160648); charged as that mean (D4)"
+by     = "python tools/callcost.py --state s1 --call 0x9790 0x9793 --key 0xC41B 0xC43C --sub 0xC3F0 0xC3F2 --frames 600 ; same for p1"

@@ -48,7 +48,7 @@ kind   = "measured"
 says   = "spriteDecode (web/template.html) ports tools/sprdec.py: on all 441 sprdec cases the whole 64K outside $8AE9-$8B1C matches the real call and T equals the uncontended T; 22 mutants killed, each by its named row"
 by     = "node test/kit.test.js ; python tools/mutants.py --match 8803"
 
-[[open]]
-ask    = "how the JS tally charges stack contention (0-7.2% of the call by frame phase) -- a mean factor, or per stack access keyed to the 7.2 clock phase"
-tried  = "measured the spread only (tc vs t in build/sprdec_cases.json)"
-settle = "count stack accesses per call in the model and fit extra T per access against tc; decide with the $C3F0 copy question"
+[[fact]]
+kind   = "measured"
+says   = "only stack ops contend in $8803; per-call spread is frame phase, which the JS tally cannot hold (DI, free-running), so charge the play-weighted mean: T x 1.0317 (s1 1.03179, p1 1.03167, p1b 1.03167; D4)"
+by     = "python tools/sprdec.py --capture --state s1 --frames 1500 --out scratch/cap.json ; same for p1, p1b at 600"

@@ -14,6 +14,8 @@ fixture it freezes is the JS gate's oracle.
              HL, DE, every byte it wrote (stack excepted) and its T, restore,
              and carry on.  Each call is replayed through the model at once;
              distinct calls go to the fixture with the bytes the model read.
+             Last line: T in play against uncontended over EVERY call, as
+             play weights them -- the decoder's contention factor (D4).
   --check    replay the fixture through the model in a blank 64K: bytes
              written and T must both agree, case by case.
   --paths    with --check: tally the row paths (raw/packed, recolour, mirror,
@@ -289,6 +291,7 @@ def capture(args):
         fx = json.load(open(out))
     seen = {case_key(c['hl'], unruns(c['in'])) for c in fx['cases']}
     calls = bad = new = 0
+    sum_t = sum_tc = 0                             # every call, weighted as play calls it
     end = r[T] + frames * h.frame_duration
     while r[T] < end:
         reason, _ = h.run_until([ENTRY], limit=200_000)
@@ -307,6 +310,7 @@ def capture(args):
         flat.load_state(st)                        # the same call, uncontended
         flat.run_until([RET], limit=2_000_000, interrupts=False)
         real_t = flat.regs[T] - t0
+        sum_t += real_t; sum_tc += cont_t
         h.load_state(st)
         for k in keys:
             press(h.ports, k)
@@ -341,6 +345,9 @@ def capture(args):
             't': real_t, 'tc': cont_t})
     print(f'sprdec: {source_label(t)}, {frames} frames: {calls} calls, {bad} disagree with the model, '
           f'{new} new distinct cases ({len(fx["cases"])} in {out})')
+    if sum_t:
+        print(f'sprdec: contention over all {calls} calls: {sum_tc} T in play against {sum_t} uncontended, '
+              f'factor {sum_tc / sum_t:.5f}')
     if bad:
         sys.exit(1)
     fx['about'] = ('Purpose: frozen oracle for the sprite decoder $8803 -- one call per sprite and flag set: HL, DE, the bytes it read as [addr, hex] runs '

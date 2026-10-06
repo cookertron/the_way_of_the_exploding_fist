@@ -62,20 +62,21 @@ def main():
     for k in keys:
         press(h.ports, k)
     site, ret = call
-    rows = []                           # (cost, sub T, sub bytes, key bytes)
+    rows = []                           # (cost, sub T, sub bytes, key bytes, sub runs)
     t0 = s_in = None
-    s_t = s_n = 0
+    s_t = s_n = s_k = 0
     end = r[T] + frames * h.frame_duration
     while r[T] < end:
         pc = r[PC]
         if pc == site:
-            t0, s_t, s_n = r[T], 0, 0
+            t0, s_t, s_n, s_k = r[T], 0, 0, 0
         elif pc == ret and t0 is not None:
-            rows.append((r[T] - t0, s_t, s_n, bytes(m[key[0]:key[1]])))
+            rows.append((r[T] - t0, s_t, s_n, bytes(m[key[0]:key[1]]), s_k))
             t0 = None
         if sub and t0 is not None and pc == sub[0] and s_in is None:
             s_in = r[T]
             s_n += r[B] * 256 + r[C]
+            s_k += 1
         h.step(1)
         if s_in is not None and r[PC] == sub[1]:
             s_t += r[T] - s_in
@@ -85,16 +86,20 @@ def main():
     if len(rows) < 2:
         print(f'*** only {len(rows)} calls returned through ${ret:04X}: wrong --call, or not reached ***')
         sys.exit(1)
-    costs = [c for c, _, _, _ in rows]
+    costs = [c for c, _, _, _, _ in rows]
     print(f'{len(rows)} calls: min {min(costs)} median {int(statistics.median(costs))} max {max(costs)} T')
     if sub:
-        per = [st / sn for _, st, sn, _ in rows if sn]
-        share = statistics.median(st / c for c, st, _, _ in rows)
+        per = [st / sn for _, st, sn, _, _ in rows if sn]
+        share = statistics.median(st / c for c, st, _, _, _ in rows)
         print(f'sub ${sub[0]:04X}: median {share:.1%} of the call'
               + (f'; T per byte min {min(per):.2f} median {statistics.median(per):.2f} max {max(per):.2f}'
                  if per else ''))
+        tn, tt, tk = (sum(x[i] for x in rows) for i in (2, 1, 4))
+        if tn:                          # an LDIR run of n bytes is 21n-5 T uncontended
+            print(f'sub ${sub[0]:04X} pooled over {tk} runs, {tn} bytes: {tt / tn:.4f} T per byte, '
+                  f'{(tt - 21 * tn + 5 * tk) / tn:.4f} over uncontended')
     groups = {}
-    for c, st, _, k in rows:
+    for c, st, _, k, _ in rows:
         groups.setdefault(k, []).append((c, c - st))
     rep = [v for v in groups.values() if len(v) > 1]
     print(f'{len(groups)} distinct keys; {len(rep)} repeat, covering {sum(map(len, rep))} calls')
