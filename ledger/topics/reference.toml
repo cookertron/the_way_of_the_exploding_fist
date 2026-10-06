@@ -1,0 +1,15 @@
+# ledger/topics/reference.toml -- current truth about "third-party disassembly (pobtastic/wayoftheexplodingfist, SkoolKit) -- phase 3 verification", a system spanning
+# routines (manual 12.11).  Written with tools/record.py; history is in git.
+
+name     = "third-party disassembly (pobtastic/wayoftheexplodingfist, SkoolKit) -- phase 3 verification"
+routines = ["$8800", "$9C2E"]
+
+[[fact]]
+kind   = "measured"
+says   = "phase 3 gate: bytes compared 41215 / mismatching 189 / skipped 1 over $5F00-$FFFF, reference cloned to ../ref_wayoftheexplodingfist (outside the repo; commit as of 2026-10-06)"
+by     = "python tools/refcheck.py ../ref_wayoftheexplodingfist/sources/wotef.skool"
+
+[[fact]]
+kind   = "data"
+says   = "mismatch $932C-$9330 is the reference t2s poking the time print buffer to \"   30\"; mismatch $FF18-$FFFF is past the tape's last byte ($F7FF) -- ours holds what the ROM start-up left (UDGs), theirs zeros; skipped $900D is an i-entry"
+by     = "cat ../ref_wayoftheexplodingfist/wayoftheexplodingfist.t2s; python tools/hexdump.py build/image.bin --offset 0xFF50 --len 16"

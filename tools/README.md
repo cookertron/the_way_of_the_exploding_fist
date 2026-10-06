@@ -76,6 +76,7 @@ Read a tool's `--help` before extending it or writing a new one (TRAPS #65,
 
 | tool | purpose | typical invocation | manual phase |
 |---|---|---|---|
+| `refcheck.py` | phase 3 gate: assemble each line of a third-party SkoolKit disassembly alone at its stated address and compare with our image (start-up relocation applied); prints "bytes compared N / mismatching M / skipped S" with every range and unparsed line named | `python tools/refcheck.py ../ref_wayoftheexplodingfist/sources/wotef.skool` | 3 find and verify any third-party disassembly |
 
 ## The manifest keys the tools read
 
