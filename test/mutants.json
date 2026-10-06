@@ -614,5 +614,117 @@
   "new": "    m[fsAt(0xAA16, c)] = 0;",
   "increment": "9AD7-port",
   "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: time-up flag ignored",
+  "old": "  if (m[0x9C2B]) return t + 11;",
+  "new": "  if (0) return t + 11;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: reel of P2 ignored",
+  "old": "  if (m[0xAA03] | m[0xAA43]) return t + 11;",
+  "new": "  if (m[0xAA03]) return t + 11;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: move $17 not frozen",
+  "old": "  if (m[0xAA04] === 0x17) return t + 11;",
+  "new": "  if (m[0xAA04] === 0x18) return t + 11;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: tick reload 12",
+  "old": "  m[0x9CA6] = 13;",
+  "new": "  m[0x9CA6] = 12;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: time-up never set",
+  "old": "  else { m[0x9C2B] = 1; t += 7 + 7 + 13; }",
+  "new": "  else { t += 7 + 7 + 13; }",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: JR nz taken costs 7",
+  "old": "  if (m[0x9CA5]) t += 12;",
+  "new": "  if (m[0x9CA5]) t += 7;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9336: terminator not written",
+  "old": "  m[ix] = 0;\n",
+  "new": "",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9336: leading zeros kept",
+  "old": "    m[p++] = 0x20;",
+  "new": "    p++;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9336: lone zero blank",
+  "old": "  if (m[0x9330] === 0x20){ m[0x9330] = 0x30;",
+  "new": "  if (0){ m[0x9330] = 0x30;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9309: digit loop JR c not-taken costs 12",
+  "old": "} else { t += 7; break; }",
+  "new": "} else { t += 12; break; }",
+  "increment": "9C6F-port",
+  "kills": "boutTimer tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "92E4: column ignored",
+  "old": "  let hl = (scr + (pos >> 8)) & 0xFFFF;",
+  "new": "  let hl = scr;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes exactly the screen bytes the real $9C6F wrote"
+ },
+ {
+  "file": "template.html",
+  "label": "923A: one row short",
+  "old": "  for (let b = 8; b > 0; b--){",
+  "new": "  for (let b = 7; b > 0; b--){",
+  "increment": "9C6F-port",
+  "kills": "boutTimer writes exactly the screen bytes the real $9C6F wrote"
+ },
+ {
+  "file": "template.html",
+  "label": "9229: row step stays in cell",
+  "old": "    if (h & 7) t += 37;",
+  "new": "    if (1) t += 37;",
+  "increment": "9C6F-port",
+  "kills": "boutTimer tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "923A: glyph from the wrong char",
+  "old": "  let src = (prod + FONT_BASE) & 0xFFFF, de = hl;",
+  "new": "  let src = (prod + FONT_BASE + 8) & 0xFFFF, de = hl;",
+  "increment": "9C6F-port",
+  "kills": "each printed cell shows the lookalike glyph of its $932C character"
  }
 ]

@@ -3,7 +3,10 @@
 
 name     = "bout_timer"
 entries  = ["$9C6F"]
-manual   = ["Q11", "7.2"]
+oracle   = "tools/callio.py"
+fixtures = ["timer9c6f"]
+port     = "boutTimer"
+manual   = ["Q11", "7.2", "5.1", "T44"]
 
 [[fact]]
 kind   = "measured"
@@ -20,3 +23,19 @@ kind   = "insn"
 at     = "$9C6F"
 says   = "returns at once if $9C2B (time up) set, $AA03|$AA43 (reel) nonzero, or $AA04 = $17; else DEC $9CA6, at 0 reload 13, DEC Time $9CA5, at 0 set $9C2B=1, print Time at $0B00 via $9336"
 by     = "python tools/adis.py 0x9C6F 25"
+
+[[fact]]
+kind   = "gated"
+says   = "boutTimer (with printNumber, printString, printChar) writes every non-screen byte, exactly the screen addresses, and the exact uncontended T of all 31 cases; each cell shows the lookalike glyph of its $932C char (D5); 14 mutants killed"
+by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "insn"
+at     = "$9336"
+says   = "$9309 writes Time as 5 ASCII digits at $932C (adds of table $92FF), 0 at $9331; leading 0s blanked, a lone 0 kept; $92E4 prints at row L col H; $923A copies ROM font $3D00+(c-$20)*8 via $C319, $9229"
+by     = "python tools/adis.py 0x9336 26 ; python tools/adis.py 0x92E4 40 ; python tools/adis.py 0x9229 30"
+
+[[fact]]
+kind   = "measured"
+says   = "fixture build/callio_9c6f.json: 30 play cases at $9745 (s1, p1 D+W, p1b) + 1 derived ($9C2B=1); every exit, time-up, Time 30..0 printed; ROM reads and glyphs as addresses (D5); --check 31/31, T 45-8023"
+by     = "python tools/callio.py --capture --state s1 --call 0x9745 0x9748 --blind 0x4000-0x57FF --out build/callio_9c6f.json (+ p1, p1b --append; --derive --case 0 --set 0x9C2B=1) ; then --check"

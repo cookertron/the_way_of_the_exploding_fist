@@ -723,7 +723,132 @@ function fighterPost(m, c){
   }
 }
 
-/* ---- the demo "game" ------------------------------------------------- */
+/* ---- the lookalike font (D5) -----------------------------------------
+   The game prints through $923A from the ROM character set at $3D00,
+   8 bytes per character from $20.  The ROM is not shipped (D5): these
+   glyphs are our own drawing, in the same layout, so $923A's arithmetic is
+   unchanged.  Only the characters the game has been seen to print are
+   drawn; any other is counted in fontMiss and printed blank. */
+const FONT_BASE = 0x3D00;
+const fontGlyphs = {
+  0x20: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+  0x30: [0x3C, 0x66, 0x6E, 0x76, 0x66, 0x66, 0x3C, 0x00],
+  0x31: [0x18, 0x38, 0x18, 0x18, 0x18, 0x18, 0x7E, 0x00],
+  0x32: [0x3C, 0x66, 0x06, 0x0C, 0x30, 0x60, 0x7E, 0x00],
+  0x33: [0x3C, 0x66, 0x06, 0x1C, 0x06, 0x66, 0x3C, 0x00],
+  0x34: [0x0C, 0x1C, 0x3C, 0x6C, 0x7E, 0x0C, 0x0C, 0x00],
+  0x35: [0x7E, 0x60, 0x7C, 0x06, 0x06, 0x66, 0x3C, 0x00],
+  0x36: [0x1C, 0x30, 0x60, 0x7C, 0x66, 0x66, 0x3C, 0x00],
+  0x37: [0x7E, 0x06, 0x0C, 0x18, 0x30, 0x30, 0x30, 0x00],
+  0x38: [0x3C, 0x66, 0x66, 0x3C, 0x66, 0x66, 0x3C, 0x00],
+  0x39: [0x3C, 0x66, 0x66, 0x3E, 0x06, 0x0C, 0x38, 0x00],
+};
+const font = new Uint8Array(0x300);
+for (const [c, g] of Object.entries(fontGlyphs)) font.set(g, (c - 0x20) * 8);
+const fontMiss = { count: 0, codes: new Set() };
+
+/* $923A with its CALL: character a at screen address hl.  Returns T. */
+function printChar(m, hl, a){
+  const [prod, tm] = rfMul(m, 8, (a - 0x20) & 0xFF);   // $C319, T without its CALL
+  if (!fontGlyphs[a]){ fontMiss.count++; fontMiss.codes.add(a); }
+  let src = (prod + FONT_BASE) & 0xFFFF, de = hl;
+  let t = 17 + 11 + 7 + 4 + 7 + 17 + tm + 10 + 11 + 10 + 7 + 10;
+  for (let b = 8; b > 0; b--){
+    const i = src - FONT_BASE;
+    m[de] = i >= 0 && i < font.length ? font[i] : 0;
+    src = (src + 1) & 0xFFFF;
+    t += 7 + 7 + 6 + 4 + 17 + 4 + (b > 1 ? 13 : 8);
+    /* $9229: down one pixel row */
+    let h = ((de >> 8) + 1) & 0xFF, l = de & 0xFF;
+    if (h & 7) t += 37;
+    else {
+      const s = l + 0x20; l = s & 0xFF;
+      if (s > 0xFF) t += 59;
+      else { h = (h - 8) & 0xFF; t += 69; }
+    }
+    de = h << 8 | l;
+  }
+  return t;
+}
+
+/* Print_String $92E4 with its CALL: the 0-terminated string at de, at
+   pixel row (pos & $FF) and column (pos >> 8).  Returns T. */
+function printString(m, pos, de){
+  const [scr, ts] = rfScreenAddr(pos & 0xFF);
+  let hl = (scr + (pos >> 8)) & 0xFFFF;
+  let t = 17 + 11 + 11 + 4 + ts + 10 + 4 + 7 + 11 + 10;
+  for (;;){
+    const a = m[de];
+    t += 7 + 4;
+    if (!a) return t + 11;
+    t += 5 + 11 + 11 + printChar(m, hl, a) + 10 + 10 + 6 + 6 + 10;
+    hl = (hl + 1) & 0xFFFF; de = (de + 1) & 0xFFFF;
+  }
+}
+
+/* Process_Print_Time $9336 with its CALL: hl as five decimal digits into
+   Time_Buffer $932C, leading zeros blanked (a lone 0 kept), printed at
+   pos.  The divisors are the game's table at $92FF (-10000 .. -1). */
+function printNumber(m, hl, pos){
+  let t = 17 + 11 + 14;
+  t += 17 + 11 + 11 + 11 + 10;                    // $9309 Process_Time with its CALL
+  let ix = 0x932C, de = 0x92FF;
+  for (;;){
+    const c = m[de], bc = m[de + 1] << 8 | c;
+    de += 2;
+    t += 52;
+    let a = 0x2F;
+    for (;;){                                     // hl ends as the value before the add that failed
+      a++;
+      const s = hl + bc;
+      t += 4 + 4 + 4 + 11;
+      if (s > 0xFFFF){ hl = s & 0xFFFF; t += 12; } else { t += 7; break; }
+    }
+    m[ix++] = a;
+    t += 4 + 19 + 10 + 10 + 4;
+    if (((c + 1) & 0xFF) === 0){ t += 7; break; }
+    t += 12;
+  }
+  t += 10 + 10 + 10 + 10;
+  m[ix] = 0;
+  t += 15 + 10 + 7 + 7 + 10 + 10;
+  let p = 0x932C;
+  for (;;){
+    t += 7 + 7 + 10;
+    if (m[p] !== 0x30) break;
+    m[p++] = 0x20;
+    t += 7 + 7 + 6 + 10;
+  }
+  t += 10 + 7 + 7 + 10;
+  if (m[0x9330] === 0x20){ m[0x9330] = 0x30; t += 7 + 7; }
+  return t + 10 + printString(m, pos, 0x932C) + 10;
+}
+
+/* ---- bout_timer $9C6F: the bout clock --------------------------------
+   Frozen while time is up ($9C2B), during either fighter's reel ($AA03,
+   $AA43) or move $17 at $AA04; else every 13th pass ($9CA6) Time $9CA5
+   drops by one and is reprinted at $0B00, setting $9C2B at 0.  Returns the
+   uncontended T from the CALL at $9745 to $9748 (python tools/callio.py
+   --capture --call 0x9745 0x9748 --blind 0x4000-0x57FF; ledger/9C6F.toml). */
+function boutTimer(m){
+  let t = 17 + 13 + 4;
+  if (m[0x9C2B]) return t + 11;
+  t += 5 + 13 + 10 + 7;
+  if (m[0xAA03] | m[0xAA43]) return t + 11;
+  t += 5 + 13 + 7;
+  if (m[0xAA04] === 0x17) return t + 11;
+  t += 5 + 10 + 11;
+  m[0x9CA6]--;                                    // Uint8Array: wraps as DEC (HL)
+  if (m[0x9CA6]) return t + 11;
+  m[0x9CA6] = 13;
+  t += 5 + 10 + 17 + 10 + 11 + 10;
+  m[0x9CA5]--;
+  if (m[0x9CA5]) t += 12;
+  else { m[0x9C2B] = 1; t += 7 + 7 + 13; }
+  return t + 13 + 7 + 4 + 10 + printNumber(m, m[0x9CA5], 0x0B00) + 10;
+}
+
+/* ---- the demo "game"------------------------------------------------- */
 const TONE_HZ = 440;
 class Demo {
   constructor(){
@@ -803,5 +928,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, font, fontMiss };
 </script>

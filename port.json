@@ -35,6 +35,12 @@
       "file": "build/callio_9ad7.json",
       "required": true,
       "note": "oracle for fighter_post $9AD7 with its store $9B9D: python tools/callio.py --capture (see its --help)"
+    },
+    {
+      "key": "timer9c6f",
+      "file": "build/callio_9c6f.json",
+      "required": true,
+      "note": "oracle for bout_timer $9C6F and its printer: python tools/callio.py --capture --blind 0x4000-0x57FF (ROM reads and glyphs as addresses only, D5)"
     }
   ],
   "tape": {

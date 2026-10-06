@@ -637,4 +637,51 @@ const mockCtx = (state) => ({
         [0, 0x40].filter(v => !fx.cases.some(c => c.regs[iC] === v)), []);
 }
 
+/* ---- bout_timer $9C6F and its printer against its frozen oracle (callio) -
+   Bracketed from the CALL at $9745 to $9748.  The screen is a blind range
+   (D5): the fixture holds which bytes the real code wrote there, not their
+   ROM-font values, so the gate checks that set of addresses, and separately
+   that each cell shows the lookalike glyph of the character in $932C. */
+{
+  const fx = P.assets.timer9c6f;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  check('the lookalike font holds no $A5 byte (the poison marks screen writes)', P.font.includes(0xA5), false);
+  let badBytes = 0, badBlind = 0, badT = 0, badGlyph = 0, firstBytes = '', firstBlind = '', firstT = '', firstGlyph = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.boutTimer(m);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++) if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
+    if (diff >= 0 && !badBytes++)
+      firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    const wrote = [], blind = [];
+    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
+    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
+    if (wrote.join() !== blind.join() && !badBlind++)
+      firstBlind = `case ${i}: wrote ${wrote.length} screen bytes, the real code ${blind.length}`;
+    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
+    if (blind.length) for (let k = 0; k < 5; k++) for (let r = 0; r < 8; r++){
+      const ch = m[0x932C + k], a = 0x4000 + 0x0B + k + (r << 8);
+      if (m[a] !== P.font[(ch - 0x20) * 8 + r] && !badGlyph++) firstGlyph = `case ${i}: char ${k} row ${r}`;
+    }
+  }
+  check('boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('boutTimer writes exactly the screen bytes the real $9C6F wrote', [badBlind, firstBlind], [0, '']);
+  check('boutTimer tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  check('each printed cell shows the lookalike glyph of its $932C character', [badGlyph, firstGlyph], [0, '']);
+  const pcs = fx.cases.map(c => { const s = new Set();
+    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  /* each RET of $9C6F: a case that passed the PC before it and not the one after */
+  check('the callio cases take every early return of $9C6F',
+        [[0x9C6F, 0x9C74], [0x9C74, 0x9C7C], [0x9C7C, 0x9C82], [0x9C82, 0x9C87]]
+          .filter(([a, b]) => !pcs.some(s => s.has(a) && !s.has(b))).map(([a]) => a.toString(16)), []);
+  check('the callio cases reach every branch of the tick and its printer',
+        [0x9C8E, 0x9C93, 0x934E, 0x935E, 0x922F, 0x9235, 0xC31E]
+          .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+}
+
 rig.done();

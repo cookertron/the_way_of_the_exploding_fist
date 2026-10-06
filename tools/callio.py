@@ -35,6 +35,11 @@ how many reads were fetches.
              --call may be given more than once (one routine, two sites).
              Fetched bytes must equal the target image at every call; the
              fixture keeps their addresses only (tape-derived, rule 7).
+             ROM bytes read as data ($0000-$3FFF) are kept the same way, as
+             addresses ("rom") -- D5: no ROM byte is committed.  --blind LO-HI
+             (repeatable) keeps the outputs in that range as addresses only
+             ("blind"), for writes that copy ROM bytes (a glyph on screen);
+             the ranges are stored in the fixture and --check honours them.
   --check    replay every case in a blank 64K holding only the target's
              bytes at those addresses and the inputs: every byte written,
              every register at the return and the T must agree, and no
@@ -52,6 +57,8 @@ Usage:
     python tools/callio.py --state s1 --call 0x9745 0x9748
     python tools/callio.py --capture --state s1 --call 0x9763 0x9766 --call 0x976C 0x976F
                            [--frames 1500] [--keys D+W] [--per 2] --out build/callio_97bb.json [--append]
+    python tools/callio.py --capture --state s1 --call 0x9745 0x9748 --blind 0x4000-0x57FF
+                           --out build/callio_9c6f.json
     python tools/callio.py --check --state s1 --fixture build/callio_97bb.json
     python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 12 --set 0xAA44=0x12
 """
@@ -152,6 +159,25 @@ def runs(addrs):
     return out
 
 
+def case_io(src, lm, blind):
+    """The in/out fields of a case: ROM data reads and blind outputs as
+    address runs only (D5, rule 7), everything else as [addr, hex] runs."""
+    hide = lambda a: any(lo <= a <= hi for lo, hi in blind)
+    io = {'in': hexruns({a: src[a] for a in lm.reads if a >= 0x4000}),
+          'out': hexruns({a: lm.m[a] for a in lm.writes if not hide(a)})}
+    rom = [a for a in lm.reads if a < 0x4000]
+    hid = [a for a in lm.writes if hide(a)]
+    if rom:
+        io['rom'] = [[lo, hi] for lo, hi in runs(rom)]
+    if hid:
+        io['blind'] = [[lo, hi] for lo, hi in runs(hid)]
+    return io
+
+
+def addrs(rs):
+    return {a for lo, hi in rs for a in range(lo, hi + 1)}
+
+
 def table(title, touched, firstpc, extra=None, gap=None):
     """touched: addr -> calls; firstpc: addr -> PC.  Contiguous addresses
     that share a call count are one row; with gap, addresses within gap
@@ -177,7 +203,7 @@ def table(title, touched, firstpc, extra=None, gap=None):
 
 def capture(args):
     t = parse_target(args)
-    calls, frames, keys, per, out, append = [], 1500, [], 2, None, False
+    calls, frames, keys, per, out, append, blind = [], 1500, [], 2, None, False, []
     while args:
         a = args[0]
         if a == '--call':
@@ -192,6 +218,8 @@ def capture(args):
             out = args[1]; del args[:2]
         elif a == '--append':
             append = True; del args[:1]
+        elif a == '--blind':
+            lo, hi = args[1].split('-'); blind.append([int(lo, 0), int(hi, 0)]); del args[:2]
         else:
             sys.exit(f'callio: unknown argument {a}  (target: {TARGET_HELP})')
     if not calls or not out:
@@ -204,6 +232,9 @@ def capture(args):
     fx = {'calls': [[s, e] for s, e in calls], 'code': [], 'cases': []}
     if append and os.path.exists(out):
         fx = json.load(open(out))
+    if append and fx.get('blind', []) != blind:
+        sys.exit(f'callio: --blind must match the fixture {fx.get("blind", [])} to append')
+    fx['blind'] = blind
     code = {a for lo, hi in fx['code'] for a in range(lo, hi + 1)}
     seen = {}
     for c in fx['cases']:
@@ -231,8 +262,7 @@ def capture(args):
         seen[site, sig] = seen.get((site, sig), 0) + 1
         new += 1
         fx['cases'].append({'site': site, 'sp': sp, 'regs': [regs_in[i] for i in REGS],
-                            'in': hexruns({a: pre[a] for a in lm.reads}),
-                            'out': hexruns({a: lm.m[a] for a in lm.writes}),
+                            **case_io(pre, lm, blind),
                             'exit': [lm.exit[i] for i in REGS], 't': dt, 'sig': sig})
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
     fx['regs'] = REGS
@@ -241,7 +271,8 @@ def capture(args):
                    '(SkoolKit indices in regs) at the CALL, the bytes read before written as [addr, hex] runs '
                    '(in; fetches and the call frame excepted), every byte written outside the frame (out), '
                    'the registers at the return (exit), the uncontended T (t); code lists the fetched '
-                   'addresses, whose bytes come from the target. Read by: python tools/callio.py --check, '
+                   'addresses, whose bytes come from the target, as do ROM data reads (rom, addresses '
+                   'only, D5); outputs inside the blind ranges are addresses only (blind). Read by: python tools/callio.py --check, '
                    'and the JS gate of that routine.')
     with open(out, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
@@ -271,6 +302,9 @@ def check(args):
         ins = unruns(c['in'])
         for a, v in ins.items():
             mem[a] = v
+        rom = addrs(c.get('rom', []))
+        for a in rom:
+            mem[a] = src[a]
         sp = c['sp']
         lm = Logged(bytes(mem), frame(sp))
         regs = list(h.regs)
@@ -278,14 +312,16 @@ def check(args):
             regs[k] = v
         regs[PC], regs[SP], regs[T] = c['site'], sp, 0
         dt, _ = run_alone(lm, regs, rets[c['site']])
-        out = {a: lm.m[a] for a in lm.writes}
-        unread = sorted(a for a in lm.reads if a not in ins)
+        hid = addrs(fx.get('blind', []))
+        out = {a: lm.m[a] for a in lm.writes if a not in hid}
+        seen = sorted(a for a in lm.writes if a in hid) == sorted(addrs(c.get('blind', [])))
+        unread = sorted(a for a in lm.reads if a not in ins and a not in rom)
         ex = [lm.exit[k] for k in fx['regs']]
-        if out != unruns(c['out']) or dt != c['t'] or unread or ex != c['exit']:
+        if out != unruns(c['out']) or not seen or dt != c['t'] or unread or ex != c['exit']:
             bad += 1
             if bad <= 5:
                 print(f'*** case {i} (${c["site"]:04X}): T replay {dt} fixture {c["t"]}; writes agree: '
-                      f'{out == unruns(c["out"])}; exit registers agree: {ex == c["exit"]}; '
+                      f'{out == unruns(c["out"]) and seen}; exit registers agree: {ex == c["exit"]}; '
                       f'unrecorded reads {[hex(a) for a in unread[:6]]}')
     ts = [c['t'] for c in fx['cases']]
     print(f'callio: {fixture}: {len(fx["cases"])} cases, {bad} disagree; T {min(ts)}-{max(ts)}')
@@ -313,7 +349,7 @@ def derive(args):
     fx = json.load(open(fixture))
     c = fx['cases'][base]
     ins = unruns(c['in'])
-    missing = [a for a in sets if a not in ins]
+    missing = [a for a in sets if a not in ins]     # never a ROM byte: those are not inputs to set
     if missing:
         sys.exit('callio: --set may only change bytes the case read: not '
                  + ' '.join(f'${a:04X}' for a in missing))
@@ -332,8 +368,7 @@ def derive(args):
     code = {a for lo, hi in fx['code'] for a in range(lo, hi + 1)} | lm.fetched | pcs
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
     fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': c['regs'],
-                        'in': hexruns({a: mem[a] for a in lm.reads}),
-                        'out': hexruns({a: lm.m[a] for a in lm.writes}),
+                        **case_io(mem, lm, fx.get('blind', [])),
                         'exit': [lm.exit[k] for k in fx['regs']], 't': dt, 'sig': sig,
                         'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()}}})
     with open(fixture, 'w') as f:
