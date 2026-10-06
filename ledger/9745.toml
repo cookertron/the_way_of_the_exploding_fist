@@ -1,0 +1,31 @@
+# ledger/9745.toml -- current truth about play_pass (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "play_pass"
+entries  = ["$9745"]
+manual   = ["Q11", "3.8", "7.2"]
+
+[[fact]]
+kind   = "measured"
+says   = "Q11 not multi-modal -- $BF13 (fighter render) is 95% of the pass, broad 158k-338k T (median 254k s1, 260k p1); every other CALL under 10k except $B15A"
+by     = "python tools/chaincost.py --state s1 --range 0x9745 0x97AC --frames 3000 ; same for p1"
+
+[[fact]]
+kind   = "measured"
+says   = "$B15A plays the sound effect requested in $B150 inline and blocking -- one call cost 746783 T (10.7 frames) in s1; this is the 13-15 frame pass tail (battery.toml)"
+by     = "python tools/chaincost.py --state s1 --range 0x9745 0x97AC --frames 3000"
+
+[[fact]]
+kind   = "measured"
+says   = "$BF13 cost is fixed by its inputs $C41B-$C43B to 0.65% (within-key spread 1648 T max) once the $C3F0 LDIR to the display is excluded; that LDIR is 9% of the call at 20.4-31.4 T/byte, so contention adds up to 12.3k T by frame phase"
+by     = "python tools/callcost.py --state s1 --call 0x9790 0x9793 --key 0xC41B 0xC43C --sub 0xC3F0 0xC3F2 ; same for p1"
+
+[[fact]]
+kind   = "measured"
+says   = "$BF13 draws through the sprite decoder $8803-$8AFF (compressed rows, mirror flag $C407, shift $C40E; its 13 hottest 16-byte blocks are 42% of $BF13 in s1, PROVISIONAL: scratch profile); the back buffer is at $F730 (uncontended)"
+by     = "python tools/adis.py 0x8803 110 ; python tools/adis.py 0xC1A2 12"
+
+[[open]]
+ask    = "which timing model for the JS pass -- a T-state tally kept by the JS sprite decoder as it walks the same compressed rows, a per-(frame,mirror,shift) cost table frozen from the harness, or a measured mean pass rate?"
+tried  = "Q11 shows no per-path constants; cost is a function of the render inputs plus up to 12.3k T of display-copy contention"
+settle = "decide in phase 10 when $8803 is read; freeze callcost tables per key as the oracle; the chosen model must land within 0.65% per key outside the copy"
