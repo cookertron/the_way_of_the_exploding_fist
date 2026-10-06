@@ -59,6 +59,175 @@ const A = JSON.parse(document.getElementById('assets').textContent);
 
 /*#include platform.js*/
 
+/* ---- the sprite decoder $8803 ------------------------------------------
+   A transliteration of tools/sprdec.py (ledger/8803.toml): the same rows,
+   the same branches, and each instruction's uncontended T, tallied into the
+   return value (D3).  m is the 64K of the machine (a Uint8Array): it reads
+   the sprite at hl, the flags $C40E (bit 0 mirror, bits 1/2/3 shift
+   2/4/6 px), $C407 (recolour) and $C408 (the stride), the tables
+   $B500-$B9FF, and writes its scratch $8AE9-$8B1C and the bytes under de.
+   T measured: equal to the harness's uncontended twin on all 441 sprdec
+   cases (python tools/sprdec.py --check).  Stack contention in play is not
+   charged here (8803 open 1). */
+const sprLdirT = n => 21 * (n || 0x10000) - 5;
+const sprDjnzT = (k, body) => k * (body + 13) - 5;
+function sprLdir(m, s, d, n){
+  for (let i = n || 0x10000; i > 0; i--){ m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; }
+  return [s, d];
+}
+function sprPut16(m, a, v){ m[a] = v & 0xFF; m[a + 1] = (v >> 8) & 0xFF; }
+const sprGet16 = (m, a) => m[a] | m[a + 1] << 8;
+
+function spriteDecode(m, hl, de, paths){
+  const tally = paths ? k => { paths[k] = (paths[k] || 0) + 1; } : () => {};
+  const F = m[0xC40E];
+  let t = 13 + 7 + 10;
+  if (F & 0xFE){ m[0x8B0A] = 1; t += 7 + 13 + 10; }
+  else { m[0x8B0A] = 0; t += 4 + 13; }
+  m[0x8AF3] = 0; t += 7 + 13;
+  let w = m[hl];
+  m[0x8B1C] = w; m[0x8B1B] = w; t += 7 + 13 + 13 + 4 + 13 + 4 + 10;
+  if (m[0x8B0A]){ m[0x8B1C] = (w + 1) & 0xFF; t += 13 + 4 + 13; }
+  hl = (hl + 1) & 0xFFFF; t += 6;
+  for (;;){
+    /* $8833 row top */
+    m[0x8AF3] ^= 1; t += 13 + 7 + 13;
+    m[0x8AFF] = 0; m[0x8AFE] = 0; t += 4 + 13 + 13;
+    t += 7 + 4 + 10;
+    if (m[hl] === 0) return t + 10;
+    sprPut16(m, 0x8B16, de + m[0xC408]); t += 72;
+    let hd = m[hl]; t += 7 + 4 + 10;
+    if (!(hd & 0x80)){                              /* $8858 raw row: w bytes */
+      tally('raw');
+      w = m[0x8B1B];
+      sprPut16(m, 0x8B14, hl + w);
+      m[0x8AE9] = w | 0x80;
+      sprLdir(m, hl, 0x8AEA, w);
+      hl = 0x8AE9;
+      t += 13 + 4 + 7 + 11 + 11 + 16 + 10 + 11 + 10 + 7 + 7 + 6 + sprLdirT(w) + 30;
+    } else {                                        /* $8875 packed row */
+      tally('packed');
+      sprPut16(m, 0x8B14, hl + (hd & 7) + 1);
+      t += 4 + 7 + 4 + 4 + 7 + 11 + 11 + 16 + 10;
+    }
+    /* $8882 recolour by row parity, tables $B8/$B9 via $8AD1 */
+    t += 13 + 4 + 10;
+    if (m[0xC407]){
+      tally('recolour');
+      const a = m[hl], n = a & 7, tab = m[0x8AF3] ? 0xB800 : 0xB900;
+      m[0x8AF4] = a;
+      for (let i = 0; i < n; i++) m[0x8AF5 + i] = m[tab + m[(hl + 1 + i) & 0xFFFF]];
+      t += 11 + 7 + 10 + 7 + 6 + 6 + 7 + 4 + 4 + 10 + 20;
+      if (n) t += sprDjnzT(n, 7 + 17 + 97 + 7 + 6 + 6);
+      hl = 0x8AF4;
+    }
+    /* $88A5 mirror: skip re-measured from the right, bytes reversed by $B7 */
+    t += 13 + 8 + 10;
+    if (F & 1){
+      tally('mirror');
+      hd = m[hl];
+      const n = hd & 7, s = (hd >> 3) & 7;
+      let a = (((m[0x8B1B] - s - n) & 0xFF) << 3) & 0xFF;
+      t += 128;
+      if (a){ a |= 0x40; t += 7; }
+      m[0x8B0B] = a | 0x80 | n;
+      for (let i = 0; i < n; i++) m[0x8B0B + n - i] = m[0xB700 + m[(hl + 1 + i) & 0xFFFF]];
+      t += 42 + 78 + (n ? sprDjnzT(n, 65) : 0) + 20;
+      hl = 0x8B0B;
+    }
+    /* $88F7 shift: bit 1 two pixels, bit 2 four (RRD), bit 3 six (left 2) */
+    t += 13 + 8 + 10;
+    let sh = 0;
+    if (F & 2) sh = 2;
+    else {
+      t += 13 + 8 + 10;
+      if (F & 4) sh = 4;
+      else {
+        t += 13 + 8 + 10;
+        if (F & 8) sh = 6;
+      }
+    }
+    if (sh){
+      tally('shift' + sh);
+      hd = m[hl]; m[0x8B01] = hd;
+      const n = hd & 7, src = (hl + 1) & 0xFFFF;
+      t += 7 + 11 + 10 + 7 + 10 + 6 + 7 + 10;
+      if (n){
+        m[0x8B00] = n;
+        const first = m[src], k = n + 1;
+        if (sh === 6){
+          m[0x8B02] = 0;
+          t += 13 + 11 + 10 + 4 + 7 + 11 + 4 + 7 + 6 + 7 + 7 + 10;
+          if (first < 0x40){ m[0x8AFE] = 1; t += 20; }
+          sprLdir(m, src, 0x8B03, n);
+          t += 4 + 4 + 10 + sprLdirT(n) + 10 + 10 + 13 + 4 + 4 + 4 + 4 + 4 + 10;
+          t += 11 + 13 + 4 + 7 + 11 + 10 + 11 + 11 + 4;
+          for (let r = 0; r < 2; r++){
+            let c = 0;
+            for (let a = 0x8B02 + n; a > 0x8B01; a--){ const v = m[a]; m[a] = (v << 1 | c) & 0xFF; c = v >> 7; }
+          }
+          t += 2 * sprDjnzT(k, 24) + 10 + 4 + 4 + 10 + 7 + 4 + 10;
+        } else {
+          t += 13 + 11 + 10 + 4 + 7 + 7 + 7 + 10;
+          if (first < (sh === 2 ? 4 : 0x10)){ m[0x8AFE] = 1; t += 20; }
+          sprLdir(m, src, 0x8B02, n);
+          m[0x8B02 + n] = 0;
+          t += 11 + 4 + 4 + 10 + sprLdirT(n) + 10 + 4 + 7 + 10;
+          if (sh === 2){
+            for (let r = 0; r < 2; r++){
+              let c = 0;
+              for (let a = 0x8B02; a < 0x8B02 + k; a++){ const v = m[a]; m[a] = v >> 1 | c << 7; c = v & 1; }
+            }
+            t += 47 + 11 + 2 * sprDjnzT(k, 24) + 10 + 4 + 4;
+          } else {
+            let acc = 0;
+            for (let a = 0x8B02; a < 0x8B02 + k; a++){ const v = m[a]; m[a] = (acc & 0xF) << 4 | v >> 4; acc = v & 0xF; }
+            t += 13 + 4 + 4 + 4 + sprDjnzT(k, 24);
+          }
+          t += 6 + 7 + 4 + 10;
+        }
+        if (m[0x8B02 + n] === 0){ m[0x8AFF] = 1; t += 20; }
+      }
+      t += 20;
+      hl = 0x8B01;
+    }
+    /* $8A30 plot: skip, then first byte masked by $B5, middle copied, last
+       masked by $B6; a single byte takes both masks ($8AA5) */
+    hd = m[hl]; t += 13 + 4 + 7 + 4 + 4 + 10;
+    if (hd & 0x40){ de = (de + ((hd >> 3) & 7)) & 0xFFFF; t += 89; }
+    const n = hd & 7; t += 25;
+    if (n === 0){
+      tally('empty');
+      hl = sprGet16(m, 0x8B14); de = sprGet16(m, 0x8B16); t += 46;
+      continue;
+    }
+    let b = n; t += 31;
+    if (m[0x8B0A]){ b++; t += 4; }
+    hl = (hl + 1) & 0xFFFF; b--; t += 37;
+    if (m[0x8AFF]){ b--; t += 4; }
+    t += 27;
+    if (m[0x8AFE]){ de = (de + 1) & 0xFFFF; hl = (hl + 1) & 0xFFFF; b--; t += 16; }
+    b &= 0xFF; t += 18;
+    if (b === 0){
+      tally('single');
+      const v = m[hl];
+      m[de] = m[de] & (m[0xB500 + v] | m[0xB600 + v]) | v;
+      t += 121;
+    } else {
+      tally('edges');
+      let v = m[hl];
+      m[de] = m[de] & m[0xB500 + v] | v;
+      hl = (hl + 1) & 0xFFFF; de = (de + 1) & 0xFFFF;
+      b--; t += 96;
+      if (b){ [hl, de] = sprLdir(m, hl, de, b); t += 11 + sprLdirT(b); }
+      v = m[hl];
+      m[de] = m[de] & m[0xB600 + v] | v;
+      t += 70;
+    }
+    hl = sprGet16(m, 0x8B14); de = sprGet16(m, 0x8B16); t += 46;
+  }
+}
+
 /* ---- the demo "game" ------------------------------------------------- */
 const TONE_HZ = 440;
 class Demo {
@@ -139,5 +308,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode };
 </script>

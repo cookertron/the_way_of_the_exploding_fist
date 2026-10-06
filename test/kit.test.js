@@ -469,4 +469,40 @@ const mockCtx = (state) => ({
   checkTrue('a long stall is capped at maxDt, not replayed', P.demo.frame - before <= 6 + Math.ceil(0.25 * FRAME_HZ));
 }
 
+/* =======================================================================
+   THE GAME: The Way of the Exploding Fist
+   ======================================================================= */
+
+/* ---- the sprite decoder $8803 against its frozen oracle (sprdec) ------
+   Every case is replayed in a blank 64K holding only the tables and the
+   bytes the real call read; the whole of memory outside the scratch
+   $8AE9-$8B1C must then equal the bytes the real call left, and the T must
+   equal its uncontended T (python tools/sprdec.py --capture). */
+{
+  const fx = P.assets.sprdec;
+  const tables = Buffer.from(fx.tables, 'hex');
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const paths = {};
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000);
+    m.set(tables, 0xB500); put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.spriteDecode(m, c.hl, c.de, paths);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === 0x8AE9) a = 0x8B1D;
+      if (m[a] !== want[a]){ diff = a; break; }
+    }
+    if (diff >= 0 && !badBytes++)
+      firstBytes = `case ${i} HL=$${c.hl.toString(16)}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (t !== c.t && !badT++) firstT = `case ${i} HL=$${c.hl.toString(16)}: T ${t} want ${c.t}`;
+  }
+  check(`spriteDecode writes every byte the real $8803 wrote (${fx.cases.length} sprdec cases)`, [badBytes, firstBytes], [0, '']);
+  check('spriteDecode tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  check('the sprdec cases reach every row path seen in play',
+        ['packed', 'edges', 'single', 'recolour', 'mirror', 'shift2', 'shift4', 'shift6'].filter(k => !paths[k]), []);
+}
+
 rig.done();

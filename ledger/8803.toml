@@ -5,6 +5,7 @@ name     = "sprite_decoder"
 entries  = ["$8803"]
 oracle   = "tools/sprdec.py"
 fixtures = ["sprdec"]
+port     = "spriteDecode"
 manual   = ["7.2", "Q11", "5.1", "3.8"]
 
 [[fact]]
@@ -41,6 +42,11 @@ kind   = "insn"
 at     = "$88A5"
 says   = "$C40E bit 0 mirrors (bytes reversed via $B7, skip measured from the right); bits 1/2/3 shift 2/4/6 px, dropping a blank first ($8AFE) or last ($8AFF) byte; $C407 recolours via $B8 odd rows, $B9 even ($8AD1)"
 by     = "python tools/adis.py 0x8882 70 ; python tools/adis.py 0x8965 100 ; python tools/adis.py 0x8AD1 10"
+
+[[fact]]
+kind   = "measured"
+says   = "spriteDecode (web/template.html) ports tools/sprdec.py: on all 441 sprdec cases the whole 64K outside $8AE9-$8B1C matches the real call and T equals the uncontended T; 22 mutants killed, each by its named row"
+by     = "node test/kit.test.js ; python tools/mutants.py --match 8803"
 
 [[open]]
 ask    = "how the JS tally charges stack contention (0-7.2% of the call by frame phase) -- a mean factor, or per stack access keyed to the 7.2 clock phase"

@@ -1,0 +1,178 @@
+[
+ {
+  "file": "template.html",
+  "label": "8803 flag $8B0A from bits 1-7",
+  "old": "if (F & 0xFE){",
+  "new": "if (F & 0xFC){",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 row top T",
+  "old": "m[0x8AF3] ^= 1; t += 13 + 7 + 13;",
+  "new": "m[0x8AF3] ^= 1; t += 13 + 7 + 12;",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 end-of-sprite T",
+  "old": "return t + 10;",
+  "new": "return t + 11;",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 stride $C408",
+  "old": "de + m[0xC408]); t += 72;",
+  "new": "de + m[0xC408] + 1); t += 72;",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 blank first byte steps dest",
+  "old": "if (m[0x8AFE]){ de = (de + 1) & 0xFFFF; hl",
+  "new": "if (m[0x8AFE]){ hl",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 recolour parity tables",
+  "old": "m[0x8AF3] ? 0xB800 : 0xB900",
+  "new": "m[0x8AF3] ? 0xB900 : 0xB800",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 recolour loop T",
+  "old": "sprDjnzT(n, 7 + 17 + 97 + 7 + 6 + 6)",
+  "new": "sprDjnzT(n, 7 + 17 + 96 + 7 + 6 + 6)",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 mirror skip from the right",
+  "old": "(m[0x8B1B] - s - n) & 0xFF",
+  "new": "(m[0x8B1B] - s) & 0xFF",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 mirror skip flag T",
+  "old": "if (a){ a |= 0x40; t += 7; }",
+  "new": "if (a){ a |= 0x40; t += 8; }",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 mirror byte order",
+  "old": "m[0x8B0B + n - i] = m[0xB700",
+  "new": "m[0x8B0C + i] = m[0xB700",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 shift2 carry bit",
+  "old": "m[a] = v >> 1 | c << 7;",
+  "new": "m[a] = v >> 1 | c << 6;",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 shift4 nibble carry",
+  "old": "m[a] = (acc & 0xF) << 4 | v >> 4;",
+  "new": "m[a] = v >> 4;",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 shift6 blank-first test",
+  "old": "if (first < 0x40){",
+  "new": "if (first < 0x20){",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 shift2 blank-first test",
+  "old": "first < (sh === 2 ? 4 : 0x10)",
+  "new": "first < (sh === 2 ? 2 : 0x10)",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 blank-last test",
+  "old": "if (m[0x8B02 + n] === 0){ m[0x8AFF] = 1;",
+  "new": "if (m[0x8B01 + n] === 0){ m[0x8AFF] = 1;",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 shift6 rotate T",
+  "old": "t += 2 * sprDjnzT(k, 24) + 10 + 4 + 4 + 10 + 7 + 4 + 10;",
+  "new": "t += 2 * sprDjnzT(k, 24) + 10 + 4 + 4 + 10 + 7 + 4 + 9;",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 skip bytes T",
+  "old": "t += 89; }",
+  "new": "t += 90; }",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 single byte takes both masks",
+  "old": "m[de] & (m[0xB500 + v] | m[0xB600 + v]) | v",
+  "new": "m[de] & m[0xB500 + v] | v",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 last byte mask $B6",
+  "old": "m[de] = m[de] & m[0xB600 + v] | v;",
+  "new": "m[de] = m[de] & m[0xB500 + v] | v;",
+  "increment": "8803-js",
+  "kills": "spriteDecode writes every byte the real $8803 wrote (441 sprdec cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 LDIR T per byte",
+  "old": "const sprLdirT = n => 21 *",
+  "new": "const sprLdirT = n => 20 *",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 DJNZ T",
+  "old": "const sprDjnzT = (k, body) => k * (body + 13) - 5;",
+  "new": "const sprDjnzT = (k, body) => k * (body + 13) - 6;",
+  "increment": "8803-js",
+  "kills": "spriteDecode tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 path tally shift",
+  "old": "tally('shift' + sh);",
+  "new": "tally('shift');",
+  "increment": "8803-js",
+  "kills": "the sprdec cases reach every row path seen in play"
+ }
+]

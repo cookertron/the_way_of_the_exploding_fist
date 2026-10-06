@@ -53,5 +53,9 @@
     "states": "build",
     "image": "build/image.bin",
     "snapshot": "build/boot48.z80"
+  },
+  "mutants": {
+    "cases": "test/mutants.json",
+    "suite": "test/kit.test.js"
   }
 }
