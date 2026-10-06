@@ -536,6 +536,10 @@ const mockCtx = (state) => ({
   check('renderFighters tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
   check('the rendfx cases reach every render path seen in play',
         ['separate', 'merged', 'p1-first', 'p2-first', 'floor-part', 'flip', 'unflipped'].filter(k => !paths[k]), []);
+  /* per comparison, margin 0 is the last merged case and 1 the first drawn
+     apart, so a slack of 10 or 12 in either must fail the byte check above */
+  check('the rendfx cases straddle both $C03B overlap comparisons (margins 0 and 1)',
+        ['1:0', '1:1', '2:0', '2:1'].filter(k => !fx.cases.some(c => c.margin && c.margin[k[0] - 1] === +k[2])), []);
 }
 
 rig.done();

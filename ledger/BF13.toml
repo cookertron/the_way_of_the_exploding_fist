@@ -13,16 +13,19 @@ kind   = "measured"
 at     = "$C3F0"
 says   = "the display-copy LDIR costs 4.72 T per byte over 21n-5 pooled (s1 4.63 over 156336 bytes, p1 4.81 over 160648); charged as that mean (D4)"
 by     = "python tools/callcost.py --state s1 --call 0x9790 0x9793 --key 0xC41B 0xC43C --sub 0xC3F0 0xC3F2 --frames 600 ; same for p1"
+
 [[fact]]
 kind   = "insn"
 at     = "$BFB7"
 says   = "LD A,E is overwritten by LD A,$BE (also at $C001): the y-max of each fighter's box ($C437/$C43B) is always $BE, never the computed max -- every box extends to row 190"
 by     = "python tools/adis.py 0xBFB4 4 ; python tools/adis.py 0xBFFE 4"
+
 [[fact]]
 kind   = "insn"
 at     = "$BF73"
 says   = "each fighter's box is the union of this frame (x=$C41B/$C41D, y=$C41C/$C41E, w,h from frame header +1,+2) and last frame ($C42C..$C433); then this frame is saved to $C42C..$C433 at $C007"
 by     = "python tools/adis.py 0xBF73 70 ; python tools/adis.py 0xC007 13"
+
 [[fact]]
 kind   = "insn"
 at     = "$C03B"
@@ -34,6 +37,7 @@ kind   = "insn"
 at     = "$C0D2"
 says   = "merged path draw order: $C427 nonzero draws P1 ($C1A2) then P2 ($C1CC), zero draws P2 then P1; separate path ($C136/$C186) draws each in its own box"
 by     = "python tools/adis.py 0xC0D2 7"
+
 [[fact]]
 kind   = "insn"
 at     = "$C34F"
@@ -45,22 +49,29 @@ kind   = "insn"
 at     = "$C09F"
 says   = "box: width bytes ((xmax-xmin)>>2)+2 to $C40A/$C40F, height ymax-ymin to $C409, $C41A=ymin; $C234 copies rows from the 64-row shadow at $8000 (B=xmin&$FC, C=ymin-$48) into $F730, zero-filling rows past shadow row $40"
 by     = "python tools/adis.py 0xC091 50 ; python tools/adis.py 0xC234 60"
+
 [[fact]]
 kind   = "measured"
 at     = "$BF13"
-says   = "JS renderFighters (template.html) gated: all 41 rendfx cases write every byte and tally the uncontended T exactly; saved SP at $C2B0 is entry SP - 2"
+says   = "JS renderFighters (template.html) gated: all 50 rendfx cases write every byte and tally the uncontended T exactly; saved SP at $C2B0 is entry SP - 2"
 by     = "python tools/build.py ; node test/kit.test.js"
+
 [[fact]]
 kind   = "insn"
 at     = "$C23C"
-says   = "with y-max forced to $BE, c+l-1 = (ymin-$48)+($BE-ymin)-1 = $75 always, so the shadow-overflow branch $C244 runs on every call and the no-overflow path is dead in play (41/41 cases overflow)"
+says   = "with y-max forced to $BE, c+l-1 = (ymin-$48)+($BE-ymin)-1 = $75 always, so the shadow-overflow branch $C244 runs on every call and the no-overflow path is dead in play (50/50 cases overflow)"
 by     = "python tools/adis.py 0xC237 12 ; python tools/rendfx.py --check --state s1 --paths"
+
 [[fact]]
 kind   = "measured"
 at     = "$BF13"
-says   = "rendfx fixture, 41 cases (s1 + p1, 600 frames each, one per PC set): blank-64K replay reproduces every write and T (176361-317689); paths separate 4, merged 37, p1-first 9, p2-first 28, floor-part 14"
-by     = "python tools/rendfx.py --capture --state s1 --per 1 ; same for p1 with --append ; python tools/rendfx.py --check --state s1 --paths"
-[[open]]
-ask    = "is the overlap slack +11 at $C042/$C04F pinned by data -- the fixture's nearest case sits 30 px from the merge/separate boundary, and every box top is in the middle third"
-tried  = "rendfx s1 and p1 600 frames each; mutants +11 to +10 and top/bottom third survive, coarser ones killed"
-settle = "capture with fighters within 11 px of touching (keys or a nudged state) and box tops outside $40-$7F if play reaches them; then restore the +10 mutant"
+says   = "rendfx fixture, 50 cases: s1 + p1 one per PC set, plus p1 A and p1 Q (Q swaps sides) one per new margin; replay reproduces every write and T (176361-317689); both $C03B comparisons have margins -2..2, so the +11 slack is pinned (10 and 12 killed)"
+by     = "python tools/rendfx.py --capture --state s1 --per 1 ; p1 --per 1 --append ; p1 --keys A --per 0 --near 3 --append ; p1 --frames 3000 --keys Q --per 0 --near 2 --append ; python tools/rendfx.py --check --state s1 --paths"
+
+[[fact]]
+kind   = "unreachable"
+at     = "$C203"
+says   = "box tops ($C41A) never leave $67-$7A, so the copy-out always starts in the middle third: Screen_Calc never returns a top- or bottom-third base in play, and their mutants survive by design"
+by     = "python tools/rendfx.py --capture --state p1 --keys W --per 3 ; same for p1 Q E C Z A+W, p1b W, s1 W"
+window = "600 frames each of 8 state/key runs"
+n      = 548

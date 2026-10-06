@@ -17,7 +17,9 @@ the target).
              with interrupts on, and carry on.  A case is kept per distinct
              set of PCs executed in $BF13-$C406 (the paths: separate/merged
              boxes, draw order, flip, floor-anchored parts, shadow overflow,
-             x&3 shifts), at most --per of each.
+             x&3 shifts), at most --per of each; with --near N, also one
+             case per distinct margin of either $C03B comparison within N px
+             of its boundary (margin(): > 0 drawn apart).
   --check    replay every case in a blank 64K holding only the code, the
              tables, the inputs and the return address: every byte written
              and the T must agree, and no byte outside them may be read.
@@ -25,7 +27,7 @@ the target).
 
 Usage:
     python tools/rendfx.py --capture --state s1 [--frames 600] [--keys D+W]
-                           [--per 2] [--out build/rendfx_cases.json] [--append]
+                           [--per 2] [--near N] [--out build/rendfx_cases.json] [--append]
     python tools/rendfx.py --check --state s1 [--paths] [--fixture build/rendfx_cases.json]
 """
 import json
@@ -79,17 +81,30 @@ class Logged:
         return iter(self.m)
 
 
+TEST = 0xC03B          # the overlap test: boxes in $C434/$C435 (P1 x) and $C438/$C439 (P2 x)
+
+
+def margin(m):
+    """Signed slack of each $C03B comparison: [P1 xmin - (P2 xmax + 11),
+    P2 xmin - (P1 xmax + 11)], 8-bit as the code does it.  The boxes are
+    drawn apart when either is > 0; a slack of 10 instead of 11 flips a
+    comparison at 0, a slack of 12 one at 1."""
+    return [m[0xC434] - ((m[0xC439] + 11) & 255), m[0xC438] - ((m[0xC435] + 11) & 255)]
+
+
 def run_alone(mem, regs, limit=5_000_000):
     """Run the call in an uncontended twin over `mem` until PC = RET;
-    return (T, PCs executed in OWN)."""
+    return (T, PCs executed in OWN, margin at the overlap test)."""
     sim = Simulator(mem, config=FLAT)
     sim.registers[:] = regs
     r, ops, t0 = sim.registers, sim.opcodes, regs[T]
-    pcs = set()
+    pcs, mg = set(), None
     for _ in range(limit):
         pc = r[PC]
         if pc == RET:
-            return r[T] - t0, pcs
+            return r[T] - t0, pcs, mg
+        if pc == TEST:
+            mg = margin(mem.m)
         if pc in OWN:
             pcs.add(pc)
         ops[mem.m[pc]]()
@@ -102,7 +117,7 @@ def path_names(pcs):
 
 def capture(args):
     t = parse_target(args)
-    frames, keys, out, append, per = 600, [], FIXTURE, False, 2
+    frames, keys, out, append, per, near = 600, [], FIXTURE, False, 2, None
     while args:
         a = args[0]
         if a == '--frames':
@@ -113,6 +128,8 @@ def capture(args):
             out = args[1]; del args[:2]
         elif a == '--per':
             per = int(args[1]); del args[:2]
+        elif a == '--near':
+            near = int(args[1]); del args[:2]
         elif a == '--append':
             append = True; del args[:1]
         else:
@@ -127,8 +144,10 @@ def capture(args):
     fx = {'tables': None, 'cases': []}
     if append and os.path.exists(out):
         fx = json.load(open(out))
-    seen = {}
+    seen, mseen, hist = {}, set(), {}
     for c in fx['cases']:
+        for i, g in enumerate(c.get('margin') or ()):
+            mseen.add((i, g))
         seen[c['sig']] = seen.get(c['sig'], 0) + 1
     code = None
     calls = new = 0
@@ -141,7 +160,7 @@ def capture(args):
         st = h.save_state()
         pre, sp, t0 = bytes(m), r[SP], r[T]
         lm = Logged(pre)
-        real_t, pcs = run_alone(lm, list(r))
+        real_t, pcs, mg = run_alone(lm, list(r))
         h.run_until([RET], limit=5_000_000, interrupts=False)
         cont_t = r[T] - t0
         h.load_state(st)
@@ -162,19 +181,29 @@ def capture(args):
         stack = range(sp - 64, sp + 2)
         sig = ''.join(f'{a:04x}' for a in sorted(pcs))
         sigs.add(sig)
-        if seen.get(sig, 0) >= per:
+        new_ms = set()
+        for i, g in enumerate(mg or ()):
+            hist[i, g] = hist.get((i, g), 0) + 1
+            if near is not None and abs(g) <= near and (i, g) not in mseen:
+                new_ms.add((i, g))
+        close = bool(new_ms)
+        if seen.get(sig, 0) >= per and not close:
             continue
         seen[sig] = seen.get(sig, 0) + 1
+        mseen |= new_ms
         new += 1
         ins = {a: v for a, v in lm.reads.items() if not constant(a) and a not in stack}
         outs = {a: lm.m[a] for a in lm.written if a not in stack}
-        fx['cases'].append({'sp': sp, 'sig': sig, 'paths': path_names(pcs),
+        fx['cases'].append({'sp': sp, 'sig': sig, 'paths': path_names(pcs), 'margin': mg,
                             'in': runs(ins), 'out': runs(outs), 't': real_t, 'tc': cont_t})
     print(f'rendfx: {source_label(t)}, {frames} frames: {calls} calls, {len(sigs)} distinct paths, '
           f'{new} new cases ({len(fx["cases"])} in {out})')
+    for i in (0, 1):
+        near_ms = sorted((g for j, g in hist if j == i), key=abs)[:8]
+        print(f'nearest margins of $C03B test {i + 1} (margin:calls): ' + ' '.join(f'{g}:{hist[i, g]}' for g in near_ms))
     fx['about'] = ('Purpose: frozen oracle for render_fighters $BF13 -- one call per distinct path (at most a few each): '
                    'SP at entry, the bytes it read before writing them as [addr, hex] runs (in; code and the tables '
-                   '$B500-$B9FF excepted), every byte it wrote outside the stack (out), its uncontended T (t) and its '
+                   '$B500-$B9FF excepted), its margin at the $C03B overlap test, every byte it wrote outside the stack (out), its uncontended T (t) and its '
                    'T in play (tc). Read by: python tools/rendfx.py --check, and the JS renderFighters gate.')
     with open(out, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
@@ -194,7 +223,7 @@ def check(args):
     src = h.memobj.m
     fx = json.load(open(fixture))
     tables = bytes.fromhex(fx['tables'])
-    tally, bad = {}, 0
+    tally, bad, margins = {}, 0, []
     for i, c in enumerate(fx['cases']):
         mem = bytearray(0x10000)
         for rg in CODE:
@@ -208,7 +237,8 @@ def check(args):
         lm = Logged(mem)
         regs = list(h.regs)
         regs[PC], regs[SP], regs[T] = ENTRY, sp, 0
-        rt, pcs = run_alone(lm, regs)
+        rt, pcs, mg = run_alone(lm, regs)
+        margins.append(mg)
         stack = range(sp - 64, sp + 2)
         want = unruns(c['out'])
         out = {a: lm.m[a] for a in lm.written if a not in stack}
@@ -224,6 +254,8 @@ def check(args):
     print(f'rendfx: {len(fx["cases"])} cases, {bad} disagree; T {min(ts)}-{max(ts)}')
     if want_paths:
         print('paths: ' + ', '.join(f'{k} {tally.get(k, 0)}' for k in PATHS))
+        for i in (0, 1):
+            print(f'margins of $C03B test {i + 1} (> 0 apart): ' + ' '.join(str(g[i]) for g in sorted(margins, key=lambda g: g[i])))
     sys.exit(1 if bad else 0)
 
 
