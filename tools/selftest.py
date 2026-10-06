@@ -532,7 +532,29 @@ def t_adis():
         adis.save_sym('main', 0x8000, q)
         eq(adis.load_syms(q)[0x8000], 'main', 'symbols.json round trip')
     eq(adis.load_regions(os.path.join(HERE, 'regions.json')), [], 'shipped regions.json is empty')
-    assert 0x8000 not in adis.load_syms(os.path.join(HERE, 'symbols.json')), 'shipped symbols.json is empty'
+    shipped = adis.load_syms(os.path.join(HERE, 'symbols.json'))
+    assert all(isinstance(k, int) and 0 <= k <= 0xFFFF and isinstance(v, str) and v
+               for k, v in shipped.items()), 'shipped symbols.json: int keys, non-empty names'
+
+
+def t_refcheck_parse():
+    rc = mod('refcheck')
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, 't.skool')
+        open(p, 'w').write(
+            '; Move The Player\n;\n; Used by the routine at #R$8000.\n'
+            '@label=Move_Player\nc$8000 LD A,1 ; {Load one\n $8002 RET ; }\n\n'
+            '; Routine at 8003\n@label=Bare\nc$8003 NOP\n'
+            '@label=Inner\n $8004 RET ; returns\n')
+        entries, labels = rc.parse(p)
+        eq(labels, {0x8000: 'Move_Player', 0x8003: 'Bare', 0x8004: 'Inner'}, 'labels')
+        eq(entries, [('c', 0x8000, 'Move The Player', 2, 1),
+                     ('c', 0x8003, 'Routine at 8003', 2, 1)], 'entries, titles, comment counts')
+        assert rc.DEFAULT_TITLE.match(entries[1][2]) and not rc.DEFAULT_TITLE.match(entries[0][2])
+        q = os.path.join(d, 'symbols.json')
+        json.dump({'0x8000': 'ours'}, open(q, 'w'))
+        rc.import_symbols(p, q, 0x8000, 0x8004)
+        eq(json.load(open(q)), {'0x8000': 'ours', '0x8003': 'Bare'}, 'our names kept, range honoured')
 
 
 def t_strings_hexdump():
@@ -1328,6 +1350,7 @@ CHECKS = [
     ('walk: boundaries, calls, jumps, inventory', t_walk),
     ('grepbytes: search + boundary confirmation', t_grepbytes),
     ('adis: symbols, regions, DEFB, empty config files', t_adis),
+    ('refcheck: skool entries, titles, labels, symbol import', t_refcheck_parse),
     ('strings / hexdump', t_strings_hexdump),
     ('speckle: art vs noise', t_speckle),
     ('contact: both layouts', t_contact),

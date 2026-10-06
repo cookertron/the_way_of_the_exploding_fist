@@ -13,3 +13,19 @@ by     = "python tools/refcheck.py ../ref_wayoftheexplodingfist/sources/wotef.sk
 kind   = "data"
 says   = "mismatch $932C-$9330 is the reference t2s poking the time print buffer to \"   30\"; mismatch $FF18-$FFFF is past the tape's last byte ($F7FF) -- ours holds what the ROM start-up left (UDGs), theirs zeros; skipped $900D is an i-entry"
 by     = "cat ../ref_wayoftheexplodingfist/wayoftheexplodingfist.t2s; python tools/hexdump.py build/image.bin --offset 0xFF50 --len 16"
+
+[[fact]]
+kind   = "data"
+says   = "agrees with ours -- $8BFA P1_Default_Keys, $8C0C P2_Default_Keys, $8C42 Kempston, $A3FF Random_Number (LD A,R), $AC05 Main_Game, $AC3E Start_1UP_Game; $AA00 and $AA40 (our P1/P2 records) carry only the default title Game status buffer entry"
+by     = "python tools/refcheck.py ../ref_wayoftheexplodingfist/sources/wotef.skool --coverage"
+
+[[fact]]
+kind   = "measured"
+says   = "coverage -- 65 routines: 29 titled, 36 default title; 760/6286 code lines commented (12%); 214 labels. Bare bodies include $9745 $9ED2 $A402 $B15A $B2FB $BF13 $AC3E -- the play logic"
+by     = "python tools/refcheck.py ../ref_wayoftheexplodingfist/sources/wotef.skool --coverage"
+
+[[fact]]
+kind   = "insn"
+at     = "$AE29"
+says   = "DISAGREES: reference labels $9745 Game_Over, but $AC3E calls it at $AE29 then AND A / RET M, once per pass (battery.toml); our play_pass stands in symbols.json"
+by     = "python tools/adis.py 0xAE29 3"
