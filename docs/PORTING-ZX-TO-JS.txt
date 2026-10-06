@@ -3253,56 +3253,70 @@ reviewer can see it.
 
 [BB] Bubble Bobble's battery later passed 5,000 cases, and a full run
 took nearly five hours on a 16-core machine: about a minute of CPU per
-case, spent rebuilding the page, reloading it and running the whole
-suite of over 1,244 checks against a mutant that most of those checks
-never touch. A battery grows with every increment, so a runner that pays
-for the whole suite on every case gets slower every week. Build the
-kit's runner to pay only for what can matter, in this order. Each step
-is worth having on its own, and the first is a measurement:
+case, spent running the whole suite of 1,735 checks against a mutant
+that most of them never touch. A battery grows with every increment, so
+a runner that pays for the whole suite on every case gets slower every
+week. The kit's runner, tools/mutants.py, pays only for what can matter:
 
-  1. MEASURE ONE CASE FIRST. Time the rebuild, the page load and the
-     suite separately for a single case, and list the slowest gates. The
-     split decides which of the steps below pays most.
-  2. RUN THE KILLING ROW FIRST, AND STOP AT THE FIRST FAILURE. Every case
-     records the named row expected to kill it (6.9 step 9). Run that row
-     first; if it fails, the case is killed in seconds. If another row
-     kills it instead, record that -- TRAPS #145 -- rather than letting it
-     pass unnoticed.
-  3. RUN ONLY THE ROWS THAT CAN KILL IT. During each full run, record
-     which source lines each gate row executes -- the V8 coverage built
-     into Node, taken per row by the rig. For each case, run only the
-     rows that execute its anchored line: a row that never runs the
-     mutated line cannot kill it, and a mutant that no row executes is a
-     survivor without anything being run. Established tools work this
-     way (PIT for Java, Stryker for JavaScript). It needs the suite in
-     named blocks that can run on their own, which is the gate helpers'
-     job (map: gate).
-  4. STAMP EVERY VERDICT (12.3). A verdict goes stale only when one of
-     its inputs changes: the killing row's test code, the source that row
-     executed, or the rig, harness, build and runner. A milestone run
-     re-runs the stale verdicts only; a truly full run is needed only
-     when the rig, harness, build or runner changes.
-  5. BUILD ONCE FOR ALL MUTANTS. Compile every case into one build behind
-     a switch -- "if (MUTANT === 1234) { mutated line } else { original
-     line }", what Stryker calls mutation switching -- so that a warm
-     worker loads the page once and runs case after case by changing one
-     number. The build with every switch off must pass the suite
-     identically: that is a check, not an assumption.
-  6. PRUNE WHAT ADDS NOTHING. From a full run's kill matrix, a case that
-     is killed by every row that kills another case adds nothing to it.
-     Research on such subsumed mutants finds that the minimal set is
-     often a small fraction of the whole. Leave the rest out of routine
-     runs, and re-check them before a release.
+  python tools/mutants.py --affected     after an increment (6.9 step 9)
+  python tools/mutants.py --background   a full run; summary to a file
+  python tools/mutants.py --profile      step 1 below, on demand
+
+It was built in this order, each step worth having on its own:
+
+  1. MEASURE ONE CASE FIRST. For Bubble Bobble the rebuild cost 0.2 s and
+     the suite everything else, so the rest of this list aims at the
+     suite. --profile prints the split and the slowest blocks.
+  2. RUN ONLY THE BLOCKS THAT CAN KILL IT. tools/mutants.js turns the
+     suite into a SELECTABLE copy: its helpers first, then any chosen
+     subset of its top-level check blocks, in any order. One coverage
+     pass per run -- the V8 coverage built into Node, taken between
+     blocks -- records which blocks execute each case's anchor, and a
+     case runs only those. An anchor that runs while the page loads (a
+     constant, a table) can reach every block, so it gets them all. In
+     Bubble Bobble, 73% of the cases narrowed to specific blocks.
+  3. RUN THE KILLING BLOCK FIRST, AND STOP AT THE FIRST FAILURE. Every
+     verdict records the row and the block that killed the case, and
+     next time that block runs first. TRAPS #145 still holds: if another
+     row kills it instead, that is recorded, not assumed away.
+  4. STAMP THE VERDICTS (12.3). Built in part: --affected re-runs a case
+     when its anchor lines or its killing block changed, and status.py
+     warns when the rig, the build or the runner changed since the last
+     full run. Per-verdict hashes of the code each block executed are
+     still to build.
+  5. BUILD ONCE FOR ALL MUTANTS, behind a switch, as Stryker's mutation
+     switching does. Not built: step 1 showed the rebuild costs 0.2 s.
+     Build it for a port whose build is slow, and only after measuring.
+  6. PRUNE WHAT ADDS NOTHING: a case killed by every row that kills
+     another case adds nothing to it. Still to build, because stopping
+     at the first failure records one killing row and pruning needs them
+     all -- an occasional run with no early stop.
+
+Measured on 24 Bubble Bobble cases checked against the full run's
+verdicts: every verdict agreed; 9.2 s a case while the killing blocks
+were unknown and 1.3 s once they were known, against 54 s for the whole
+suite on the same core.
+
+WHAT KEEPS IT HONEST. Selection only ever costs time, never a verdict: a
+case that survives its selected blocks is run against the whole suite
+before it is called a survivor, and a case that only the whole suite
+kills is counted as a MISS. The selectable copy must run exactly the
+checks the original runs, or nothing runs. And EVERY GATE BLOCK MUST
+PASS ON ITS OWN: the runner checks each one alone at baseline, learns
+what a block that fails alone depends on -- Bubble Bobble had one chain
+of six, all driving the page's single game object -- and runs those
+blocks first whenever it runs. That costs time on every case that needs
+the chain; making such a block reset what it uses is the real fix. The
+preparation -- baseline, coverage, isolation -- is cached by everything
+it depends on, and reused while none of that changes.
 
 THE CASE FORMAT CARRIES WHAT THESE NEED, FROM THE FIRST CASE: an id, the
 file, the anchor line, the replacement, the increment that wrote it, the
 named row expected to kill it, and, for a withdrawn case, the reason.
-Cases written that way are ready for every step above, whichever runner
-the port starts with.
 
-AND A FULL RUN IS NOBODY'S CONVERSATION. Start it as a script or a
-scheduled job that writes a one-line summary to a file, and let a session
-read that line afterwards. A session that waits on a run of hours, or
+AND A FULL RUN IS NOBODY'S CONVERSATION. Start it with --background: it
+writes a one-line summary to build/mutants/summary.txt, and a session
+reads that line afterwards. A session that waits on a run of hours, or
 polls it, pays for its whole context every time it looks.
 
 
@@ -4594,9 +4608,9 @@ In this order, each paying for the next:
      reporting through it.
   3. The measurement entry point (6.11), before the second oracle is
      written, so that no oracle ever bypasses it.
-  4. The mutation runner (6.12): steps 1 to 3 before the first gate
-     block, and the rest as the battery grows -- by the time a full run
-     takes an hour, it should already have them all.
+  4. The mutation runner ships with the kit (6.12): write cases in its
+     format from the first gate block, and keep every gate block able to
+     pass on its own.
   5. The byte-usage map (12.5), as soon as the harness can drive play.
   6. Phase 4's marks and folding, as soon as the ledger has content.
   7. The roster manifest, the moment there is a second saved state.

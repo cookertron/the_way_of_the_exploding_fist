@@ -8,16 +8,16 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 
 | State | Meaning | All 196 | #61 onward |
 |---|---|---|---|
-| KIT | the kit already prevents it | 27 | 4 |
-| BB | built in the Bubble Bobble repo and generic; move it into the kit | 20 | 18 |
-| BUILD | no mechanism yet; build it | 125 | 96 |
+| KIT | the kit already prevents it | 41 | 16 |
+| BB | built in the Bubble Bobble repo and generic; move it into the kit | 9 | 9 |
+| BUILD | no mechanism yet; build it | 122 | 93 |
 | READ | knowledge only; read by ID when relevant | 24 | 18 |
 
 | Mechanism | Traps | Still to build |
 |---|---|---|
 | `gate`: Gate helpers in test/rig.js | 49 | 49 |
 | `measure`: measure(), the single measurement entry point (manual 6.11) | 24 | 24 |
-| `battery`: Kit mutation runner in tools/ | 22 | 9 |
+| `battery`: Kit mutation runner, tools/mutants.py (manual 6.12) | 22 | 6 |
 | `lint`: Static checks on engine and test source | 14 | 11 |
 | `harness`: Harness defaults and API in tools/harness.py | 10 | 8 |
 | `roster`: Save-state manifest and census rules (manual 12.6) | 8 | 8 |
@@ -42,7 +42,7 @@ Traps: #24, #37, #40, #44, #49, #50, #54, #55, #57, #60, #61, #62, #63, #66, #77
 
 Traps: #27, #34, #35, #46, #59, #64, #71, #87, #89, #90, #94, #102, #143, #144, #146, #147, #152, #153, #154, #160, #172, #182, #189, #193
 
-**`battery`: Kit mutation runner in tools/** (22 traps; BB 13, BUILD 9). Checks each mutation applied; requires the positive N/N baseline; keeps anchors live, unique and counted (listed, live, killed); syntax-checks each mutant; gives timeouts their own verdict and drains FAIL lines; runs one battery at a time; reads paths from config; records a reason for every withdrawn case; runs only the affected cases per increment (new cases, cases whose anchor lines changed, cases whose killing row changed); and keeps each case cheap, in manual 6.12's order: the killing row first with a stop at the first failure, only the rows whose coverage includes the mutated line, stamped verdicts so a milestone re-runs only stale ones, one build for all mutants behind a switch, subsumed cases pruned; full runs go to a background script that writes a one-line summary.
+**`battery`: Kit mutation runner, tools/mutants.py (manual 6.12)** (22 traps; KIT 14, BUILD 6, BB 2). Checks each mutation applied; requires the positive N/N baseline and a selectable copy that runs the same checks; reports dead and ambiguous anchors as red; tells a diagnostic, a broken mutant and a crash apart; gives timeouts their own verdict and keeps their FAIL lines; runs one battery at a time; reads its paths from port.json; records each case's killing row and block; runs only the blocks a case's anchor reaches, killing block first, stopping at the first failure, and confirms survivors against the whole suite; runs the affected cases per increment.  Still to build: anchors checked against live code rather than comments, a reason kept for every withdrawn case, per-verdict stamps, and pruning.
 
 Traps: #23, #33, #70, #73, #106, #107, #118, #119, #126, #130, #137, #145, #158, #162, #166, #167, #177, #185, #186, #194, #195, #196
 
@@ -116,7 +116,7 @@ Traps: #178, #179, #184
 | 20 | Release every key when the window loses focus. | `platform` | KIT |
 | 21 | One key script through harness and engine, diffed row by row. | `rig` | KIT |
 | 22 | Freeze the oracle's output as a fixture the suite runs against. | `rig` | KIT |
-| 23 | Mutation-test every behaviour; a named check must fail. | `battery` | BB |
+| 23 | Mutation-test every behaviour; a named check must fail. | `battery` | KIT |
 | 24 | Run each enhancement on and off and require byte-identical state. | `gate` | BUILD |
 | 25 | Ship diagnostics; on a player's machine they are the debugger. | `platform` | KIT |
 | 26 | The static image is post-boot; study the front end in a live state. | `manual` | READ |
@@ -126,7 +126,7 @@ Traps: #178, #179, #184
 | 30 | A self-modifying PRNG's cycle depends on its seed; don't reuse it elsewhere. | `manual` | READ |
 | 31 | Distribution claims come from natural play; forced scenarios only reach paths. | `roster` | BUILD |
 | 32 | Scope a 'nothing reads it' claim to what was watched: its window. | `status` | KIT |
-| 33 | A gate that re-implements its subject can't fail; the battery exposes it. | `battery` | BB |
+| 33 | A gate that re-implements its subject can't fail; the battery exposes it. | `battery` | KIT |
 | 34 | Sample fixtures at structural boundaries (ISR entry, RET), not T offsets. | `measure` | BUILD |
 | 35 | Bracket a routine's cost by control flow, never by the stack pointer. | `measure` | BUILD |
 | 36 | Get a region's extent first; a known hazard can arrive disguised. | `manual` | READ |
@@ -166,7 +166,7 @@ Traps: #178, #179, #184
 | 70 | Mutate the value that lands; a typed array masks it for you. | `battery` | BUILD |
 | 71 | Interval claims name their window; rare states need long windows. | `measure` | BUILD |
 | 72 | Wiring is a separate act from gating; missing resets surface there. | `manual` | READ |
-| 73 | Report listed, live and killed; a dead anchor is a red result. | `battery` | BB |
+| 73 | Report listed, live and killed; a dead anchor is a red result. | `battery` | KIT |
 | 74 | Census the address itself, then classify the byte in front of it. | `codemap` | BUILD |
 | 75 | Build page+offset addresses with +, not \|; OR hides the carry. | `lint` | BUILD |
 | 76 | Enumerate every address an index can produce, not only those play uses. | `manual` | READ |
@@ -200,7 +200,7 @@ Traps: #178, #179, #184
 | 104 | A gate's two sides must come from different sources. | `gate` | BUILD |
 | 105 | Guard domains the machine never had, and count every guard hit. | `platform` | BUILD |
 | 106 | Bound transliterated loops; judge long jobs by artifacts, not silence. | `battery` | BUILD |
-| 107 | Give timeouts their own verdict; never report a hang as a pass. | `battery` | BB |
+| 107 | Give timeouts their own verdict; never report a hang as a pass. | `battery` | KIT |
 | 108 | Bound the quantity that actually grows, with measured headroom. | `platform` | BUILD |
 | 109 | Ship only the assets the engine reads; the rig counts test assets it merges. | `build` | BB |
 | 110 | Assert that what a check measured is non-empty. | `gate` | BUILD |
@@ -211,8 +211,8 @@ Traps: #178, #179, #184
 | 115 | Test worlds must be states the machine can actually reach. | `gate` | BUILD |
 | 116 | Every artifact a tool writes has a reader, checked by script. | `status` | KIT |
 | 117 | Counts in a check's text are derived from the code, never typed. | `lint` | BUILD |
-| 118 | Verify each mutation actually applied; NOT-APPLIED is its own verdict. | `battery` | BB |
-| 119 | Runners take paths from config; empty-list checks need a control. | `battery` | BUILD |
+| 118 | Verify each mutation actually applied; NOT-APPLIED is its own verdict. | `battery` | KIT |
+| 119 | Runners take paths from config; empty-list checks need a control. | `battery` | KIT |
 | 120 | A loop count that disagrees with its table is a measurement, not a typo. | `manual` | READ |
 | 121 | A JP into a routine runs the rest of it; map tail jumps as calls. | `codemap` | BUILD |
 | 122 | Reject all-zero or uniform tables in a gate unless declared. | `gate` | BUILD |
@@ -223,7 +223,7 @@ Traps: #178, #179, #184
 | 127 | Drive the routine with a world, not its helper with arguments. | `gate` | BUILD |
 | 128 | Derive a wrap's test points from where the wrap can occur. | `gate` | BUILD |
 | 129 | Two instructions clearing one flag need a world where only one runs. | `gate` | BUILD |
-| 130 | Collapsing duplicate code kills anchors on the copy; re-anchor deliberately. | `battery` | BB |
+| 130 | Collapsing duplicate code kills anchors on the copy; re-anchor deliberately. | `battery` | KIT |
 | 131 | Test a store against a target holding a different value. | `gate` | BUILD |
 | 132 | Drive both players, or every instance, of a multi-instance routine. | `gate` | BUILD |
 | 133 | Assert the footprint (which cells), not only the count. | `gate` | BUILD |
@@ -238,7 +238,7 @@ Traps: #178, #179, #184
 | 142 | Some writes are observed only by the ISR; gate their order in the source. | `manual` | READ |
 | 143 | Sweep a comparison where its two sides can straddle. | `measure` | BUILD |
 | 144 | A sweep that finds nothing fails or says so out loud. | `measure` | BUILD |
-| 145 | Check which row kills a case; it may be a check above the target. | `battery` | BUILD |
+| 145 | Check which row kills a case; it may be a check above the target. | `battery` | KIT |
 | 146 | Snapshot after arming, never before. | `measure` | BUILD |
 | 147 | Exclude named windows only, and report what was dropped. | `measure` | BUILD |
 | 148 | Measure the step the gate names, as a difference of two runs. | `gate` | BUILD |
@@ -259,8 +259,8 @@ Traps: #178, #179, #184
 | 163 | When a method gains a parameter, check every call site. | `lint` | BUILD |
 | 164 | Gate a count bound and a terminator bound separately. | `gate` | BUILD |
 | 165 | A census counts the machine's population, not your own table. | `roster` | BUILD |
-| 166 | Run one battery at a time, and don't edit the tree mid-run. | `battery` | BB |
-| 167 | The baseline must show the positive N/N signal. | `battery` | BB |
+| 166 | Run one battery at a time, and don't edit the tree mid-run. | `battery` | KIT |
+| 167 | The baseline must show the positive N/N signal. | `battery` | KIT |
 | 168 | Parse generated source before writing it; no heredocs. | `hook` | KIT |
 | 169 | Enumerate categories in code and assert none is unnamed. | `gate` | BUILD |
 | 170 | Every session lists the tools; selftest fails on an unregistered script. | `hook` | KIT |
@@ -270,7 +270,7 @@ Traps: #178, #179, #184
 | 174 | Prefer a throw to a fallback lookup. | `lint` | BUILD |
 | 175 | Measure coverage against the machine, not the port's own register. | `gate` | BUILD |
 | 176 | Accidental agreement is still a defect; enumerate its class. | `manual` | READ |
-| 177 | A guard added during a fix can be dead on arrival; the battery shows it. | `battery` | BB |
+| 177 | A guard added during a fix can be dead on arrival; the battery shows it. | `battery` | KIT |
 | 178 | The gate keyed on the delta's sign; the machine uses the phase counter. | `game` | READ |
 | 179 | One routine has two bottom wraps, and they differ. | `game` | READ |
 | 180 | A mask that looks cosmetic can switch a whole behaviour. | `manual` | READ |
@@ -278,7 +278,7 @@ Traps: #178, #179, #184
 | 182 | Poison where the routine actually writes, with a telling value. | `measure` | BUILD |
 | 183 | Choose census worlds that contain the thing being counted. | `roster` | BUILD |
 | 184 | The same bits are paint at one time and bubble tags at another. | `game` | READ |
-| 185 | Decode suite output as UTF-8 and require the N/N line. | `battery` | BB |
+| 185 | Decode suite output as UTF-8 and require the N/N line. | `battery` | KIT |
 | 186 | An anchor must match live code, not a comment; keep a count invariant. | `battery` | BB |
 | 187 | When a slow check reports a class of error, write the fast one. | `manual` | READ |
 | 188 | Flag variables that are set together in every world you built. | `roster` | BUILD |
@@ -288,8 +288,8 @@ Traps: #178, #179, #184
 | 192 | Set diagnostic bounds above the machine's worst case, not the best observed. | `platform` | BUILD |
 | 193 | Count loop tops for iterations; don't divide write totals. | `measure` | BUILD |
 | 194 | Syntax-check each mutant; a hang can be its own malformation. | `battery` | BUILD |
-| 195 | Check anchor uniqueness; a repeated idiom matches many lines. | `battery` | BB |
-| 196 | Drain FAIL lines before killing a timed-out run. | `battery` | BUILD |
+| 195 | Check anchor uniqueness; a repeated idiom matches many lines. | `battery` | KIT |
+| 196 | Drain FAIL lines before killing a timed-out run. | `battery` | KIT |
 
 ## Keeping the map honest
 

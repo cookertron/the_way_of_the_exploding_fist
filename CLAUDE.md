@@ -93,6 +93,10 @@ record up loses nothing.
   and source written through shell heredocs, a consistency check at the
   end of every response, a note when the context passes the handover mark,
   and a short block for every sub-agent.
+- `tools/mutants.py` — the mutation battery's runner (manual 6.12): each
+  case runs only the gate blocks its anchor reaches, killing block first,
+  stopping at the first failure; survivors are confirmed against the whole
+  suite.
 - `tools/record.py` and `tools/status.py` — the records (manual 12.11):
   record.py writes each to its home and checks its links; status.py gives
   the orientation, `status.py ADDR`, `--check` and `--index`.  Evidence is
@@ -109,7 +113,7 @@ each must prevent.
 | stamps for status.py (build first) | trusting evidence that predates a harness fix (manual 12.3) |
 | `measure()` in the harness | the measurement checklist (manual 6.11, G11) |
 | gate helpers in `test/rig.js` | remembering how gates fail (map: `gate`) |
-| a kit mutation runner (manual 6.12) | a whole-suite run per case -- nearly five hours for Bubble Bobble's 5,000 cases.  Built in 6.12's order, from Bubble Bobble's runner (map: `battery`) |
+| per-verdict stamps and pruning, for the runner (manual 6.12 steps 4, 6) | re-running unchanged verdicts at milestones; keeping redundant cases (map: `battery`) |
 | the byte-usage map and roster manifest | backward-decode verdicts; guessing how saved states differ (12.5, 12.6) |
 | `tools/brief.py`, `tools/verify_claims.py` | re-reading a range to check a sub-agent (12.7) |
 
@@ -118,18 +122,19 @@ on this card that it now enforces.
 
 ## The mutation battery (manual 6.9 step 9, 6.12)
 
-- Every case records its id, file, anchor line, replacement, the increment
-  that wrote it, and the named row expected to kill it.
-- After an increment, run only the affected cases: its new ones, and older
-  ones whose anchor lines or killing rows it changed.
-- Run the full battery at each milestone, after any change to the harness,
-  rig, build or runner, and before a release -- as a background script
-  that writes a one-line summary.  Never wait on it or poll it.
+- After an increment: `python tools/mutants.py --affected` -- its new
+  cases, and older ones whose anchor lines or killing blocks it changed.
+- A full run with `python tools/mutants.py --background`: at each milestone,
+  after any change to the harness, rig, build or runner (`status.py` warns
+  when one is due), and before a release.  It writes a one-line summary to
+  `build/mutants/summary.txt`; never wait on it or poll it.
+- Every case records its id, file, anchor, replacement, the increment that
+  wrote it and the row expected to kill it; the runner records the row and
+  block that did.
+- Every gate block must pass on its own: a case runs only the blocks its
+  anchor reaches, and a block that leans on another's leftovers makes every
+  case that needs it slower.
 - Say in the commit which kind of run it was.
-- Build the runner in manual 6.12's order: measure one case first; run the
-  killing row first and stop at the first failure; run only the rows that
-  execute the mutated line; stamp verdicts so only stale ones re-run; one
-  build for all mutants, behind a switch; prune subsumed cases.
 
 ## House rules
 
