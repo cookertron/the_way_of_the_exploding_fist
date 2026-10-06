@@ -23,6 +23,12 @@
       "file": "build/rendfx_cases.json",
       "required": true,
       "note": "oracle for render_fighters $BF13: python tools/rendfx.py --capture (see its --help)"
+    },
+    {
+      "key": "step97bb",
+      "file": "build/callio_97bb.json",
+      "required": true,
+      "note": "oracle for fighter_step $97BB: python tools/callio.py --capture (see its --help)"
     }
   ],
   "tape": {

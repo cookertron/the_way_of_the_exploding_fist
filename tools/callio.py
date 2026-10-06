@@ -27,11 +27,35 @@ the length decoded by z80dis -- not dataread.py's [PC, PC+3] window, which
 drops DEC (HL) at $9CA3 reading Time at $9CA5.  The self-check line prints
 how many reads were fetches.
 
+  --capture  freeze the calls as a fixture, the rendfx.py shape for any
+             call: per case the site (the CALL itself), SP and registers at
+             entry, the inputs as [addr, hex] runs, the outputs, the
+             registers at the return, the uncontended T and the PC set; one
+             case per distinct (site, PC set), at most --per of each.
+             --call may be given more than once (one routine, two sites).
+             Fetched bytes must equal the target image at every call; the
+             fixture keeps their addresses only (tape-derived, rule 7).
+  --check    replay every case in a blank 64K holding only the target's
+             bytes at those addresses and the inputs: every byte written,
+             every register at the return and the T must agree, and no
+             byte outside them may be read.
+  --derive   a path driven play never reached: replay case N over the
+             target image with some of the bytes it read changed (--set),
+             and append what the real code then did as a new case, marked
+             "derived" with its parent and the bytes set.  The oracle is
+             still the machine code; the input is constructed, so say so
+             wherever the case is counted.
+
 Usage:
     python tools/callio.py --state NAME --call SITE RET [--frames 1500] [--keys D+W]
                            [--only in|out|code] [--gap N]
     python tools/callio.py --state s1 --call 0x9745 0x9748
+    python tools/callio.py --capture --state s1 --call 0x9763 0x9766 --call 0x976C 0x976F
+                           [--frames 1500] [--keys D+W] [--per 2] --out build/callio_97bb.json [--append]
+    python tools/callio.py --check --state s1 --fixture build/callio_97bb.json
+    python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 12 --set 0xAA44=0x12
 """
+import json
 import os
 import statistics
 import sys
@@ -39,9 +63,10 @@ import sys
 import z80dis.z80 as z
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from harness import Simulator, SP, PC, T                           # noqa: E402
+from harness import Simulator, SP, PC, T, R                         # noqa: E402
 from keyprobe import press                                         # noqa: E402
 from probeutil import parse_target, boot_target, source_label, TARGET_HELP  # noqa: E402
+from sprdec import runs as hexruns, unruns                         # noqa: E402
 
 FLAT = {'fast_djnz': False, 'fast_ldir': False}
 
@@ -56,6 +81,8 @@ class Logged:
         self.reads = {}            # addr -> first PC that read it before any write
         self.writes = {}           # addr -> first PC that wrote it
         self.fetches = 0
+        self.fetched = set()       # addresses fetched as instruction bytes
+        self.exit = None           # registers at the return
         self.lens = {}             # (pc, first 4 bytes) -> instruction length
 
     def __len__(self):
@@ -65,6 +92,7 @@ class Logged:
         pc = self.regs[PC]
         if pc <= a < pc + 4 and a < pc + self.length(pc):
             self.fetches += 1
+            self.fetched.add(a)
         elif a not in self.writes and a not in self.reads and a not in self.stack:
             self.reads[a] = pc
         return self.m[a]
@@ -95,10 +123,19 @@ def run_alone(mem, regs, ret, limit=20_000_000):
     for _ in range(limit):
         pc = r[PC]
         if pc == ret:
+            mem.exit = list(r)
             return r[T] - t0, pcs
         pcs.add(pc)
         ops[mem.m[pc]]()
     sys.exit(f'callio: call never returned to ${ret:04X}')
+
+
+REGS = [i for i in range(24) if i not in (SP, 13, R)]   # 13 unused; R is not modelled
+
+
+def frame(sp):
+    """The call's own stack frames: never inputs or outputs."""
+    return {a & 0xFFFF for a in range(sp - 128, sp + 2)}
 
 
 def runs(addrs):
@@ -138,10 +175,183 @@ def table(title, touched, firstpc, extra=None, gap=None):
         print(f'  {span:<13} {calls:>8} calls  first at {at}{more}')
 
 
+def capture(args):
+    t = parse_target(args)
+    calls, frames, keys, per, out, append = [], 1500, [], 2, None, False
+    while args:
+        a = args[0]
+        if a == '--call':
+            calls.append((int(args[1], 0), int(args[2], 0))); del args[:3]
+        elif a == '--frames':
+            frames = int(args[1], 0); del args[:2]
+        elif a == '--keys':
+            keys = args[1].split('+'); del args[:2]
+        elif a == '--per':
+            per = int(args[1]); del args[:2]
+        elif a == '--out':
+            out = args[1]; del args[:2]
+        elif a == '--append':
+            append = True; del args[:1]
+        else:
+            sys.exit(f'callio: unknown argument {a}  (target: {TARGET_HELP})')
+    if not calls or not out:
+        sys.exit('callio: --capture needs --call SITE RET (one or more) and --out FILE')
+    h = boot_target(t, 'callio')
+    r, m = h.regs, h.memobj.m
+    image = bytes(m)
+    for k in keys:
+        press(h.ports, k)
+    fx = {'calls': [[s, e] for s, e in calls], 'code': [], 'cases': []}
+    if append and os.path.exists(out):
+        fx = json.load(open(out))
+    code = {a for lo, hi in fx['code'] for a in range(lo, hi + 1)}
+    seen = {}
+    for c in fx['cases']:
+        seen[c['site'], c['sig']] = seen.get((c['site'], c['sig']), 0) + 1
+    rets = dict(calls)
+    n = new = 0
+    end = r[T] + frames * h.frame_duration
+    while r[T] < end:
+        reason, _ = h.run_until(list(rets), limit=200_000)
+        if reason != 'target':
+            continue
+        site, sp, regs_in, pre = r[PC], r[SP], list(r), bytes(m)
+        lm = Logged(pre, frame(sp))
+        dt, pcs = run_alone(lm, regs_in, rets[site])
+        h.run_until([rets[site]], limit=20_000_000)    # the real call, interrupts on
+        n += 1
+        drift = [a for a in lm.fetched | pcs if pre[a] != image[a]]
+        if drift:
+            sys.exit(f'callio: ${site:04X} fetched bytes that differ from the target image at '
+                     + ' '.join(f'${a:04X}' for a in sorted(drift)[:6]))
+        code |= lm.fetched | pcs
+        sig = ''.join(f'{a:04x}' for a in sorted(pcs))
+        if seen.get((site, sig), 0) >= per:
+            continue
+        seen[site, sig] = seen.get((site, sig), 0) + 1
+        new += 1
+        fx['cases'].append({'site': site, 'sp': sp, 'regs': [regs_in[i] for i in REGS],
+                            'in': hexruns({a: pre[a] for a in lm.reads}),
+                            'out': hexruns({a: lm.m[a] for a in lm.writes}),
+                            'exit': [lm.exit[i] for i in REGS], 't': dt, 'sig': sig})
+    fx['code'] = [[lo, hi] for lo, hi in runs(code)]
+    fx['regs'] = REGS
+    fx['about'] = ('Purpose: frozen oracle for the routine called at ' + ', '.join(f'${s:04X}' for s, _ in calls)
+                   + ' -- one case per distinct (site, PC set), at most a few each: SP and the registers '
+                   '(SkoolKit indices in regs) at the CALL, the bytes read before written as [addr, hex] runs '
+                   '(in; fetches and the call frame excepted), every byte written outside the frame (out), '
+                   'the registers at the return (exit), the uncontended T (t); code lists the fetched '
+                   'addresses, whose bytes come from the target. Read by: python tools/callio.py --check, '
+                   'and the JS gate of that routine.')
+    with open(out, 'w') as f:
+        json.dump(fx, f, separators=(',', ':'))
+    print(f'callio: {source_label(t)}, {frames} frames: {n} calls, {new} new cases '
+          f'({len(fx["cases"])} in {out}); code {len(code)} bytes in {len(fx["code"])} runs')
+
+
+def check(args):
+    t = parse_target(args)
+    fixture = None
+    while args:
+        if args[0] == '--fixture':
+            fixture = args[1]; del args[:2]
+        else:
+            sys.exit(f'callio: unknown argument {args[0]}')
+    if not fixture:
+        sys.exit('callio: --check needs --fixture FILE')
+    h = boot_target(t, 'callio')                   # the code comes from the target, never the fixture
+    src = h.memobj.m
+    fx = json.load(open(fixture))
+    rets = dict((s, e) for s, e in fx['calls'])
+    bad = 0
+    for i, c in enumerate(fx['cases']):
+        mem = bytearray(0x10000)
+        for lo, hi in fx['code']:
+            mem[lo:hi + 1] = src[lo:hi + 1]
+        ins = unruns(c['in'])
+        for a, v in ins.items():
+            mem[a] = v
+        sp = c['sp']
+        lm = Logged(bytes(mem), frame(sp))
+        regs = list(h.regs)
+        for k, v in zip(fx['regs'], c['regs']):
+            regs[k] = v
+        regs[PC], regs[SP], regs[T] = c['site'], sp, 0
+        dt, _ = run_alone(lm, regs, rets[c['site']])
+        out = {a: lm.m[a] for a in lm.writes}
+        unread = sorted(a for a in lm.reads if a not in ins)
+        ex = [lm.exit[k] for k in fx['regs']]
+        if out != unruns(c['out']) or dt != c['t'] or unread or ex != c['exit']:
+            bad += 1
+            if bad <= 5:
+                print(f'*** case {i} (${c["site"]:04X}): T replay {dt} fixture {c["t"]}; writes agree: '
+                      f'{out == unruns(c["out"])}; exit registers agree: {ex == c["exit"]}; '
+                      f'unrecorded reads {[hex(a) for a in unread[:6]]}')
+    ts = [c['t'] for c in fx['cases']]
+    print(f'callio: {fixture}: {len(fx["cases"])} cases, {bad} disagree; T {min(ts)}-{max(ts)}')
+    sys.exit(1 if bad else 0)
+
+
+def derive(args):
+    t = parse_target(args)
+    fixture, base, sets = None, None, {}
+    while args:
+        if args[0] == '--fixture':
+            fixture = args[1]; del args[:2]
+        elif args[0] == '--case':
+            base = int(args[1]); del args[:2]
+        elif args[0] == '--set':
+            for kv in args[1].split(','):
+                a, v = kv.split('=')
+                sets[int(a, 0)] = int(v, 0)
+            del args[:2]
+        else:
+            sys.exit(f'callio: unknown argument {args[0]}')
+    if not fixture or base is None or not sets:
+        sys.exit('callio: --derive needs --fixture FILE --case N --set ADDR=VAL[,ADDR=VAL...]')
+    h = boot_target(t, 'callio')
+    fx = json.load(open(fixture))
+    c = fx['cases'][base]
+    ins = unruns(c['in'])
+    missing = [a for a in sets if a not in ins]
+    if missing:
+        sys.exit('callio: --set may only change bytes the case read: not '
+                 + ' '.join(f'${a:04X}' for a in missing))
+    mem = bytearray(h.memobj.m)                    # the target, for code the case never fetched
+    for a, v in {**ins, **sets}.items():
+        mem[a] = v
+    sp = c['sp']
+    lm = Logged(bytes(mem), frame(sp))
+    regs = list(h.regs)
+    for k, v in zip(fx['regs'], c['regs']):
+        regs[k] = v
+    regs[PC], regs[SP], regs[T] = c['site'], sp, 0
+    dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']])
+    sig = ''.join(f'{a:04x}' for a in sorted(pcs))
+    old = {a for s in (x['sig'] for x in fx['cases']) for a in (int(s[i:i + 4], 16) for i in range(0, len(s), 4))}
+    code = {a for lo, hi in fx['code'] for a in range(lo, hi + 1)} | lm.fetched | pcs
+    fx['code'] = [[lo, hi] for lo, hi in runs(code)]
+    fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': c['regs'],
+                        'in': hexruns({a: mem[a] for a in lm.reads}),
+                        'out': hexruns({a: lm.m[a] for a in lm.writes}),
+                        'exit': [lm.exit[k] for k in fx['regs']], 't': dt, 'sig': sig,
+                        'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()}}})
+    with open(fixture, 'w') as f:
+        json.dump(fx, f, separators=(',', ':'))
+    print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {dt}; PCs no case reached before: '
+          + (' '.join(f'${a:04X}' for a, _ in runs(pcs - old)) if pcs - old else 'none'))
+
+
 def main():
     args = sys.argv[1:]
     if not args or '-h' in args or '--help' in args:
         print(__doc__.strip()); sys.exit(0)
+    if args[0] == '--capture':
+        return capture(args[1:])
+    if args[0] == '--check':
+        return check(args[1:])
+    if args[0] == '--derive':
+        return derive(args[1:])
     t = parse_target(args)
     site = ret = None
     frames, keys, only, gap = 1500, [], None, None

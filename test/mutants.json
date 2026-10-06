@@ -398,5 +398,117 @@
   "new": "  rfCost.dec += 0;",
   "increment": "BF13-play",
   "kills": "rfPlayT pools within 0.25% of the contended $BF13 T (rendfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: frame read from the move byte",
+  "old": "  let e = m[hl], d = m[(hl - 1) & 0xFFFF];",
+  "new": "  let e = m[(hl - 1) & 0xFFFF], d = m[(hl - 1) & 0xFFFF];",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: store-back swaps move and frame",
+  "old": "  m[hl] = d; hl = (hl + 1) & 0xFFFF; m[hl] = e;",
+  "new": "  m[hl] = e; hl = (hl + 1) & 0xFFFF; m[hl] = d;",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9986 frame 7 not remapped to $18",
+  "old": "      e = 0x18;\n",
+  "new": "      e = 0x19;\n",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9BA7 distance sign flipped",
+  "old": "      if (!m[fsAt(0xAA17, c)]){ dist = (ee - dd) & 0xFF; t += 7 + 4 + 4 + 12; }",
+  "new": "      if (!m[fsAt(0xAA17, c)]){ dist = (dd - ee) & 0xFF; t += 7 + 4 + 4 + 12; }",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9BA7 near limit $16 -> $17",
+  "old": "      if (dist < 0x16) return",
+  "new": "      if (dist < 0x17) return",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $99A1 flag $7A -> $7B",
+  "old": "      m[hl] = 0x7A; hl",
+  "new": "      m[hl] = 0x7B; hl",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $99CD sound 5 -> 6",
+  "old": "      m[0x9CA7] = 1; m[0xB150] = 5;",
+  "new": "      m[0x9CA7] = 1; m[0xB150] = 6;",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $99DD move 1 + frame $11 -> $13",
+  "old": "      if (e === 0x11){ d = 0x12; return t + 7 + 7 + 10; }\n      t += 12 + 7;",
+  "new": "      if (e === 0x11){ d = 0x13; return t + 7 + 7 + 10; }\n      t += 12 + 7;",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9A70 table base $B462 -> $B463",
+  "old": "    const k = m[fsAt(0xB462, d)];",
+  "new": "    const k = m[fsAt(0xB463, d)];",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9A3D move $15 -> $16",
+  "old": "        d = 0x15;",
+  "new": "        d = 0x16;",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9AA1 changed move writes D one byte low",
+  "old": "      m[(hl + 1) & 0xFFFF] = d; m[hl] = 0;",
+  "new": "      m[hl] = 0; m[(hl + 1) & 0xFFFF] = 0;",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9ACD copy not made",
+  "old": "    m[(hl + 1) & 0xFFFF] = m[hl];\n    return t;",
+  "new": "    return t;",
+  "increment": "97BB-port",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9B93 T off by one",
+  "old": "  t += 52;                                       // its body, RET included",
+  "new": "  t += 53;                                       // its body, RET included",
+  "increment": "97BB-port",
+  "kills": "fighterStep tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB: $9A8D JR taken T as not taken",
+  "old": "    else t += 12;\n    m[fsAt(0xAA09, c)] = 0;\n    return t + 22 + 10 + 10;",
+  "new": "    else t += 7;\n    m[fsAt(0xAA09, c)] = 0;\n    return t + 22 + 10 + 10;",
+  "increment": "97BB-port",
+  "kills": "fighterStep tallies the uncontended T of every case exactly"
  }
 ]

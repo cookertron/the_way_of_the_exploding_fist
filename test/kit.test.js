@@ -569,4 +569,41 @@ const mockCtx = (state) => ({
         worst < 0.03 ? '' : `${(100 * worst).toFixed(2)}% at ${at}`, '');
 }
 
+/* ---- fighter_step $97BB against its frozen oracle (callio) -----------
+   Every case is replayed in a blank 64K holding only the bytes the real
+   call read; the whole of memory must then equal the bytes it left, and the
+   T its uncontended T from the CALL to the return (python tools/callio.py
+   --capture --call 0x9763 0x9766 --call 0x976C 0x976F). */
+{
+  const fx = P.assets.step97bb;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const iC = fx.regs.indexOf(3);                 // SkoolKit index of C
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000);
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.fighterStep(m, c.regs[iC]);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
+    if (diff >= 0 && !badBytes++)
+      firstBytes = `case ${i} ($${c.site.toString(16)}): $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (t !== c.t && !badT++) firstT = `case ${i} ($${c.site.toString(16)}): T ${t} want ${c.t}`;
+  }
+  check('fighterStep writes every byte the real $97BB wrote (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('fighterStep tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* every exit of every callee, play or derived (callio.py --derive: the
+     real code on a constructed input, e.g. both fighters facing one way) */
+  const ran = new Set();
+  for (const c of fx.cases) for (let j = 0; j < c.sig.length; j += 4) ran.add(parseInt(c.sig.slice(j, j + 4), 16));
+  check('the callio cases reach every exit of $9920 $9994 $9AA1 $9BA7',
+        [0x992F, 0x9989, 0x998D, 0x9990, 0x9993, 0x993A, 0x9945, 0x9951, 0x9954, 0x995C, 0x9963, 0x9985,
+         0x99BE, 0x99CC, 0x99D1, 0x99DC, 0x99DF, 0x99EB, 0x99FA, 0x99FC, 0x9A18, 0x9A1A, 0x9A1D, 0x9A26,
+         0x9A3A, 0x9A3C, 0x9A6F, 0x9A8A, 0x9A8C, 0x9AA0, 0x9AB8, 0x9ACC, 0x9AD6,
+         0x9BF1, 0x9BF4, 0x9C18, 0x9C1F, 0x9C23, 0x9C27].filter(a => !ran.has(a)).map(a => a.toString(16)), []);
+  check('the callio cases call $97BB for both fighters (C = 0 and $40)',
+        [0, 0x40].filter(v => !fx.cases.some(c => c.regs[iC] === v)), []);
+}
+
 rig.done();

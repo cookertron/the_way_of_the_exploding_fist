@@ -3,6 +3,10 @@
 
 name     = "fighter_step"
 entries  = ["$97BB"]
+oracle   = "tools/callio.py"
+fixtures = ["step97bb"]
+port     = "fighterStep"
+manual   = ["5.1", "7.2"]
 
 [[fact]]
 kind   = "insn"
@@ -14,3 +18,13 @@ by     = "python tools/adis.py 0x97BB 6 ; python tools/adis.py 0x9B93 12"
 kind   = "measured"
 says   = "reads and writes only its own record $AA04-$AA18 (+C), move tables $B464-$B47A, $9CA7 and $9C29; P2 call also reads P1 $AA04-$AA19 and $A90E/$A92C, may write $9C2D and sound $B150; 442-1350 T"
 by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x976C 0x976F ; same for 0x9763 0x9766"
+
+[[fact]]
+kind   = "measured"
+says   = "frozen fixture build/callio_97bb.json: 142 cases (site x PC set, 2 each) over s1, p1 x 13 key scripts, p1b, s1 W; each replays in a blank 64K holding only the 541 fetched code bytes and its inputs: writes, exit regs and T agree; T 442-1371"
+by     = "python tools/callio.py --capture --state p1 --keys W --call 0x9763 0x9766 --call 0x976C 0x976F --per 2 --out build/callio_97bb.json --append ; python tools/callio.py --check --state s1 --fixture build/callio_97bb.json"
+
+[[fact]]
+kind   = "gated"
+says   = "fighterStep (web/template.html) writes every byte and tallies the exact uncontended T of all 170 fixture cases (159 play + 11 derived: $9A1E, same-facing $9BF5-$9C27, $9BA7 distance limits $16/$EF and 3/$10 each side); 14 mutants killed"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 63 --set 0xAA19=0x1E ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --match 97BB"

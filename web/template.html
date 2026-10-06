@@ -453,6 +453,217 @@ function renderFighters(m, paths, sp = 0x5BF5, cost){
   return t + 10;
 }
 
+/* ---- fighter_step $97BB: one fighter's move and frame advance --------
+   c = the record offset (0 P1 at $AA00, $40 P2 at $AA40); $9C29 holds the
+   other's.  Every record address is formed in L alone (LD HL,nn; ADD A,L;
+   LD L,A), so it wraps within its page as the code does.  Returns the
+   uncontended T from the CALL at $9763/$976C to its return, which the
+   frozen oracle gates (python tools/callio.py --capture; ledger/97BB.toml). */
+const fsAt = (base, k) => (base & 0xFF00) | ((base + k) & 0xFF);
+function fighterStep(m, c){
+  const o = m[0x9C29];
+  let t = 17 + 17 + 17 + 17 + 17 + 17 + 10;      // the site's CALL, five CALLs, RET
+  /* $9B93: D,E = move, frame */
+  let hl = fsAt(0xAA05, c);
+  let e = m[hl], d = m[(hl - 1) & 0xFFFF];
+  t += 52;                                       // its body, RET included
+  /* $9920 */
+  t += fs9920();
+  /* $9994 */
+  t += fs9994();
+  /* $9AA1 */
+  t += fs9AA1();
+  /* $9B9D: store D,E back */
+  hl = fsAt(0xAA04, c);
+  m[hl] = d; hl = (hl + 1) & 0xFFFF; m[hl] = e;
+  t += 22 + 7 + 6 + 7 + 10;
+  return t;
+
+  function fs9920(){
+    let t = 4 + 7;
+    if (e !== 3){
+      t += 12 + 4 + 7;                               // $9986
+      if (e !== 7) return t + 11;
+      t += 5 + 4 + 7;
+      if (d === 4) return t + 11;
+      t += 5 + 7;
+      if (d === 7) return t + 11;
+      e = 0x18;
+      return t + 5 + 7 + 10;
+    }
+    t += 7 + 4 + 7;
+    if (d === 0x13){ e = d; return t + 12 + 4 + 10; }
+    t += 7 + 7;
+    if (d === 0x14){ e = d; return t + 7 + 4 + 10; }
+    t += 12;                                          // $9930
+    t += 31 + 7 + 4;
+    if (m[fsAt(0xAA16, o)]) return t + 11;
+    t += 5 + 31 + 7 + 4;
+    if (m[fsAt(0xAA09, o)]) return t + 11;
+    t += 5 + 31 + 7;
+    const om = m[fsAt(0xAA04, o)];
+    t += 7;
+    if (om === 0x10) return t + 11;
+    t += 5 + 7;
+    if (om === 0x0A) return t + 11;
+    t += 5 + 10 + 4 + 4 + 7 + 4;
+    if (!m[fsAt(0xA90D, om)]) return t + 11;
+    t += 5 + 11 + 17 + 10;                            // PUSH DE, CALL $9BA7, POP DE
+    const r = fs9BA7();
+    t += r[1] + 4;
+    if (!r[0]) return t + 11;
+    t += 5 + 31 + 7 + 10 + 4 + 4 + 7;
+    e = m[fsAt(0xA926, m[fsAt(0xAA04, o)])];
+    m[fsAt(0xAA09, c)] = 0;
+    m[fsAt(0xAA16, o)] = 0;
+    return t + 22 + 10 + 31 + 10 + 10;
+  }
+
+  /* $9BA7: may this fighter's move land?  [A, T after the CALL] */
+  function fs9BA7(){
+    const dd = m[fsAt(0xAA19, c)], ee = m[fsAt(0xAA19, o)];
+    let t = 22 + 7 + 31 + 7 + 10 + 13 + 7, dist;
+    const same = m[0xAA57] === m[0xAA17];
+    if (!same){
+      t += 7 + 22 + 7 + 4;
+      if (!m[fsAt(0xAA17, c)]){ dist = (ee - dd) & 0xFF; t += 7 + 4 + 4 + 12; }
+      else { dist = (dd - ee) & 0xFF; t += 12 + 4 + 4; }
+      m[0x9C2D] = dist;
+      t += 13 + 31 + 7 + 10 + 4 + 4 + 7 + 4;
+      if (m[fsAt(0xB47E, m[fsAt(0xAA04, o)])]) return [0, t + 12 + 4 + 10];
+      t += 7 + 13 + 7;
+      if (dist >= 0xEF) return [1, t + 12 + 7 + 10];
+      t += 7 + 7;
+      if (dist < 0x16) return [1, t + 12 + 7 + 10];
+      return [0, t + 7 + 4 + 10];
+    }
+    t += 12 + 22 + 7 + 4;                             // $9BF5
+    if (m[fsAt(0xAA17, c)]){ dist = (dd - ee) & 0xFF; t += 7 + 4 + 4 + 12; }
+    else { dist = (ee - dd) & 0xFF; t += 12 + 4 + 4; }
+    m[0x9C2D] = dist;
+    t += 13 + 31 + 7 + 10 + 4 + 4 + 7 + 4;
+    if (!m[fsAt(0xB47E, m[fsAt(0xAA04, o)])]) return [0, t + 12 + 4 + 10];
+    t += 7 + 13 + 7;
+    if (dist < 3) return [0, t + 12 + 4 + 10];
+    t += 7 + 7;
+    if (dist >= 0x10) return [0, t + 12 + 4 + 10];
+    return [1, t + 7 + 7 + 10];
+  }
+
+  function fs9994(){
+    let t = 4 + 7;
+    if (e === 0x1A || e === 0x1B || e === 0x16){
+      t += e === 0x1A ? 12 : e === 0x1B ? 7 + 7 + 12 : 7 + 7 + 7 + 7 + 7;
+      d = e;                                          // $99A1
+      let hl = fsAt(0xAA18, c);
+      m[hl] = 0x7A; hl = (hl - 2) & 0xFFFF; m[hl] = 0;
+      m[fsAt(0xAA09, c)] = 0;
+      t += 4 + 22 + 10 + 6 + 6 + 10 + 22 + 10 + 22 + 7 + 4;
+      if (!m[fsAt(0xAA13, c)]) return t + 11;
+      t += 5 + 22 + 7 + 7;
+      const k = m[fsAt(0xAA12, c)];
+      if (k === 0x2C) t += 12;
+      else { t += 7 + 7; if (k !== 0x28) return t + 11; t += 5; }
+      t += 13 + 4;                                    // $99CD
+      if (m[0x9CA7]) return t + 11;
+      m[0x9CA7] = 1; m[0xB150] = 5;
+      return t + 5 + 7 + 13 + 7 + 13 + 10;
+    }
+    t += 7 + 7 + 7 + 7 + 12;                          // $99DD
+    t += 4 + 4;
+    if (d === e) return t + 11;
+    t += 5 + 7;
+    if (d === 1){
+      t += 7 + 4 + 7;
+      if (e === 0x11){ d = 0x12; return t + 7 + 7 + 10; }
+      t += 12 + 7;
+      if (e === 7){ d = 4; return t + 12 + 7 + 10; }
+      t += 7 + 7;
+      if (e === 0x10){ d = 4; return t + 12 + 7 + 10; }
+      t += 7 + 7;
+      if (e === 0x0A){ d = 4; return t + 7 + 7 + 10; }
+      d = e;
+      return t + 12 + 4 + 10;
+    }
+    t += 12 + 4 + 7;                                  // $99FD
+    let hit = e === 7;
+    if (hit) t += 12;
+    else {
+      t += 7 + 7;
+      if (e === 0x10){ hit = true; t += 12; }
+      else { t += 7 + 7; if (e === 0x0A){ hit = true; t += 7; } else t += 12; }
+    }
+    if (hit){                                         // $9A0A
+      t += 4 + 7;
+      if (d === 4){
+        t += 7 + 22 + 7 + 7;
+        if (m[fsAt(0xAA09, c)] !== 1) return t + 11;
+        d = e;
+        return t + 5 + 4 + 10;
+      }
+      t += 12 + 7;                                    // $9A1B
+      if (d !== 0x12) return t + 11;
+      m[fsAt(0xAA16, c)] = 1;
+      return t + 5 + 22 + 10 + 10;
+    }
+    t += 4 + 7;                                       // $9A27
+    if (d === 0x12){
+      t += 7 + 4 + 7;
+      if (e === 0x11){
+        t += 7 + 22 + 7 + 7;
+        if (m[fsAt(0xAA09, c)] !== 1) return t + 11;
+        d = e;
+        return t + 5 + 4 + 10;
+      }
+      t += 12;
+    } else t += 12;
+    t += 4 + 7;                                       // $9A3D
+    if (d === 0x11){
+      t += 7 + 22 + 7 + 7;
+      if (m[fsAt(0xAA09, c)] === 1){
+        d = 0x15;
+        m[fsAt(0xAA16, c)] = 1; m[fsAt(0xAA07, c)] = 0;
+        m[fsAt(0xAA0B, c)] = 0; m[fsAt(0xAA09, c)] = 0;
+        return t + 7 + 7 + 4 * (22 + 10) + 10;
+      }
+      t += 12;
+    } else t += 12;
+    t += 4 + 10 + 4 + 4 + 7 + 7;                      // $9A70
+    const k = m[fsAt(0xB462, d)];
+    if (k === 0x80){
+      t += 7 + 22 + 10 + 4 + 7;
+      m[fsAt(0xAA09, c)] = 0;
+      if (e === 0x11){ d = 0x12; return t + 7 + 7 + 10; }
+      d = e;
+      return t + 12 + 4 + 10;
+    }
+    t += 12 + 4;                                      // $9A8D
+    if (!k){ t += 7 + 22 + 10; m[fsAt(0xAA16, c)] = 1; }
+    else t += 12;
+    m[fsAt(0xAA09, c)] = 0;
+    return t + 22 + 10 + 10;
+  }
+
+  function fs9AA1(){
+    let hl = fsAt(0xAA0B, c);
+    let t = 22 + 7 + 4;
+    if (m[hl] !== d){
+      m[(hl + 1) & 0xFFFF] = d; m[hl] = 0;
+      m[fsAt(0xAA09, c)] = 0;
+      return t + 7 + 6 + 7 + 6 + 10 + 22 + 10 + 10;
+    }
+    t += 12 + 22 + 7 + 7;                             // $9AB9
+    if (m[fsAt(0xAA09, c)] === 1){
+      m[fsAt(0xAA0C, c)] = 0;
+      return t + 7 + 22 + 10 + 10;
+    }
+    t += 12 + 22 + 7 + 6 + 7 + 10;                    // $9ACD
+    hl = fsAt(0xAA0B, c);
+    m[(hl + 1) & 0xFFFF] = m[hl];
+    return t;
+  }
+}
+
 /* ---- the demo "game" ------------------------------------------------- */
 const TONE_HZ = 440;
 class Demo {
@@ -533,5 +744,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep };
 </script>
