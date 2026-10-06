@@ -1,0 +1,20 @@
+# ledger/topics/loader.toml -- current truth about "tape and BASIC loader -- the post-loader image", a system spanning
+# routines (manual 12.11).  Written with tools/record.py; history is in git.
+
+name     = "tape and BASIC loader -- the post-loader image"
+routines = ["$8800"]
+
+[[fact]]
+kind   = "data"
+says   = "tape is stock ROM blocks: BASIC 319 to PROG, screen 6912 to $4000 (LOAD \"\"CODE 16384), code 38912 to $6000-$F7FF; all checksums clean"
+by     = "python tools/tzx.py tape/game.tzx"
+
+[[fact]]
+kind   = "data"
+says   = "BASIC hides real numbers behind printed ones: CLEAR 24575, BORDER/PAPER/INK 6, POKE 23659 0 then 2, attrs 23232-23295 := 54, PRINT USR 34816 ($8800)"
+by     = "python tools/basic.py scratch/blocks/game.b02.body.bin"
+
+[[fact]]
+kind   = "data"
+says   = "hand-over PC=$8800 SP=$5FE8 IM1 IFF1 I=$3F border 6; static block image equals tap2sna snapshot byte for byte over $6000-$FFFF (diffs only screen row 23, sysvars, BASIC workspace, stack)"
+by     = "python tools/simload.py --start 0x8800; python tools/snapimport.py build/boot48.z80 --save boot; diff vs python tools/mkimage.py"

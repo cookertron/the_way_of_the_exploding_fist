@@ -1,0 +1,31 @@
+# ledger/topics/battery.toml -- current truth about "section 8 diagnostic battery -- results and the 8.20 checklist", a system spanning
+# routines (manual 12.11).  Written with tools/record.py; history is in git.
+
+name     = "section 8 diagnostic battery -- results and the 8.20 checklist"
+routines = ["$9745", "$C3E4", "$B15A"]
+
+[[fact]]
+kind   = "measured"
+says   = "Q10 free-running: entry $8800 does DI and no game code ever EIs or sets IM2; loop top $9745 passes are 2.8-5.2 frames (mean 266623 T over 157), tail at 13-15 frames"
+by     = "python tools/battery.py --state s1 --frames 600 --loop 0x9745"
+
+[[fact]]
+kind   = "measured"
+says   = "Q2 ports in demo play: reads $F7FE $EFFE (keys 1-5, 6-0) and $1F Kempston; writes $FE only (1142 beeper writes / 600 frames)"
+by     = "python tools/battery.py --state s1 --frames 600 --loop 0x9745"
+
+[[fact]]
+kind   = "measured"
+says   = "Q15 render: 156948 of 157204 display-file writes come from the LDIR at $C3F0 (an off-screen buffer copied out); 0 attribute writes in play"
+by     = "python tools/battery.py --state s1 --frames 600 --loop 0x9745"
+
+[[fact]]
+kind   = "measured"
+says   = "Q3 no self-modification in 600 frames of demo: 0 writes landed on executed bytes"
+by     = "python tools/battery.py --state s1 --frames 600 --loop 0x9745"
+
+[[fact]]
+kind   = "insn"
+at     = "$9C2E"
+says   = "start-up: DI, border 5, SP=$5BFF, CALL $B138, then LDIR $6000-$80FF down to $5F00 -- static image below $8100 is pre-relocation"
+by     = "python tools/adis.py 0x9c2e 12"

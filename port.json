@@ -1,7 +1,7 @@
 {
-  "name": "starter",
+  "name": "fist",
   "template": "web/template.html",
-  "out": "web/starter.html",
+  "out": "web/fist.html",
   "includes": {
     "platform.js": "web/platform.js"
   },
@@ -16,11 +16,27 @@
   "tape": {
     "path": "tape/game.tzx",
     "deck": null,
-    "blocks": [],
+    "blocks": [
+      {
+        "dest": "0x5CCB",
+        "len": "0x013F",
+        "block": 2
+      },
+      {
+        "dest": "0x4000",
+        "len": "0x1B00",
+        "block": 4
+      },
+      {
+        "dest": "0x6000",
+        "len": "0x9800",
+        "block": 6
+      }
+    ],
     "copies": [],
     "prog": "0x5CCB",
-    "entry": null,
-    "sp": "0xFFFF",
+    "entry": "0x8800",
+    "sp": "0x5FE8",
     "tape_call_pc": null,
     "tape_ret_pc": null
   },
@@ -29,6 +45,7 @@
     "symbols": "tools/symbols.json",
     "regions": "tools/regions.json",
     "states": "build",
-    "image": "build/image.bin"
+    "image": "build/image.bin",
+    "snapshot": "build/boot48.z80"
   }
 }
