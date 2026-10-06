@@ -510,5 +510,109 @@
   "new": "    else t += 7;\n    m[fsAt(0xAA09, c)] = 0;\n    return t + 22 + 10 + 10;",
   "increment": "97BB-port",
   "kills": "fighterStep tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: move and frame swapped at $9B93",
+  "old": "  let d = m[(hl - 1) & 0xFFFF], e = m[hl];",
+  "new": "  let e = m[(hl - 1) & 0xFFFF], d = m[hl];",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: store-back swaps move and frame",
+  "old": "  m[hl] = d; m[(hl + 1) & 0xFFFF] = e;",
+  "new": "  m[hl] = e; m[(hl + 1) & 0xFFFF] = d;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9AF2 compare outcome T swapped",
+  "old": "m[fsAt(0xAA19, c)] ? 12 : 7);",
+  "new": "m[fsAt(0xAA19, c)] ? 7 : 12);",
+  "increment": "9AD7-port",
+  "kills": "fighterPost tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9ADF move 2 not taken to $9AE3",
+  "old": "      t += d === 2 ? 7 : 12;",
+  "new": "      t += d === 2 ? 12 : 7;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $AA0D flag not cleared",
+  "old": "    m[hl] = 0;\n    t += 5 + 10 + 22 + 7 + 4;",
+  "new": "    t += 5 + 10 + 22 + 7 + 4;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B09 queued move not posted to $9C28",
+  "old": "e = a; m[0x9C28] = a;",
+  "new": "e = a;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B67 table at $B463 not $B462",
+  "old": "if (!m[fsAt(0xB462, d)]){ m[fsAt(0xAA09, c)] = 1;",
+  "new": "if (!m[fsAt(0xB463, d)]){ m[fsAt(0xAA09, c)] = 1;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B8A sets $AA09 to 0",
+  "old": "m[fsAt(0xAA09, c)] = 1; return t + 12 + 22 + 10 + 10;",
+  "new": "m[fsAt(0xAA09, c)] = 0; return t + 12 + 22 + 10 + 10;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B71 second clear at +3 not +4",
+  "old": "m[hl] = 0; m[(hl + 4) & 0xFFFF] = 0;\n      return",
+  "new": "m[hl] = 0; m[(hl + 3) & 0xFFFF] = 0;\n      return",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B1E toggle on any move",
+  "old": "    if (d === 0x11){\n      const h",
+  "new": "    if (d !== 0x11){\n      const h",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B23 last flag 0 not 1",
+  "old": "    m[(hl + 5) & 0xFFFF] = 1;",
+  "new": "    m[(hl + 5) & 0xFFFF] = 0;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B38 leaves $AA16 set",
+  "old": "    m[fsAt(0xAA16, c)] = 0;\n    return t + 22",
+  "new": "    return t + 22",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7: $9B33 move not reset to 1",
+  "old": "    d = 1;\n    m[fsAt(0xAA16, c)] = 0;",
+  "new": "    m[fsAt(0xAA16, c)] = 0;",
+  "increment": "9AD7-port",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
  }
 ]

@@ -581,7 +581,7 @@ const mockCtx = (state) => ({
   let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
-    const m = new Uint8Array(0x10000);
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
     const t = P.fighterStep(m, c.regs[iC]);
@@ -603,6 +603,37 @@ const mockCtx = (state) => ({
          0x9A3A, 0x9A3C, 0x9A6F, 0x9A8A, 0x9A8C, 0x9AA0, 0x9AB8, 0x9ACC, 0x9AD6,
          0x9BF1, 0x9BF4, 0x9C18, 0x9C1F, 0x9C23, 0x9C27].filter(a => !ran.has(a)).map(a => a.toString(16)), []);
   check('the callio cases call $97BB for both fighters (C = 0 and $40)',
+        [0, 0x40].filter(v => !fx.cases.some(c => c.regs[iC] === v)), []);
+}
+
+/* ---- fighter_post $9AD7 + $9B9D against its frozen oracle (callio) ---
+   As above, the pair bracketed from the CALL at $979A/$97A6 to $97A0/$97AC
+   (python tools/callio.py --capture --call 0x979A 0x97A0 --call 0x97A6 0x97AC). */
+{
+  const fx = P.assets.post9ad7;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const iC = fx.regs.indexOf(3);
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.fighterPost(m, c.regs[iC]);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
+    if (diff >= 0 && !badBytes++)
+      firstBytes = `case ${i} ($${c.site.toString(16)}): $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (t !== c.t && !badT++) firstT = `case ${i} ($${c.site.toString(16)}): T ${t} want ${c.t}`;
+  }
+  check('fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('fighterPost tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const ran = new Set();
+  for (const c of fx.cases) for (let j = 0; j < c.sig.length; j += 4) ran.add(parseInt(c.sig.slice(j, j + 4), 16));
+  check('the callio cases reach every exit and branch of $9AD7',
+        [0x9AE3, 0x9AF4, 0x9AFD, 0x9B09, 0x9B0E, 0x9B1E, 0x9B23, 0x9B67, 0x9B71, 0x9B8A]
+          .filter(a => !ran.has(a)).map(a => a.toString(16)), []);
+  check('the callio cases call $9AD7 for both fighters (C = 0 and $40)',
         [0, 0x40].filter(v => !fx.cases.some(c => c.regs[iC] === v)), []);
 }
 

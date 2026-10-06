@@ -664,6 +664,65 @@ function fighterStep(m, c){
   }
 }
 
+/* ---- fighter_post $9AD7 and its store $9B9D: settle a finished move ----
+   c = the record offset (0 P1, $40 P2).  Called at $979A/$97A6, each
+   followed by CALL $9B9D; the pair is gated together.  Returns the
+   uncontended T from the CALL at $979A/$97A6 to $97A0/$97AC (python
+   tools/callio.py --capture --call 0x979A 0x97A0 --call 0x97A6 0x97AC;
+   ledger/9AD7.toml). */
+function fighterPost(m, c){
+  let t = 17 + 17;                               // the site's CALL, CALL $9B93
+  let hl = fsAt(0xAA05, c);
+  let d = m[(hl - 1) & 0xFFFF], e = m[hl];      // $9B93: D,E = move, frame
+  t += 52;
+  t += post();
+  /* $9B9D: store D,E back */
+  hl = fsAt(0xAA04, c);
+  m[hl] = d; m[(hl + 1) & 0xFFFF] = e;
+  return t + 17 + 22 + 7 + 6 + 7 + 10;
+
+  function post(){
+    let t = 4 + 7;
+    if (d === 3) t += 12;
+    else {
+      t += 7 + 7;
+      t += d === 2 ? 7 : 12;
+    }
+    if (d === 2 || d === 3)                      // $9AE3: compares, result unused
+      t += 22 + 7 + 22 + 7 + 4 + (m[fsAt(0xAA36, c)] === m[fsAt(0xAA19, c)] ? 12 : 7);
+    hl = fsAt(0xAA0D, c);                        // $9AF4
+    t += 22 + 7 + 4;
+    if (!m[hl]) return t + 11;
+    m[hl] = 0;
+    t += 5 + 10 + 22 + 7 + 4;                    // $9AFF
+    const a = m[fsAt(0xAA03, c)];
+    if (a){ e = a; m[0x9C28] = a; return t + 7 + 4 + 13 + 10; }
+    hl = fsAt(0xAA16, c);                        // $9B0E
+    t += 12 + 22 + 7 + 4 + 10;
+    if (!m[hl]){                                 // $9B67
+      t += 4 + 10 + 4 + 4 + 7 + 4;
+      if (!m[fsAt(0xB462, d)]){ m[fsAt(0xAA09, c)] = 1; return t + 12 + 22 + 10 + 10; }
+      d = 1;
+      m[fsAt(0xAA00, c)] = d;
+      hl = fsAt(0xAA07, c);
+      m[hl] = 0; m[(hl + 4) & 0xFFFF] = 0;
+      return t + 7 + 7 + 4 + 22 + 7 + 22 + 10 + 24 + 10 + 10;
+    }
+    t += 4 + 7;
+    if (d === 0x11){
+      const h = (hl + 1) & 0xFFFF;
+      m[h] ^= 1;
+      t += 7 + 6 + 7 + 7 + 7;
+    } else t += 12;
+    hl = fsAt(0xAA07, c);                        // $9B23
+    m[hl] = 0; m[(hl + 2) & 0xFFFF] = 0; m[(hl + 4) & 0xFFFF] = 0;
+    m[(hl + 5) & 0xFFFF] = 1;
+    d = 1;
+    m[fsAt(0xAA16, c)] = 0;
+    return t + 22 + 10 + 6 + 6 + 10 + 6 + 6 + 10 + 7 + 6 + 10 + 22 + 10 + 10;
+  }
+}
+
 /* ---- the demo "game" ------------------------------------------------- */
 const TONE_HZ = 440;
 class Demo {
@@ -744,5 +803,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost };
 </script>

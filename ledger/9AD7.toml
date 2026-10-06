@@ -3,8 +3,30 @@
 
 name     = "fighter_post"
 entries  = ["$9AD7"]
+oracle   = "tools/callio.py"
+fixtures = ["post9ad7"]
+port     = "fighterPost"
+manual   = ["5.1", "7.2", "T44", "T131"]
 
 [[fact]]
 kind   = "measured"
 says   = "per fighter (C, $9C29 as $97BB): reads own $AA03-$AA19 and the other's x ($AA36/$AA76 copies), tables $B463-$B47A; writes own $AA00-$AA16 and $9C28; 167-479 T; followed by $9B9D storing D,E to $AA04-$AA05 (+C)"
 by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x979A 0x979D ; same for 0x97A6 0x97A9 and 0x979D 0x97A0"
+
+[[fact]]
+kind   = "unreachable"
+at     = "$9B41"
+says   = "$9B41-$9B66 (D=1, or D=4 with $AA16/$AA0C set for moves 7, $0A, $10) has no CALL, JP or JR to it; the only 41 9B bytes ($D6A7) are not an instruction; not ported"
+by     = "python tools/grepbytes.py \"41 9B\" ; python tools/grepbytes.py \"CD 41 9B\""
+window = "$0000-$FFFF image"
+n      = 0
+
+[[fact]]
+kind   = "measured"
+says   = "fixture build/callio_9ad7.json: 36 play cases bracketing $9AD7 + its $9B9D store ($979A-$97A0, $97A6-$97AC) over s1, p1 x 15 key scripts, p1b; --check: writes, exit regs and T agree; T 236-548"
+by     = "python tools/callio.py --capture --state p1 --keys D+W --call 0x979A 0x97A0 --call 0x97A6 0x97AC --frames 6000 --per 2 --out build/callio_9ad7.json --append ; python tools/callio.py --check --state s1 --fixture build/callio_9ad7.json"
+
+[[fact]]
+kind   = "gated"
+says   = "fighterPost writes every byte and tallies the exact uncontended T of all 38 cases (36 play + 2 derived: move $11 with $AA16 set, per fighter); gate memory poisoned $A5 (T44); 13 mutants killed"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_9ad7.json --case 6 --set 0xAA04=0x11 ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"

@@ -29,6 +29,12 @@
       "file": "build/callio_97bb.json",
       "required": true,
       "note": "oracle for fighter_step $97BB: python tools/callio.py --capture (see its --help)"
+    },
+    {
+      "key": "post9ad7",
+      "file": "build/callio_9ad7.json",
+      "required": true,
+      "note": "oracle for fighter_post $9AD7 with its store $9B9D: python tools/callio.py --capture (see its --help)"
     }
   ],
   "tape": {
