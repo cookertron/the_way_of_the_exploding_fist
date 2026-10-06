@@ -788,4 +788,45 @@ const mockCtx = (state) => ({
         pcs.some(s => s.has(0x95ED) && !s.has(0x95EE)), true);
 }
 
+/* ---- control_pass $97CB and the AI $A090 against its frozen oracle ----
+   Bracketed from the CALL at $9757 to $975A (python tools/callio.py
+   --capture --call 0x9757 0x975A).  Each case carries its port reads in
+   order and R at the CALL and the return: the port is served the logged
+   values and must ask for the same ports, and its R -- the AI's draws --
+   must land where the machine's did (ledger/97CB.toml, A3FF.toml). */
+{
+  const fx = P.assets.control97cb;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const iA = fx.regs.indexOf(0);
+  let badBytes = 0, badT = 0, badA = 0, badR = 0, badPorts = 0;
+  let firstBytes = '', firstT = '', firstA = '', firstR = '', firstPorts = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const log = c.ports || [];
+    let j = 0, portErr = '';
+    const io = { r: c.r, in: p => {
+      if (j >= log.length || log[j][0] !== p){ portErr = portErr || `read ${j} of port $${p.toString(16)}`; j++; return 0xFF; }
+      return log[j++][1];
+    } };
+    let res;
+    try { res = P.controlPass(m, io); } catch (e){ res = { t: -1, a: -1, r: -1 }; portErr = portErr || e.message; }
+    if (j !== log.length) portErr = portErr || `${j} port reads, the machine ${log.length}`;
+    if (portErr && !badPorts++) firstPorts = `case ${i}: ${portErr}`;
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
+    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (res.t !== c.t && !badT++) firstT = `case ${i}: T ${res.t} want ${c.t}`;
+    if (res.a !== c.exit[iA] && !badA++) firstA = `case ${i}: A ${res.a} want ${c.exit[iA]}`;
+    if (res.r !== c.rx && !badR++) firstR = `case ${i}: R ${res.r} want ${c.rx}`;
+  }
+  check('controlPass reads the same ports in the same order as the real $97CB', [badPorts, firstPorts], [0, '']);
+  check('controlPass writes every byte the real $97CB wrote (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('controlPass tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  check('controlPass returns the A the real $97CB returned (the RET M at $975B)', [badA, firstA], [0, '']);
+  check('controlPass counts R to the value the real $97CB left (the AI draws)', [badR, firstR], [0, '']);
+}
+
 rig.done();

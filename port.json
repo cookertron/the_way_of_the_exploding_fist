@@ -59,6 +59,12 @@
       "file": "build/callio_95d4.json",
       "required": true,
       "note": "oracle for fighter_motion $95D4: python tools/callio.py --capture --call 0x978D 0x9790 (its ROM reads kept as addresses, D5)"
+    },
+    {
+      "key": "control97cb",
+      "file": "build/callio_97cb.json",
+      "required": true,
+      "note": "oracle for control_pass $97CB and the AI $A090: python tools/callio.py --capture --call 0x9757 0x975A (port reads and R kept per case)"
     }
   ],
   "tape": {

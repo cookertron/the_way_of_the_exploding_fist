@@ -3,8 +3,28 @@
 
 name     = "control_pass"
 entries  = ["$97CB"]
+oracle   = "tools/callio.py"
+fixtures = ["control97cb"]
+port     = "controlPass"
+manual   = ["Q18", "5.1", "7.2"]
 
 [[fact]]
 kind   = "measured"
 says   = "Num_Players $9C2C = 0 in s1 (demo): both fighters driven by the AI ($A090-$A5C2, $AADC-$AB67), 4.3k-9.1k T; reads and writes both records $AA00-$AA19 / $AA40-$AA59 and $AA77-$AA9C, writes $A5EC-$A644; reads $A646, $A905-$A93E, $B330-$B496"
 by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x9757 0x975A"
+
+[[fact]]
+kind   = "gated"
+says   = "controlPass matches all 456 cases: same ports in order, every byte, exact uncontended T, A and R at the return; R is an M1 count from io.r (blockcost.py); a hand mutant (one LD A,R as 1 M1) fails bytes, T and R"
+by     = "python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "insn"
+at     = "$97CB"
+says   = "control_pass -- demo: keys + Kempston tested, both fighters by the AI $A090 on copies (self $A5F1, AI state $A60B, foe $A62B); 1P/2P: quit keys 1+6, P1 from $8B1F via moves $98DD, P2 likewise or by AI; $909E/$8C54 are later units"
+by     = "python tools/adis.py 0x97CB 80 ; python tools/adis.py 0x987A 60 ; python tools/adis.py 0xA090 700 ; python tools/adis.py 0xAADC 60"
+
+[[fact]]
+kind   = "measured"
+says   = "fixture build/callio_97cb.json: 456 cases, one per PC set (s1; p1 x 7 keys; p1b W), ports and R per case; --check 456/456, T 882-9393; play never reached $A096 $A2A6 $A49A-$A4C7 $A57B $A5C3-$A5EB, nor $909E/$8C54"
+by     = "python tools/callio.py --capture --state s1 --call 0x9757 0x975A --frames 6000 --per 2 --out build/callio_97cb.json (p1, p1b --append; one per PC set kept) ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"

@@ -43,7 +43,10 @@ how many reads were fetches.
   --check    replay every case in a blank 64K holding only the target's
              bytes at those addresses and the inputs: every byte written,
              every register at the return and the T must agree, and no
-             byte outside them may be read.
+             byte outside them may be read.  Port reads are served from
+             the case's log in order (the twin logs them from the keys held
+             in the capture); R is set from the case and checked at the
+             return, so a routine reading LD A,R replays exactly.
   --derive   a path driven play never reached: replay case N over the
              target image with some of the bytes it read changed (--set),
              and append what the real code then did as a new case, marked
@@ -121,8 +124,36 @@ class Logged:
         return iter(self.m)
 
 
-def run_alone(mem, regs, ret, limit=20_000_000):
+class PortLog:
+    """The twin's ports.  Live: answer from the harness's Ports (the keys held
+    for the whole capture) and log each read; replay: serve a case's logged
+    reads in order, and count any read that does not match the log."""
+    def __init__(self, live=None, logged=None):
+        self.live, self.logged, self.log, self.bad = live, logged, [], 0
+
+    def read_port(self, registers, port):
+        if self.logged is None:
+            v = self.live.read_port(registers, port) if self.live else 0xFF
+        else:
+            i = len(self.log)
+            if i < len(self.logged) and self.logged[i][0] == port:
+                v = self.logged[i][1]
+            else:
+                self.bad += 1; v = 0xFF
+        self.log.append([port, v])
+        return v
+
+    def write_port(self, registers, port, value, offset=0):
+        pass
+
+    def left(self):
+        return len(self.logged) - len(self.log) if self.logged is not None else 0
+
+
+def run_alone(mem, regs, ret, limit=20_000_000, ports=None):
     sim = Simulator(mem, config=FLAT)
+    if ports is not None:
+        sim.set_tracer(ports)
     sim.registers[:] = regs
     r, ops, t0 = sim.registers, sim.opcodes, regs[T]
     mem.regs = r
@@ -137,7 +168,7 @@ def run_alone(mem, regs, ret, limit=20_000_000):
     sys.exit(f'callio: call never returned to ${ret:04X}')
 
 
-REGS = [i for i in range(24) if i not in (SP, 13, R)]   # 13 unused; R is not modelled
+REGS = [i for i in range(24) if i not in (SP, 13, R)]   # 13 unused; R is kept apart, in r / rx
 
 
 def frame(sp):
@@ -248,7 +279,8 @@ def capture(args):
             continue
         site, sp, regs_in, pre = r[PC], r[SP], list(r), bytes(m)
         lm = Logged(pre, frame(sp))
-        dt, pcs = run_alone(lm, regs_in, rets[site])
+        pl = PortLog(live=h.ports)
+        dt, pcs = run_alone(lm, regs_in, rets[site], ports=pl)
         h.run_until([rets[site]], limit=20_000_000)    # the real call, interrupts on
         n += 1
         drift = [a for a in lm.fetched | pcs if pre[a] != image[a]]
@@ -263,14 +295,16 @@ def capture(args):
         new += 1
         fx['cases'].append({'site': site, 'sp': sp, 'regs': [regs_in[i] for i in REGS],
                             **case_io(pre, lm, blind),
-                            'exit': [lm.exit[i] for i in REGS], 't': dt, 'sig': sig})
+                            'exit': [lm.exit[i] for i in REGS], 'r': regs_in[R], 'rx': lm.exit[R],
+                            **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig})
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
     fx['regs'] = REGS
     fx['about'] = ('Purpose: frozen oracle for the routine called at ' + ', '.join(f'${s:04X}' for s, _ in calls)
                    + ' -- one case per distinct (site, PC set), at most a few each: SP and the registers '
                    '(SkoolKit indices in regs) at the CALL, the bytes read before written as [addr, hex] runs '
                    '(in; fetches and the call frame excepted), every byte written outside the frame (out), '
-                   'the registers at the return (exit), the uncontended T (t); code lists the fetched '
+                   'the registers at the return (exit), R at the call and the return (r, rx), the port reads '
+                   'in order as [port, value] (ports), the uncontended T (t); code lists the fetched '
                    'addresses, whose bytes come from the target, as do ROM data reads (rom, addresses '
                    'only, D5); outputs inside the blind ranges are addresses only (blind). Read by: python tools/callio.py --check, '
                    'and the JS gate of that routine.')
@@ -311,17 +345,22 @@ def check(args):
         for k, v in zip(fx['regs'], c['regs']):
             regs[k] = v
         regs[PC], regs[SP], regs[T] = c['site'], sp, 0
-        dt, _ = run_alone(lm, regs, rets[c['site']])
+        if 'r' in c:
+            regs[R] = c['r']
+        pl = PortLog(logged=c.get('ports', []))
+        dt, _ = run_alone(lm, regs, rets[c['site']], ports=pl)
+        portsok = not pl.bad and not pl.left() and ('rx' not in c or lm.exit[R] == c['rx'])
         hid = addrs(fx.get('blind', []))
         out = {a: lm.m[a] for a in lm.writes if a not in hid}
         seen = sorted(a for a in lm.writes if a in hid) == sorted(addrs(c.get('blind', [])))
         unread = sorted(a for a in lm.reads if a not in ins and a not in rom)
         ex = [lm.exit[k] for k in fx['regs']]
-        if out != unruns(c['out']) or not seen or dt != c['t'] or unread or ex != c['exit']:
+        if out != unruns(c['out']) or not seen or dt != c['t'] or unread or ex != c['exit'] or not portsok:
             bad += 1
             if bad <= 5:
                 print(f'*** case {i} (${c["site"]:04X}): T replay {dt} fixture {c["t"]}; writes agree: '
                       f'{out == unruns(c["out"]) and seen}; exit registers agree: {ex == c["exit"]}; '
+                      f'ports and R agree: {portsok}; '
                       f'unrecorded reads {[hex(a) for a in unread[:6]]}')
     ts = [c['t'] for c in fx['cases']]
     print(f'callio: {fixture}: {len(fx["cases"])} cases, {bad} disagree; T {min(ts)}-{max(ts)}')
@@ -362,14 +401,21 @@ def derive(args):
     for k, v in zip(fx['regs'], c['regs']):
         regs[k] = v
     regs[PC], regs[SP], regs[T] = c['site'], sp, 0
-    dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']])
+    if 'r' in c:
+        regs[R] = c['r']
+    pl = PortLog(logged=c.get('ports', []))
+    dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], ports=pl)
+    if pl.bad or pl.left():
+        sys.exit('callio: the derived case reads the ports differently from its parent; derive another way')
     sig = ''.join(f'{a:04x}' for a in sorted(pcs))
     old = {a for s in (x['sig'] for x in fx['cases']) for a in (int(s[i:i + 4], 16) for i in range(0, len(s), 4))}
     code = {a for lo, hi in fx['code'] for a in range(lo, hi + 1)} | lm.fetched | pcs
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
     fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': c['regs'],
                         **case_io(mem, lm, fx.get('blind', [])),
-                        'exit': [lm.exit[k] for k in fx['regs']], 't': dt, 'sig': sig,
+                        'exit': [lm.exit[k] for k in fx['regs']],
+                        **({'r': c['r'], 'rx': lm.exit[R]} if 'r' in c else {}),
+                        **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig,
                         'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()}}})
     with open(fixture, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
@@ -419,7 +465,7 @@ def main():
             continue
         sp = r[SP]
         lm = Logged(bytes(m), {a & 0xFFFF for a in range(sp - 128, sp + 2)})
-        dt, pcs = run_alone(lm, list(r), ret)
+        dt, pcs = run_alone(lm, list(r), ret, ports=PortLog(live=h.ports))
         h.run_until([ret], limit=20_000_000)           # the real call, interrupts on
         calls += 1
         ts.append(dt)
