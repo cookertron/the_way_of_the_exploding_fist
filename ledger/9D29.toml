@@ -3,8 +3,28 @@
 
 name     = "p1_hits_p2"
 entries  = ["$9D29"]
+oracle   = "tools/callio.py"
+fixtures = ["hit9d29"]
+port     = "p1HitsP2"
+manual   = ["Q11", "7.2", "5.1", "T44"]
 
 [[fact]]
 kind   = "measured"
 says   = "mirror of $9ED2: copies x $AA19/$AA59 to $A071/$A072 every pass, reads P1 move $AA04 with $AA09-$AA19, P2 $AA52-$AA57, same tables; writes P2 reel $AA43, $AA3F, $AA08, $A06F-$A070, sound $B150"
 by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x974B 0x974E"
+
+[[fact]]
+kind   = "insn"
+at     = "$9D29"
+says   = "prefix copies $AA19/$AA59 to $A071/$A072 (52 T); from $9D35 the body is $9ED2's at -$19D with P1/P2 blocks swapped; both fall-throughs take victim x - attacker x, so one JS core hitTest(m, A, V, t) serves both"
+by     = "python tools/adis.py 0x9D29 200 ; python tools/adis.py 0x9ED2 200"
+
+[[fact]]
+kind   = "measured"
+says   = "fixture build/callio_9d29.json: 31 play cases (s1, p1, p1b x 10 key scripts, 6000 frames) + 56 derived; play never had $AA17 set at a hit nor reached $A9BC; --check 87/87, T 130-971"
+by     = "python tools/callio.py --capture --state p1 --keys D+W --call 0x974B 0x974E --frames 6000 --per 2 --out build/callio_9d29.json --append ; python tools/callio.py --check --state s1 --fixture build/callio_9d29.json"
+
+[[fact]]
+kind   = "gated"
+says   = "p1HitsP2 writes every byte and the exact uncontended T of all 87 cases; derived: $AA19 either side of each outcome edge per $AA17/$AA57 pair on parents 11 and 24, $AA13 = 0, $AA52 = 0 on $A9BC; 6 mutants killed"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_9d29.json --case 24 --set 0xAA17=1 --set 0xAA57=1 --set 0xAA19=83 ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"

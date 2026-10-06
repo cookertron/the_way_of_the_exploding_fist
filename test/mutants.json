@@ -738,7 +738,7 @@
  {
   "file": "template.html",
   "label": "9ED2: $AA53 gate dropped",
-  "old": "if (!m[0xAA53]) return t + 11;",
+  "old": "if (!m[A + 0x13]) return t + 11;",
   "new": "if (0) return t + 11;",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
@@ -746,7 +746,7 @@
  {
   "file": "template.html",
   "label": "9ED2: $AA56 gate dropped",
-  "old": "if (m[0xAA56]) return t + 11;",
+  "old": "if (m[A + 0x16]) return t + 11;",
   "new": "if (0) return t + 11;",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
@@ -754,7 +754,7 @@
  {
   "file": "template.html",
   "label": "9ED2: $AA49 gate dropped",
-  "old": "if (m[0xAA49]) return t + 11;",
+  "old": "if (m[A + 0x09]) return t + 11;",
   "new": "if (0) return t + 11;",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
@@ -762,16 +762,16 @@
  {
   "file": "template.html",
   "label": "9ED2: frame match from the wrong table",
-  "old": "if (m[0xAA52] !== tb(0xA971)) return",
-  "new": "if (m[0xAA52] !== tb(0xA970)) return",
+  "old": "if (m[A + 0x12] !== tb(0xA971)) return",
+  "new": "if (m[A + 0x12] !== tb(0xA970)) return",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
  },
  {
   "file": "template.html",
   "label": "9ED2: facing test reads $AA57 alone",
-  "old": "  const same = m[0xAA57] === m[0xAA17];\n  const row",
-  "new": "  const same = !m[0xAA57];\n  const row",
+  "old": "  const same = m[A + 0x17] === m[V + 0x17];\n  const row",
+  "new": "  const same = !m[A + 0x17];\n  const row",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
  },
@@ -794,8 +794,8 @@
  {
   "file": "template.html",
   "label": "9ED2: gap sense ignores the path",
-  "old": "const fwd = !m[0xAA57] !== same;",
-  "new": "const fwd = !m[0xAA57];",
+  "old": "const vFirst = !m[A + 0x17] !== same;",
+  "new": "const vFirst = !m[A + 0x17];",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
  },
@@ -842,16 +842,16 @@
  {
   "file": "template.html",
   "label": "9ED2: same-facing reel values swapped",
-  "old": "if (tb(0xB47E)){ m[0xAA03] = 0x16; return t + 7 + 10 + 30; }",
-  "new": "if (tb(0xB47E)){ m[0xAA03] = 0x1A; return t + 7 + 10 + 30; }",
+  "old": "if (tb(0xB47E)){ m[V + 0x03] = 0x16; return t + 7 + 10 + 30; }",
+  "new": "if (tb(0xB47E)){ m[V + 0x03] = 0x1A; return t + 7 + 10 + 30; }",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
  },
  {
   "file": "template.html",
   "label": "9ED2: gap T paths swapped",
-  "old": "t += 5 + 11 + (fwd ? 66 : 59);",
-  "new": "t += 5 + 11 + (fwd ? 59 : 66);",
+  "old": "t += 5 + 11 + (vFirst ? 66 : 59);",
+  "new": "t += 5 + 11 + (vFirst ? 59 : 66);",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
  },
@@ -862,5 +862,53 @@
   "new": "m[0xAA3F] = D + 1;",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9D29: x copies swapped",
+  "old": "m[0xA071] = m[0xAA19]; m[0xA072] = m[0xAA59];",
+  "new": "m[0xA071] = m[0xAA59]; m[0xA072] = m[0xAA19];",
+  "increment": "9D29-port",
+  "kills": "p1HitsP2 writes every byte the real $9D29 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9D29: x prefix T short",
+  "old": "return hitTest(m, 0xAA00, 0xAA40, 17 + 52);",
+  "new": "return hitTest(m, 0xAA00, 0xAA40, 17 + 48);",
+  "increment": "9D29-port",
+  "kills": "p1HitsP2 tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "hit core: attacker x copy fixed at P1",
+  "old": "const xa = A === 0xAA00 ? 0xA071 : 0xA072, xv",
+  "new": "const xa = 0xA071, xv",
+  "increment": "9D29-port",
+  "kills": "p1HitsP2 writes every byte the real $9D29 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "hit core: points to the victim",
+  "old": "m[A + 0x08] = pts;",
+  "new": "m[V + 0x08] = pts;",
+  "increment": "9D29-port",
+  "kills": "p1HitsP2 writes every byte the real $9D29 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "hit core: heavy reel to the attacker",
+  "old": "m[V + 0x03] = 0x1B;",
+  "new": "m[A + 0x03] = 0x1B;",
+  "increment": "9D29-port",
+  "kills": "p1HitsP2 writes every byte the real $9D29 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "hit core: reach row by the attacker frame",
+  "old": "+ m[V + 0x12]) & 0xFFFF];",
+  "new": "+ m[A + 0x12]) & 0xFFFF];",
+  "increment": "9D29-port",
+  "kills": "p1HitsP2 writes every byte the real $9D29 wrote (callio cases)"
  }
 ]

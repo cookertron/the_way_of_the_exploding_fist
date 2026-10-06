@@ -848,44 +848,46 @@ function boutTimer(m){
   return t + 13 + 7 + 4 + 10 + printNumber(m, m[0x9CA5], 0x0B00) + 10;
 }
 
-/* ---- p2_hits_p1 $9ED2: does P2's move land on P1 ----------------------
-   D = P2's move $AA44.  Its table bytes are read as LD L,base+D, which
-   wraps inside the page.  A frame of a striking move ($A90D+D, $A971+D
-   matching $AA52), with $AA53 set and $AA56, $AA49 clear, picks the
-   reach row ($A98A or, when the facings $AA57/$AA17 agree, $A9BC) and
-   P1's frame $AA12 indexes it: $80 there is no reach.  The reach E and
-   the gap C between the x copies $A071/$A072 (sense set by $AA57) decide
-   2 or 1 points ($AA48) by $A93F+D and $A958+D, then $A01C sets P1's reel
-   $AA03 and the sound $B150.  Returns the uncontended T from the CALL at
-   $9748 to $974B (python tools/callio.py --capture --call 0x9748 0x974B;
-   ledger/9ED2.toml). */
-function p2HitsP1(m){
-  const D = m[0xAA44];
+/* ---- the hit tests $9D29 / $9ED2: does one fighter's move land ---------
+   The two routines are one body with the fighters' blocks swapped: A is
+   the attacker's ($AA00 P1, $AA40 P2), V the victim's, and xa, xv their
+   x copies ($A071 P1, $A072 P2).  D = the attacker's move A+$04.  Its
+   table bytes are read as LD L,base+D, which wraps inside the page.  A
+   frame of a striking move ($A90D+D, $A971+D matching A+$12), with A+$13
+   set and A+$16, A+$09 clear, picks the reach row ($A98A or, when the
+   facings A+$17/V+$17 agree, $A9BC) and the victim's frame V+$12 indexes
+   it: $80 there is no reach.  The reach E and the gap C between the x
+   copies decide 2 or 1 points (A+$08) by $A93F+D and $A958+D, then the
+   tail sets $AA3F, the sound $B150 and the victim's reel V+$03.  t comes
+   in holding the T up to LD A,(A+$04) (ledger/9ED2.toml, 9D29.toml). */
+function hitTest(m, A, V, t){
+  const D = m[A + 0x04];
   const tb = base => m[(base & 0xFF00) | ((base + D) & 0xFF)];
-  let t = 17 + 13 + 4 + 10 + 4 + 4 + 4 + 7 + 4;
+  t += 13 + 4 + 10 + 4 + 4 + 4 + 7 + 4;
   if (!tb(0xA90D)) return t + 11;
   t += 5 + 17;
-  if (!m[0xAA53]) return t + 11;
+  if (!m[A + 0x13]) return t + 11;
   t += 5 + 17;
-  if (m[0xAA56]) return t + 11;
+  if (m[A + 0x16]) return t + 11;
   t += 5 + 17;
-  if (m[0xAA49]) return t + 11;
+  if (m[A + 0x09]) return t + 11;
   t += 5 + 29 + 17;
-  if (m[0xAA52] !== tb(0xA971)) return t + 11;
+  if (m[A + 0x12] !== tb(0xA971)) return t + 11;
   t += 5 + 30;
-  const same = m[0xAA57] === m[0xAA17];
+  const same = m[A + 0x17] === m[V + 0x17];
   const row = (same ? 0xA9BC : 0xA98A) + ((D << 1) & 0xFF);
   m[0xA06F] = m[row]; m[0xA070] = m[(row + 1) & 0xFFFF];
   t += same ? 12 + 104 : 7 + 106;
-  const r = m[((m[0xA06F] | m[0xA070] << 8) + m[0xAA12]) & 0xFFFF];
+  const r = m[((m[0xA06F] | m[0xA070] << 8) + m[V + 0x12]) & 0xFFFF];
   t += 69;
   if (r === 0x80) return t + 11;
   const E = (r + 0x80) & 0xFF;
-  /* the gap's sense: $A071-$A072 when $AA57 is clear on the $A98A path,
-     when it is set on the $A9BC path */
-  const fwd = !m[0xAA57] !== same;
-  t += 5 + 11 + (fwd ? 66 : 59);
-  const C = ((fwd ? m[0xA071] - m[0xA072] : m[0xA072] - m[0xA071]) + 0x80) & 0xFF;
+  /* the gap's sense: the fall-through takes victim x - attacker x, when
+     A+$17 is clear on the $A98A path, when it is set on the $A9BC path */
+  const xa = A === 0xAA00 ? 0xA071 : 0xA072, xv = A === 0xAA00 ? 0xA072 : 0xA071;
+  const vFirst = !m[A + 0x17] !== same;
+  t += 5 + 11 + (vFirst ? 66 : 59);
+  const C = ((vFirst ? m[xv] - m[xa] : m[xa] - m[xv]) + 0x80) & 0xFF;
   t += 44;
   const near = tb(0xB47E) ? same : !same;   // the $9F65/$A000 test, else $9F83/$9FE4
   let pts = 0;
@@ -925,13 +927,13 @@ function p2HitsP1(m){
       }
     }
   }
-  m[0xAA48] = pts;
+  m[A + 0x08] = pts;
   t += 30 + 69 + 30;
   m[0xAA3F] = D;
   m[0xB150] = m[(0xA073 + D) & 0xFFFF];
-  if (m[0xAA57] !== m[0xAA17]){
+  if (m[A + 0x17] !== m[V + 0x17]){
     t += 7 + 33;
-    if (tb(0xB47E)){ m[0xAA03] = 0x1A; return t + 12 + 30; }
+    if (tb(0xB47E)){ m[V + 0x03] = 0x1A; return t + 12 + 30; }
     t += 7 + 4 + 7;
     if (D === 0x18) t += 12;
     else {
@@ -939,17 +941,31 @@ function p2HitsP1(m){
       if (D === 7) t += 12;
       else {
         t += 7 + 7;
-        if (D !== 0x0C){ m[0xAA03] = 0x16; return t + 12 + 30; }
+        if (D !== 0x0C){ m[V + 0x03] = 0x16; return t + 12 + 30; }
         t += 7;
       }
     }
-    m[0xAA03] = 0x1B; m[0xB150] = 4;
+    m[V + 0x03] = 0x1B; m[0xB150] = 4;
     return t + 50;
   }
   t += 12 + 33;
-  if (tb(0xB47E)){ m[0xAA03] = 0x16; return t + 7 + 10 + 30; }
-  m[0xAA03] = 0x1A;
+  if (tb(0xB47E)){ m[V + 0x03] = 0x16; return t + 7 + 10 + 30; }
+  m[V + 0x03] = 0x1A;
   return t + 12 + 30;
+}
+
+/* p2_hits_p1 $9ED2: the uncontended T from the CALL at $9748 to $974B
+   (python tools/callio.py --capture --call 0x9748 0x974B) */
+function p2HitsP1(m){
+  return hitTest(m, 0xAA40, 0xAA00, 17);
+}
+
+/* p1_hits_p2 $9D29: first copies the x bytes $AA19, $AA59 to $A071,
+   $A072, which $9ED2 then reads; the T from the CALL at $974B to $974E
+   (python tools/callio.py --capture --call 0x974B 0x974E) */
+function p1HitsP2(m){
+  m[0xA071] = m[0xAA19]; m[0xA072] = m[0xAA59];
+  return hitTest(m, 0xAA00, 0xAA40, 17 + 52);
 }
 
 /* ---- the demo "game"------------------------------------------------- */
@@ -1032,5 +1048,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, font, fontMiss };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, font, fontMiss };
 </script>
