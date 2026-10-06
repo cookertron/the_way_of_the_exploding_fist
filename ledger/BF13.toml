@@ -1,0 +1,5 @@
+# ledger/BF13.toml -- current truth about render_fighters (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "render_fighters"
+entries  = ["$BF13"]
