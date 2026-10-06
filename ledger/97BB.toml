@@ -1,0 +1,16 @@
+# ledger/97BB.toml -- current truth about fighter_step (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "fighter_step"
+entries  = ["$97BB"]
+
+[[fact]]
+kind   = "insn"
+at     = "$97BB"
+says   = "per fighter, C = record offset (0 P1 $AA00, $40 P2 $AA40), $9C29 = the other's offset: $9B93 loads D,E = move,frame from $AA04+C/$AA05+C; $9920, $9994, $9AA1; $9B9D stores D,E back"
+by     = "python tools/adis.py 0x97BB 6 ; python tools/adis.py 0x9B93 12"
+
+[[fact]]
+kind   = "measured"
+says   = "reads and writes only its own record $AA04-$AA18 (+C), move tables $B464-$B47A, $9CA7 and $9C29; P2 call also reads P1 $AA04-$AA19 and $A90E/$A92C, may write $9C2D and sound $B150; 442-1350 T"
+by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x976C 0x976F ; same for 0x9763 0x9766"

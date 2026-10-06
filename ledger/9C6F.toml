@@ -1,0 +1,22 @@
+# ledger/9C6F.toml -- current truth about bout_timer (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "bout_timer"
+entries  = ["$9C6F"]
+manual   = ["Q11", "7.2"]
+
+[[fact]]
+kind   = "measured"
+says   = "s1 driven play: Time drops by 1 every 13 passes exactly while running; frozen through every reel ($AA43=$16/$1B) and the following $17 phase (about 60 passes); reset to 30 by $AEF8 Init_Time"
+by     = "python tools/sample.py --state s1 --at 0x9745 --passes 1500 --changes --var time=0x9CA5 --var up=0x9C2B --var reel1=0xAA03 --var reel2=0xAA43 --var mv1=0xAA04"
+
+[[fact]]
+kind   = "data"
+says   = "writers: Time only $AEFA (Init_Time, $1E) and $9CA3; $9C2B set $9C90 $ABB3 $ADDA, cleared $9CAE; reel states $AA03/$AA43 written $A04D-$A05E / $9EB0-$9EC1 ($16, $1A, $1B; $1B also requests sound 4 via $B150)"
+by     = "python tools/grepbytes.py \"32 A5 9C\" ; same for \"32 2B 9C\" \"32 03 AA\" \"32 43 AA\""
+
+[[fact]]
+kind   = "insn"
+at     = "$9C6F"
+says   = "returns at once if $9C2B (time up) set, $AA03|$AA43 (reel) nonzero, or $AA04 = $17; else DEC $9CA6, at 0 reload 13, DEC Time $9CA5, at 0 set $9C2B=1, print Time at $0B00 via $9336"
+by     = "python tools/adis.py 0x9C6F 25"

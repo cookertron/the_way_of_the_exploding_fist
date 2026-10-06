@@ -1,0 +1,10 @@
+# ledger/97CB.toml -- current truth about control_pass (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "control_pass"
+entries  = ["$97CB"]
+
+[[fact]]
+kind   = "measured"
+says   = "Num_Players $9C2C = 0 in s1 (demo): both fighters driven by the AI ($A090-$A5C2, $AADC-$AB67), 4.3k-9.1k T; reads and writes both records $AA00-$AA19 / $AA40-$AA59 and $AA77-$AA9C, writes $A5EC-$A644; reads $A646, $A905-$A93E, $B330-$B496"
+by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x9757 0x975A"

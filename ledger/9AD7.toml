@@ -1,0 +1,10 @@
+# ledger/9AD7.toml -- current truth about fighter_post (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "fighter_post"
+entries  = ["$9AD7"]
+
+[[fact]]
+kind   = "measured"
+says   = "per fighter (C, $9C29 as $97BB): reads own $AA03-$AA19 and the other's x ($AA36/$AA76 copies), tables $B463-$B47A; writes own $AA00-$AA16 and $9C28; 167-479 T; followed by $9B9D storing D,E to $AA04-$AA05 (+C)"
+by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x979A 0x979D ; same for 0x97A6 0x97A9 and 0x979D 0x97A0"

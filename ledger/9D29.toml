@@ -1,0 +1,10 @@
+# ledger/9D29.toml -- current truth about p1_hits_p2 (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "p1_hits_p2"
+entries  = ["$9D29"]
+
+[[fact]]
+kind   = "measured"
+says   = "mirror of $9ED2: copies x $AA19/$AA59 to $A071/$A072 every pass, reads P1 move $AA04 with $AA09-$AA19, P2 $AA52-$AA57, same tables; writes P2 reel $AA43, $AA3F, $AA08, $A06F-$A070, sound $B150"
+by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x974B 0x974E"

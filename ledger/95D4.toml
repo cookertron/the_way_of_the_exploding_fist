@@ -1,0 +1,15 @@
+# ledger/95D4.toml -- current truth about rom_effect (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "rom_effect"
+entries  = ["$95D4"]
+
+[[fact]]
+kind   = "measured"
+says   = "per fighter (HL=$AA16, $AA56): reads ROM $3100-$3312 (step $3B, 9 rows) and $3900-$3AFE indexed by those, plus game tables $936A-$93FF, $9450-$95CF; writes $9743-$9744 and $AA0B-$AA2B / $AA4B-$AA6B; 223-4817 T"
+by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x978D 0x9790 ; python tools/adis.py 0x9664 20"
+
+[[open]]
+ask    = "the port needs the ROM bytes $95D4 reads as data; manual 0.5 says ship neither the ROM nor a transcription -- embed them in the local asset bundle, or not?"
+tried  = "callio shows reads of $3100-$3312 and $3900-$3AFE only through LD C,(HL) $9673 and LD A,(BC) $9674/$9678"
+settle = "the user decides (rights); then a D-number in docs/DECISIONS.md"
