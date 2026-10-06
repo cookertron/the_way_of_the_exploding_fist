@@ -10,3 +10,57 @@ kind   = "measured"
 at     = "$C3F0"
 says   = "the display-copy LDIR costs 4.72 T per byte over 21n-5 pooled (s1 4.63 over 156336 bytes, p1 4.81 over 160648); charged as that mean (D4)"
 by     = "python tools/callcost.py --state s1 --call 0x9790 0x9793 --key 0xC41B 0xC43C --sub 0xC3F0 0xC3F2 --frames 600 ; same for p1"
+
+[[fact]]
+kind   = "insn"
+at     = "$C1F6"
+says   = "minmax(D,E): unsigned D-E; carry (D<E) returns unchanged, else swaps -- exit D=min, E=max; preserves nothing else but A clobbered"
+by     = "python tools/adis.py 0xC1F6 13"
+
+[[fact]]
+kind   = "insn"
+at     = "$BFB7"
+says   = "LD A,E is overwritten by LD A,$BE (also at $C001): the y-max of each fighter's box ($C437/$C43B) is always $BE, never the computed max -- every box extends to row 190"
+by     = "python tools/adis.py 0xBFB4 4 ; python tools/adis.py 0xBFFE 4"
+
+[[fact]]
+kind   = "insn"
+at     = "$BF73"
+says   = "each fighter's box is the union of this frame (x=$C41B/$C41D, y=$C41C/$C41E, w,h from frame header +1,+2) and last frame ($C42C..$C433); then this frame is saved to $C42C..$C433 at $C007"
+by     = "python tools/adis.py 0xBF73 70 ; python tools/adis.py 0xC007 13"
+
+[[fact]]
+kind   = "insn"
+at     = "$C03B"
+says   = "overlap test in 8-bit arithmetic (ADD A,11 wraps): if (p2xmax+11)&255 < p1xmin or (p1xmax+11)&255 < p2xmin, path $C101 draws each fighter in its own box (two copies); else the boxes are merged by minmax and one box drawn"
+by     = "python tools/adis.py 0xC03B 40"
+
+[[fact]]
+kind   = "insn"
+at     = "$C0D2"
+says   = "merged path draw order: $C427 nonzero draws P1 ($C1A2) then P2 ($C1CC), zero draws P2 then P1; separate path ($C136/$C186) draws each in its own box"
+by     = "python tools/adis.py 0xC0D2 7"
+
+[[fact]]
+kind   = "insn"
+at     = "$C34F"
+says   = "part list: B,C = box-relative x,y offsets ($C412,$C413); header byte0 = part count, byte1 = frame width ($C416), byte2 -> $C417; then per part $C36E: dx,dy,stride word, and HL advances by stride after the part"
+by     = "python tools/adis.py 0xC34F 30"
+
+[[fact]]
+kind   = "insn"
+at     = "$C39C"
+says   = "part y = $C413+dy, except dy=$FF means y = $BE-$C41A-12 (floor-anchored part); part x = $C412+dx unflipped ($C410=0), else $C412 + ($C416 - dx - 4*(first part byte)), all 8-bit"
+by     = "python tools/adis.py 0xC393 40"
+
+[[fact]]
+kind   = "insn"
+at     = "$C2B5"
+says   = "part dest = $F730 + y*$C40D + (x>>2) via 8x8 mul $C319; x&3 sets flag bits 0/2/4/8 OR'd into $C40C -> $C40E; $C407=$C40B, $C408=$C40D; then CALL sprite_decoder $8803"
+by     = "python tools/adis.py 0xC2B5 40 ; python tools/adis.py 0xC319 22"
+
+[[fact]]
+kind   = "insn"
+at     = "$C09F"
+says   = "box: width bytes ((xmax-xmin)>>2)+2 to $C40A/$C40F, height ymax-ymin to $C409, $C41A=ymin; $C234 copies rows from the 64-row shadow at $8000 (B=xmin&$FC, C=ymin-$48) into $F730, zero-filling rows past shadow row $40"
+by     = "python tools/adis.py 0xC091 50 ; python tools/adis.py 0xC234 60"
