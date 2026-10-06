@@ -848,6 +848,110 @@ function boutTimer(m){
   return t + 13 + 7 + 4 + 10 + printNumber(m, m[0x9CA5], 0x0B00) + 10;
 }
 
+/* ---- p2_hits_p1 $9ED2: does P2's move land on P1 ----------------------
+   D = P2's move $AA44.  Its table bytes are read as LD L,base+D, which
+   wraps inside the page.  A frame of a striking move ($A90D+D, $A971+D
+   matching $AA52), with $AA53 set and $AA56, $AA49 clear, picks the
+   reach row ($A98A or, when the facings $AA57/$AA17 agree, $A9BC) and
+   P1's frame $AA12 indexes it: $80 there is no reach.  The reach E and
+   the gap C between the x copies $A071/$A072 (sense set by $AA57) decide
+   2 or 1 points ($AA48) by $A93F+D and $A958+D, then $A01C sets P1's reel
+   $AA03 and the sound $B150.  Returns the uncontended T from the CALL at
+   $9748 to $974B (python tools/callio.py --capture --call 0x9748 0x974B;
+   ledger/9ED2.toml). */
+function p2HitsP1(m){
+  const D = m[0xAA44];
+  const tb = base => m[(base & 0xFF00) | ((base + D) & 0xFF)];
+  let t = 17 + 13 + 4 + 10 + 4 + 4 + 4 + 7 + 4;
+  if (!tb(0xA90D)) return t + 11;
+  t += 5 + 17;
+  if (!m[0xAA53]) return t + 11;
+  t += 5 + 17;
+  if (m[0xAA56]) return t + 11;
+  t += 5 + 17;
+  if (m[0xAA49]) return t + 11;
+  t += 5 + 29 + 17;
+  if (m[0xAA52] !== tb(0xA971)) return t + 11;
+  t += 5 + 30;
+  const same = m[0xAA57] === m[0xAA17];
+  const row = (same ? 0xA9BC : 0xA98A) + ((D << 1) & 0xFF);
+  m[0xA06F] = m[row]; m[0xA070] = m[(row + 1) & 0xFFFF];
+  t += same ? 12 + 104 : 7 + 106;
+  const r = m[((m[0xA06F] | m[0xA070] << 8) + m[0xAA12]) & 0xFFFF];
+  t += 69;
+  if (r === 0x80) return t + 11;
+  const E = (r + 0x80) & 0xFF;
+  /* the gap's sense: $A071-$A072 when $AA57 is clear on the $A98A path,
+     when it is set on the $A9BC path */
+  const fwd = !m[0xAA57] !== same;
+  t += 5 + 11 + (fwd ? 66 : 59);
+  const C = ((fwd ? m[0xA071] - m[0xA072] : m[0xA072] - m[0xA071]) + 0x80) & 0xFF;
+  t += 44;
+  const near = tb(0xB47E) ? same : !same;   // the $9F65/$A000 test, else $9F83/$9FE4
+  let pts = 0;
+  if (near){
+    t += same ? 12 : 7;
+    if (same){                                // $A000: C = E hits, C > E misses
+      t += 15;
+      if (C === E){ pts = 2; t += 5; }
+      else if (C > E) return t + 11;
+      else t += 5;
+    } else {                                  // $9F65: C < E tested, C = E hits
+      t += 8;
+      if (C < E) t += 12;
+      else { t += 7; if (C === E){ pts = 2; t += 12; } else return t + 7 + 10; }
+    }
+    if (!pts){
+      t += 37;
+      if (((tb(0xA93F) + C) & 0xFF) >= E){ pts = 2; t += 12; }
+      else {
+        t += 7 + 37;
+        if (((tb(0xA958) + C) & 0xFF) >= E){ pts = 1; t += 12; }
+        else return t + 7 + 10;
+      }
+    }
+  } else {                                    // $9F83 / $9FE4: C = E hits, C < E misses
+    t += same ? 7 : 12;
+    t += 15;
+    if (C === E){ pts = 2; t += 5; }
+    else if (C < E) return t + 11;
+    else {
+      t += 5 + 37;
+      if (((C - tb(0xA93F)) & 0xFF) < E){ pts = 2; t += 12; }
+      else {
+        t += 7 + 37;
+        if (((C - tb(0xA958)) & 0xFF) < E){ pts = 1; t += 12; }
+        else return t + 7 + 10;
+      }
+    }
+  }
+  m[0xAA48] = pts;
+  t += 30 + 69 + 30;
+  m[0xAA3F] = D;
+  m[0xB150] = m[(0xA073 + D) & 0xFFFF];
+  if (m[0xAA57] !== m[0xAA17]){
+    t += 7 + 33;
+    if (tb(0xB47E)){ m[0xAA03] = 0x1A; return t + 12 + 30; }
+    t += 7 + 4 + 7;
+    if (D === 0x18) t += 12;
+    else {
+      t += 7 + 7;
+      if (D === 7) t += 12;
+      else {
+        t += 7 + 7;
+        if (D !== 0x0C){ m[0xAA03] = 0x16; return t + 12 + 30; }
+        t += 7;
+      }
+    }
+    m[0xAA03] = 0x1B; m[0xB150] = 4;
+    return t + 50;
+  }
+  t += 12 + 33;
+  if (tb(0xB47E)){ m[0xAA03] = 0x16; return t + 7 + 10 + 30; }
+  m[0xAA03] = 0x1A;
+  return t + 12 + 30;
+}
+
 /* ---- the demo "game"------------------------------------------------- */
 const TONE_HZ = 440;
 class Demo {
@@ -928,5 +1032,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, font, fontMiss };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, font, fontMiss };
 </script>

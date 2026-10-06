@@ -41,6 +41,12 @@
       "file": "build/callio_9c6f.json",
       "required": true,
       "note": "oracle for bout_timer $9C6F and its printer: python tools/callio.py --capture --blind 0x4000-0x57FF (ROM reads and glyphs as addresses only, D5)"
+    },
+    {
+      "key": "hit9ed2",
+      "file": "build/callio_9ed2.json",
+      "required": true,
+      "note": "oracle for p2_hits_p1 $9ED2: python tools/callio.py --capture --call 0x9748 0x974B"
     }
   ],
   "tape": {

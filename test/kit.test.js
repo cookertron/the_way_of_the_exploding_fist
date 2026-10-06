@@ -684,4 +684,39 @@ const mockCtx = (state) => ({
           .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
 }
 
+/* ---- p2_hits_p1 $9ED2 against its frozen oracle (callio) ---------------
+   Bracketed from the CALL at $9748 to $974B (python tools/callio.py
+   --capture --call 0x9748 0x974B); derived cases reach the branches driven
+   play did not (ledger/9ED2.toml). */
+{
+  const fx = P.assets.hit9ed2;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.p2HitsP1(m);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
+    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
+  }
+  check('p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('p2HitsP1 tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const pcs = fx.cases.map(c => { const s = new Set();
+    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  /* each early RET: a case that passed the PC before it and not the one after */
+  check('the callio cases take every early return of $9ED2',
+        [[0x9ED2, 0x9EDF], [0x9EDF, 0x9EE4], [0x9EE4, 0x9EE9], [0x9EE9, 0x9EEE], [0x9EEE, 0x9EFA],
+         [0x9F30, 0x9F3F], [0x9FAF, 0x9FBE]]
+          .filter(([a, b]) => !pcs.some(s => s.has(a) && !s.has(b))).map(([a]) => a.toString(16)), []);
+  check('the callio cases reach every branch of the range tests and the reel',
+        [0x9F48, 0x9F51, 0x9F65, 0x9F69, 0x9F6B, 0x9F6C, 0x9F77, 0x9F82, 0x9F83, 0x9F87, 0x9F88, 0x9F93, 0x9F9E,
+         0x9FC7, 0x9FD0, 0x9FE4, 0x9FE8, 0x9FE9, 0x9FF4, 0x9FFF, 0xA000, 0xA004, 0xA005, 0xA010, 0xA01B,
+         0x9F9F, 0x9FA7, 0xA043, 0xA047, 0xA04B, 0xA056, 0xA05C, 0xA062, 0xA06C]
+          .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+}
+
 rig.done();

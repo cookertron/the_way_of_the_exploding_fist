@@ -3,8 +3,28 @@
 
 name     = "p2_hits_p1"
 entries  = ["$9ED2"]
+oracle   = "tools/callio.py"
+fixtures = ["hit9ed2"]
+port     = "p2HitsP1"
+manual   = ["Q11", "7.2", "5.1", "T44"]
 
 [[fact]]
 kind   = "measured"
 says   = "interface: reads P2 move $AA44 and $AA49-$AA57, P1 $AA12-$AA17, x copies $A071-2; tables $A90D+move, $A971+move, word tables $A98A/$A9BC to frame data $BAxx-$BCxx, $B47E; writes P1 reel $AA03, $AA3F, $AA48, sound $B150"
 by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x9748 0x974B"
+
+[[fact]]
+kind   = "insn"
+at     = "$9ED2"
+says   = "D=$AA44 gated by $A90D+D, $AA53, $AA56, $AA49, $AA52=$A971+D (page-wrapped); reach row $A98A/$A9BC+2D at $AA12; gap C vs reach E by $A93F+D/$A958+D: 2 or 1 to $AA48; $A01C sets $AA3F, $B150, P1 reel $AA03 $1A/$16/$1B"
+by     = "python tools/adis.py 0x9ED2 120 ; python tools/adis.py 0x9F93 80 ; python tools/adis.py 0xA011 60"
+
+[[fact]]
+kind   = "measured"
+says   = "fixture build/callio_9ed2.json: 42 play cases (s1, p1 and p1b x 10 key scripts, 6000 frames) + 18 derived; $AA17 was 0 in every play hit; --check 60/60, T 78-912"
+by     = "python tools/callio.py --capture --state p1 --keys D+W --call 0x9748 0x974B --frames 6000 --per 2 --out build/callio_9ed2.json --append ; python tools/callio.py --check --state s1 --fixture build/callio_9ed2.json"
+
+[[fact]]
+kind   = "gated"
+says   = "p2HitsP1 writes every byte and the exact uncontended T of all 60 cases; derived cases cover $9F48, $9FC7, both range-test variants on each path, $A06C, the $AA53 return; 17 mutants killed"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_9ed2.json --case 25 --set 0xAA17=1 --set 0xAA12=0x01 --set 0xA071=0x26 ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"

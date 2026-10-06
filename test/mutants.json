@@ -726,5 +726,141 @@
   "new": "  let src = (prod + FONT_BASE + 8) & 0xFFFF, de = hl;",
   "increment": "9C6F-port",
   "kills": "each printed cell shows the lookalike glyph of its $932C character"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: move gate from the wrong table byte",
+  "old": "if (!tb(0xA90D)) return t + 11;",
+  "new": "if (!tb(0xA90E)) return t + 11;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: $AA53 gate dropped",
+  "old": "if (!m[0xAA53]) return t + 11;",
+  "new": "if (0) return t + 11;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: $AA56 gate dropped",
+  "old": "if (m[0xAA56]) return t + 11;",
+  "new": "if (0) return t + 11;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: $AA49 gate dropped",
+  "old": "if (m[0xAA49]) return t + 11;",
+  "new": "if (0) return t + 11;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: frame match from the wrong table",
+  "old": "if (m[0xAA52] !== tb(0xA971)) return",
+  "new": "if (m[0xAA52] !== tb(0xA970)) return",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: facing test reads $AA57 alone",
+  "old": "  const same = m[0xAA57] === m[0xAA17];\n  const row",
+  "new": "  const same = !m[0xAA57];\n  const row",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: reach rows swapped",
+  "old": "const row = (same ? 0xA9BC : 0xA98A)",
+  "new": "const row = (same ? 0xA98A : 0xA9BC)",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: no-reach marker wrong",
+  "old": "if (r === 0x80) return t + 11;",
+  "new": "if (r === 0x7F) return t + 11;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: gap sense ignores the path",
+  "old": "const fwd = !m[0xAA57] !== same;",
+  "new": "const fwd = !m[0xAA57];",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: range test ignores $B47E",
+  "old": "const near = tb(0xB47E) ? same : !same;",
+  "new": "const near = !same;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: add-side 2-point reach off by one",
+  "old": "if (((tb(0xA93F) + C) & 0xFF) >= E){ pts = 2; t += 12; }",
+  "new": "if (((tb(0xA93F) + C) & 0xFF) > E){ pts = 2; t += 12; }",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: sub-side 1-point reach off by one",
+  "old": "if (((C - tb(0xA958)) & 0xFF) < E){ pts = 1; t += 12; }",
+  "new": "if (((C - tb(0xA958)) & 0xFF) <= E){ pts = 1; t += 12; }",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: move $18 not a heavy reel",
+  "old": "if (D === 0x18) t += 12;",
+  "new": "if (D === 0x19) t += 12;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: hit sound from the wrong entry",
+  "old": "m[0xB150] = m[(0xA073 + D) & 0xFFFF];",
+  "new": "m[0xB150] = m[(0xA074 + D) & 0xFFFF];",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: same-facing reel values swapped",
+  "old": "if (tb(0xB47E)){ m[0xAA03] = 0x16; return t + 7 + 10 + 30; }",
+  "new": "if (tb(0xB47E)){ m[0xAA03] = 0x1A; return t + 7 + 10 + 30; }",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: gap T paths swapped",
+  "old": "t += 5 + 11 + (fwd ? 66 : 59);",
+  "new": "t += 5 + 11 + (fwd ? 59 : 66);",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2: attacker move not stored",
+  "old": "m[0xAA3F] = D;",
+  "new": "m[0xAA3F] = D + 1;",
+  "increment": "9ED2-port",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
  }
 ]
