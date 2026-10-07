@@ -747,11 +747,14 @@ const font = new Uint8Array(0x300);
 for (const [c, g] of Object.entries(fontGlyphs)) font.set(g, (c - 0x20) * 8);
 const fontMiss = { count: 0, codes: new Set() };
 
-/* $923A with its CALL: character a at screen address hl.  Returns T. */
-function printChar(m, hl, a){
-  const [prod, tm] = rfMul(m, 8, (a - 0x20) & 0xFF);   // $C319, T without its CALL
+/* $923A with its CALL: character a at screen address hl.  Returns T;
+   the M1 count (for R) is added to cnt.m1 when cnt is given. */
+function printChar(m, hl, a, cnt){
+  const e = (a - 0x20) & 0xFF;
+  const [prod, tm] = rfMul(m, 8, e);              // $C319, T without its CALL
   if (!fontGlyphs[a]){ fontMiss.count++; fontMiss.codes.add(a); }
-  let src = (prod + FONT_BASE) & 0xFFFF, de = hl;
+  let src = (prod + FONT_BASE) & 0xFFFF, de = hl, n = 11 + 38 + 7 * 8;
+  for (let i = 0; i < 8; i++) n += e >> i & 1;    // $C319: one ADD A,D per set bit
   let t = 17 + 11 + 7 + 4 + 7 + 17 + tm + 10 + 11 + 10 + 7 + 10;
   for (let b = 8; b > 0; b--){
     const i = src - FONT_BASE;
@@ -760,28 +763,33 @@ function printChar(m, hl, a){
     t += 7 + 7 + 6 + 4 + 17 + 4 + (b > 1 ? 13 : 8);
     /* $9229: down one pixel row */
     let h = ((de >> 8) + 1) & 0xFF, l = de & 0xFF;
-    if (h & 7) t += 37;
+    if (h & 7){ t += 37; n += 5; }
     else {
       const s = l + 0x20; l = s & 0xFF;
-      if (s > 0xFF) t += 59;
-      else { h = (h - 8) & 0xFF; t += 69; }
+      if (s > 0xFF){ t += 59; n += 9; }
+      else { h = (h - 8) & 0xFF; t += 69; n += 12; }
     }
     de = h << 8 | l;
   }
+  if (cnt) cnt.m1 += n;
   return t;
 }
 
 /* Print_String $92E4 with its CALL: the 0-terminated string at de, at
-   pixel row (pos & $FF) and column (pos >> 8).  Returns T. */
-function printString(m, pos, de){
+   pixel row (pos & $FF) and column (pos >> 8).  Returns T; the M1 count
+   is added to cnt.m1 when cnt is given. */
+function printString(m, pos, de, cnt){
   const [scr, ts] = rfScreenAddr(pos & 0xFF);
   let hl = (scr + (pos >> 8)) & 0xFFFF;
   let t = 17 + 11 + 11 + 4 + ts + 10 + 4 + 7 + 11 + 10;
+  if (cnt) cnt.m1 += 4 + (pos & 0xC0 ? 8 : 5) + 19 + 5;
   for (;;){
     const a = m[de];
     t += 7 + 4;
+    if (cnt) cnt.m1 += 3;
     if (!a) return t + 11;
-    t += 5 + 11 + 11 + printChar(m, hl, a) + 10 + 10 + 6 + 6 + 10;
+    if (cnt) cnt.m1 += 2 + 5;
+    t += 5 + 11 + 11 + printChar(m, hl, a, cnt) + 10 + 10 + 6 + 6 + 10;
     hl = (hl + 1) & 0xFFFF; de = (de + 1) & 0xFFFF;
   }
 }
@@ -1099,8 +1107,8 @@ function fighterMotion(m){
    count from io.r, the R at the CALL at $9757.  Ports come from io.in.
    T and M1 per block are measured (python tools/blockcost.py).  Returns
    the uncontended T from the CALL at $9757 to $975A, A at the return and
-   R there.  The paths that start a game ($909E) or open the menu ($8C54)
-   are not ported yet and throw. */
+   R there.  Starting a game (1/Kempston fire, 2) runs New_Round $909E and
+   returns $80; the menu ($8C54, key 0x23) is not ported yet and throws. */
 function controlPass(m, io){
   let t = 0, n = 0;
   const k = (T, R) => { t += T; n += R; };
@@ -1114,20 +1122,36 @@ function controlPass(m, io){
   k(66, 7);                                        // $97D2-$97DE (LD A,R there is dead)
   m[0xAA46] = 1; m[0xAA06] = 1;
   let [cy, a] = keyTest(0x24);
-  if (!cy){ k(12, 1); return notYet('$97EF Start_1UP (New_Round $909E)'); }
+  if (!cy){ k(12, 1); return start(1); }
   k(7, 1);
   a = io.in(a << 8 | 0x1F);
   k(29, 4);                                        // $97E3-$97E7
   if (!(a & 0x20)){
     k(17, 2);                                      // $97EA-$97EC
-    if (a & 0x10) return notYet('$97EF Start_1UP (New_Round $909E)');
+    if (a & 0x10) return start(1);
   }
   k(24, 2);                                        // $9801-$9803
-  if (!keyTest(0x1C)[0]){ k(7, 1); return notYet('$9808 Start_2UP (New_Round $909E)'); }
+  if (!keyTest(0x1C)[0]){ k(7, 1); return start(2); }
   k(12 + 24, 1 + 2);                               // $9806 taken, $981A-$981C
   if (!keyTest(0x23)[0]){ k(7 + 17, 1 + 1); return notYet('$9821 Game_Configs_Main ($8C54)'); }
   k(12, 1);
   return play();
+
+  function start(p){                               // $97EF Start_1UP / $9808 Start_2UP
+    m[0x9C2C] = p; m[0xAA46] = p === 1 ? 1 : 0; m[0xAA06] = 0;
+    k(67, 6);
+    newRound();
+    k(17, 2);
+    return out(0x80);
+  }
+
+  function newRound(){                             // $909E New_Round, CALL counted by the caller
+    m[0xAA01] = 0; m[0xAA41] = 0; m[0xAA02] = 0; m[0xAA42] = 0;
+    k(4 + 4 * 13, 5);
+    const c = { m1: 0 };
+    for (const pos of [0x0108, 0x0110, 0x1A08, 0x1A10]) k(20 + printString(m, pos, 0xB064, c), 2);
+    k(10, 1 + c.m1);
+  }
 
   function quit(){                                 // $9827 Check_Quit_Game
     k(24, 2);

@@ -63,7 +63,8 @@ how many reads were fetches.
              I=VAL[,...] answers the parent's I-th logged port read (from 0)
              with VAL: a key or Kempston value on a path driven play already
              took, which --capture drops as a repeat PC set.  The derived
-             case must read the same ports in the same order.
+             case must read the same ports in the same order, or stop
+             early (a key that ends the routine): it keeps the reads made.
 
 Usage:
     python tools/callio.py --state NAME --call SITE RET [--frames 1500] [--keys D+W]
@@ -450,7 +451,7 @@ def derive(args):
         ports[i][1] = v
     pl = PortLog(logged=ports)
     dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], ports=pl)
-    if pl.bad or pl.left():
+    if pl.bad:                                     # stopping early is fine: the case keeps its own log
         sys.exit('callio: the derived case reads the ports differently from its parent; derive another way')
     sig = ''.join(f'{a:04x}' for a in sorted(pcs))
     old = {a for s in (x['sig'] for x in fx['cases']) for a in (int(s[i:i + 4], 16) for i in range(0, len(s), 4))}

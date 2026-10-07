@@ -714,16 +714,16 @@
  {
   "file": "template.html",
   "label": "9229: row step stays in cell",
-  "old": "    if (h & 7) t += 37;",
-  "new": "    if (1) t += 37;",
+  "old": "    if (h & 7){ t += 37; n += 5; }",
+  "new": "    if (1){ t += 37; n += 5; }",
   "increment": "9C6F-port",
   "kills": "boutTimer tallies the uncontended T of every case exactly"
  },
  {
   "file": "template.html",
   "label": "923A: glyph from the wrong char",
-  "old": "  let src = (prod + FONT_BASE) & 0xFFFF, de = hl;",
-  "new": "  let src = (prod + FONT_BASE + 8) & 0xFFFF, de = hl;",
+  "old": "  let src = (prod + FONT_BASE) & 0xFFFF, de = hl,",
+  "new": "  let src = (prod + FONT_BASE + 8) & 0xFFFF, de = hl,",
   "increment": "9C6F-port",
   "kills": "each printed cell shows the lookalike glyph of its $932C character"
  },
@@ -1146,16 +1146,16 @@
  {
   "file": "template.html",
   "label": "control: quit returns $00",
-  "old": "    return out(0x80);",
-  "new": "    return out(0);",
+  "old": "m[0x9C2C] = 0;\n    return out(0x80);",
+  "new": "m[0x9C2C] = 0;\n    return out(0);",
   "increment": "97CB-mut",
   "kills": "controlPass returns the A the real $97CB returned (the RET M at $975B)"
  },
  {
   "file": "template.html",
   "label": "control: Kempston fire bit $08",
-  "old": "if (a & 0x10) return notYet(",
-  "new": "if (a & 0x08) return notYet(",
+  "old": "if (a & 0x10) return start(1);",
+  "new": "if (a & 0x08) return start(1);",
   "increment": "97CB-mut",
   "kills": "controlPass reads the same ports in the same order as the real $97CB"
  },
@@ -1318,5 +1318,141 @@
   "new": "m[0xA5F6] = 0x12; k(63, 6); }",
   "increment": "97CB-mut",
   "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: Kempston fire as 2UP",
+  "old": "if (a & 0x10) return start(1);",
+  "new": "if (a & 0x10) return start(2);",
+  "increment": "909E",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: 2 as 1UP",
+  "old": "k(7, 1); return start(2); }",
+  "new": "k(7, 1); return start(1); }",
+  "increment": "909E",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: AA46 always 1",
+  "old": "m[0xAA46] = p === 1 ? 1 : 0;",
+  "new": "m[0xAA46] = 1;",
+  "increment": "909E",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: forgets AA06",
+  "old": "m[0xAA06] = 0;\n    k(67, 6);",
+  "new": "\n    k(67, 6);",
+  "increment": "909E",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: M1 6 as 7",
+  "old": "    k(67, 6);",
+  "new": "    k(67, 7);",
+  "increment": "909E",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: T 67 as 66",
+  "old": "    k(67, 6);",
+  "new": "    k(66, 6);",
+  "increment": "909E",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "start: returns $81",
+  "old": "    return out(0x80);\n  }\n\n  function newRound",
+  "new": "    return out(0x81);\n  }\n\n  function newRound",
+  "increment": "909E",
+  "kills": "controlPass returns the A the real $97CB returned (the RET M at $975B)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: tail T 17 as 16",
+  "old": "    k(17, 2);\n    return out(0x80);",
+  "new": "    k(16, 2);\n    return out(0x80);",
+  "increment": "909E",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "newRound: forgets AA42",
+  "old": "m[0xAA02] = 0; m[0xAA42] = 0;",
+  "new": "m[0xAA02] = 0;",
+  "increment": "909E",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "newRound: third string at row 9",
+  "old": "[0x0108, 0x0110, 0x1A08, 0x1A10]",
+  "new": "[0x0108, 0x0110, 0x1A09, 0x1A10]",
+  "increment": "909E",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "newRound: RET M1 dropped",
+  "old": "k(10, 1 + c.m1);",
+  "new": "k(10, c.m1);",
+  "increment": "909E",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "printString: loop M1 3 as 2",
+  "old": "if (cnt) cnt.m1 += 3;",
+  "new": "if (cnt) cnt.m1 += 2;",
+  "increment": "909E",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "printString: prelude M1 off by one",
+  "old": "cnt.m1 += 4 + (pos & 0xC0 ? 8 : 5) + 19 + 5;",
+  "new": "cnt.m1 += 4 + (pos & 0xC0 ? 8 : 5) + 19 + 4;",
+  "increment": "909E",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "printChar: row M1 7 as 6",
+  "old": "n = 11 + 38 + 7 * 8;",
+  "new": "n = 11 + 38 + 6 * 8;",
+  "increment": "909E",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "printChar: 9229 short M1 5 as 4",
+  "old": "if (h & 7){ t += 37; n += 5; }",
+  "new": "if (h & 7){ t += 37; n += 4; }",
+  "increment": "909E",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "printChar: 9229 long M1 12 as 11",
+  "old": "else { h = (h - 8) & 0xFF; t += 69; n += 12; }",
+  "new": "else { h = (h - 8) & 0xFF; t += 69; n += 11; }",
+  "increment": "909E",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "start: 1UP key ignored",
+  "old": "if (!cy){ k(12, 1); return start(1); }",
+  "new": "if (false){ k(12, 1); return start(1); }",
+  "increment": "909E",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
  }
 ]

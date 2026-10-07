@@ -50,3 +50,20 @@ by     = "python tools/grepbytes.py \"ED 4F\" ; python tools/adis.py 0xA090 6"
 kind   = "gated"
 says   = "27 controlPass/AI mutants all killed; 3 derived cases added to kill them (case 1 with R=$0D; $AA19=$5B for d=$D4; Kempston $08 via --derive --port); fixture 673 cases"
 by     = "python tools/mutants.py --affected ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"
+
+[[fact]]
+kind   = "gated"
+says   = "18 mutants for the starts, New_Round and the print M1 tallies, 46 affected cases all killed (4 older anchors repointed after the print edits)"
+by     = "python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "unreachable"
+says   = "New_Round prints the constant nine spaces ($B060, never written) at rows 8/16: $C206 fall, the 8 $C319 ADD outcomes and $9233 carry never run ($9239 is credited via $922D); carry-M1 mutant dropped"
+by     = "python tools/grepbytes.py \"60 B0\" ; python tools/grepbytes.py \"64 B0\" ; python tools/branches.py --fixture build/callio_97cb.json"
+window = "$909E-$90CF, $92E4-$92FE, $923A-$9254, $9229-$9239, $C203-$C233, $C319-$C34E"
+n      = 0
+
+[[fact]]
+kind   = "gated"
+says   = "starts ported: key 1 or Kempston fire to $97EF, key 2 to $9808, then New_Round $909E (4 prints of $B064), A=$80; 3 derived cases (case 0 --port 0=0, 1=$10, 2=0), 676 in all; M1 counted through Print_String for R; only $8C54 throws"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 0 --port 0=0x00 ; python tools/build.py ; node test/kit.test.js"
