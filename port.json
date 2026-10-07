@@ -157,10 +157,16 @@
       "note": "live rows for P1 winning, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0xAA01=4,0xAA3C=1 --passes 200 --also 0xAE8E --also 0xAD6E --also 0xAD18 --json build/live_p1w.json with live's script, vars (and sc=0xB02D:3), marks and hashes (and --hash 0x4800-0x5AFF: below the text rows, D5), the P1 score cells $4001-$4008 skipped with the timer's (D5); $AA3C=1: the win ranks up to stage 3, so the tune and the scenery run before $AD18"
     },
     {
+      "key": "demo_ac3c",
+      "file": "build/callio_ac3c.json",
+      "required": true,
+      "note": "oracle for Main_Game_Loop's text rows and Demo_Mode $AB70 to the demo's first $AE29, after a lost 1UP bout: python tools/callio.py --capture --state p1 --call 0xAC3C 0xAE29 --frames 3000 with setup_ac5f's text cells blinded (D5)"
+    },
+    {
       "key": "live",
       "file": "build/live_p1.json",
       "required": true,
-      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --also 0xAC3C --mark 0xAC09 --json build/live_p1.json (the script, vars, marks and ranges are stored in the file)"
+      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --also 0xAC3C --mark 0xAC09 --passes 500 --hash 0x4800-0x5AFF --json build/live_p1.json (the script, vars, marks and ranges are stored in the file; $4800- is below the demo's text rows, D5)"
     }
   ],
   "tape": {

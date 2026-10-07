@@ -1,0 +1,29 @@
+# ledger/AC09.toml -- current truth about main_game_loop (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "main_game_loop"
+entries  = ["$AC09", "$AB70"]
+oracle   = "tools/callio.py"
+fixtures = ["demo_ac3c", "live"]
+port     = "demoIn"
+manual   = ["7.2"]
+
+[[fact]]
+kind   = "measured"
+says   = "demoIn matches the machine $AC3C to the demo's first $AE29 on 5 cases (1 played after the lost bout, 4 derived by R at the JR: both ranks take 7-10): bytes outside the text cells (D5 blind), T 640994, R exactly"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac3c.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "demoIn matches the machine $AC3C to the demo's first $AE29 on 5 cases (1 played, 4 derived by R at the JR: both ranks take 7-10): bytes outside the text cells (D5), T 640994, R exactly"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac3c.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "live (P2 lost) runs past $AC3C: demoIn a pass (within 0.2% of the machine's 768438 T), then round_loop as the demo's, row for row to row 418, the machine's return to $ABCB: the engine stops there"
+by     = "node test/kit.test.js (live block, P2 leave row) ; python tools/sample.py (port.json live note)"
+
+[[open]]
+ask    = "the demo's ways out of $AE26 -- $ABCB (a point, the pose, rank up by $AF27, the next stage), the RET M quit to the $AC27 dispatch, round end $AE67 -- still stop the engine"
+tried  = "live_p1 rows 419-499 follow the machine's demo past its first point; not yet ported"
+settle = "port $ABCB-$AC04 as pointPath's twin, gated on callio --call 0xABCB 0xAE29,0xAC27 and live rows 418 on"

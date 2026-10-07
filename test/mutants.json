@@ -2962,7 +2962,7 @@
  {
   "file": "template.html",
   "label": "AD1B point: round: a point stops the engine again",
-  "old": "  if (b.exit !== 'ret') return b;",
+  "old": "  if (b.exit !== 'ret' || demo) return b;",
   "new": "  if (b.exit !== 'ret' || 1) return b;",
   "increment": "AD1B-point",
   "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
@@ -3117,15 +3117,7 @@
   "old": "if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); this.win = 0; }",
   "new": "if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); }",
   "increment": "AD94-win",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
- },
- {
-  "file": "template.html",
-  "label": "AD94 win: Fist: the bout lost unnamed",
-  "old": "this.exit = { exit: 'lost', at: 0xAC3C };",
-  "new": "this.exit = { exit: 'p2', at: 0xAC3C };",
-  "increment": "AD94-win",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
+  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
  },
  {
   "file": "template.html",
@@ -3533,7 +3525,7 @@
   "old": "t += winEnd(); t += this.next(0, t);",
   "new": "t += winEnd(); this.exit = { exit: 'lost', at: 0xAC5F };",
   "increment": "ACA6-next",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
+  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
  },
  {
   "file": "template.html",
@@ -3762,8 +3754,8 @@
  {
   "file": "template.html",
   "label": "AC5F live: Fist.setupPass: R not advanced by the rest's M1",
-  "old": "    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
-  "new": "    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;",
+  "old": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
+  "new": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;",
   "increment": "AC5F-live",
   "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3952,10 +3944,106 @@
  },
  {
   "file": "template.html",
-  "label": "AC39: Fist.next: the lost bout stops at $AC39",
-  "old": "this.exit = { exit: 'lost', at: 0xAC3C };",
-  "new": "this.exit = { exit: 'lost', at: 0xAC39 };",
-  "increment": "AC39",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
+  "label": "AC39: Fist.next: the lost bout stops at $AC3C",
+  "old": "this.demoAt = true; return b.t",
+  "new": "this.exit = { exit: 'lost', at: 0xAC3C }; return b.t",
+  "increment": "AC09",
+  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: demoIn: JR Main_Game_Loop T",
+  "old": "  let t = 12; M1.m1 += 1;                          // JR Main_Game_Loop",
+  "new": "  let t = 10; M1.m1 += 1;                          // JR Main_Game_Loop",
+  "increment": "AC09",
+  "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: demoIn: JR Main_Game_Loop M1",
+  "old": "  let t = 12; M1.m1 += 1;                          // JR Main_Game_Loop",
+  "new": "  let t = 12; M1.m1 += 2;                          // JR Main_Game_Loop",
+  "increment": "AC09",
+  "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: demoIn: second blank row dropped",
+  "old": "[[0x0022, 0xB060], [0x0019, 0xB060], [0x0222, 0xB039]]",
+  "new": "[[0x0022, 0xB060], [0x0222, 0xB039]]",
+  "increment": "AC09",
+  "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: demoIn: draw read before LD A,R's M1",
+  "old": "    M1.m1 += 1 + 2;\n    const v = (r & 0x80)",
+  "new": "    M1.m1 += 1;\n    const v = (r & 0x80)",
+  "increment": "AC09",
+  "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: demoIn: rank mask AND 7",
+  "old": "    m[a] = (v & 3) + 7;",
+  "new": "    m[a] = (v & 7) + 7;",
+  "increment": "AC09",
+  "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: demoIn: stage 3",
+  "old": "m[0xAA06] = 1; m[0xAF34] = 2;",
+  "new": "m[0xAA06] = 1; m[0xAF34] = 3;",
+  "increment": "AC09",
+  "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: demoIn: roundIn R off by one",
+  "old": "  return t + roundIn(m, r);",
+  "new": "  return t + roundIn(m, r + 1);",
+  "increment": "AC09",
+  "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: roundPass: the demo's point played by pointPath",
+  "old": "  if (b.exit !== 'ret' || demo) return b;",
+  "new": "  if (b.exit !== 'ret') return b;",
+  "increment": "AC09",
+  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: Fist.pass: the demo's return named $AD1B",
+  "old": "res.exit === 'end' ? 0xAE67 : 0xABCB;",
+  "new": "res.exit === 'end' ? 0xAE67 : 0xAD1B;",
+  "increment": "AC09",
+  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: Fist.demoPass: round_loop not the demo's",
+  "old": "this.demoAt = false; this.demo = true; this.stage = true;",
+  "new": "this.demoAt = false; this.demo = false; this.stage = true;",
+  "increment": "AC09",
+  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: Fist.demoPass: text rows not blinded",
+  "old": "this.demoAt = false; this.demo = true; this.stage = true;",
+  "new": "this.demoAt = false; this.demo = true; this.stage = false;",
+  "increment": "AC09",
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AC09: Fist.demoPass: scenery charged at the rest's mean",
+  "old": "u = demoIn(this.m, this.r, cost);",
+  "new": "u = demoIn(this.m, this.r, null);",
+  "increment": "AC09",
+  "kills": "P2: ...and the pass from $AC3C into the demo's $AE29 is charged within 0.2% of the contended machine"
  }
 ]

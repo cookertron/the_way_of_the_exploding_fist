@@ -1467,6 +1467,45 @@ const mockCtx = (state) => ({
          [undefined, undefined, undefined, undefined, { af35: 0 }, { b2fa: 0 }, { b05f: 0 }]]);
 }
 
+/* ---- the attract demo after a lost bout: $AC3C to its first $AE29 -------
+   python tools/callio.py --capture --state p1 --call 0xAC3C 0xAE29 (port.json:
+   one played, the rest derived with R at the JR set, so the two draws for
+   the demo's ranks take each value).  demoIn: every byte outside the stack
+   frames and the text cells (D5), the text cells written, T and R. */
+{
+  const fx = P.assets.demo_ac3c;
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    P.M1.m1 = 0;
+    let t;
+    try { t = P.demoIn(m, c.r); }
+    catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
+    let diff = -1;
+    for (let x = 0; x < 0x10000; x++){
+      if (x === c.sp - 128) x = c.sp + 2;
+      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
+    }
+    const wrote = [], blind = [];
+    for (let x = 0; x < 0x10000; x++) if (inBlind(x) && m[x] !== 0xA5) wrote.push(x);
+    for (const [lo, hi] of c.blind || []) for (let x = lo; x <= hi; x++) blind.push(x);
+    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, wrote.join() === blind.join()];
+    const wnt = [c.t, c.rx, -1, true];
+    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
+      first = `case ${i}: T, R, first bad byte, text cells ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
+  }
+  check("demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly",
+        [bad, first], [0, '']);
+  const outAt = (c, x) => { for (const [a, h] of c.out) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
+  check('...and the cases draw each demo rank 7-10 for both sides ($AA94, Also_Rank $AA80), R at the JR 94 played, 95, 96, 97 and $7F derived',
+        [[0xAA94, 0xAA80].map(x => [...new Set(fx.cases.map(c => outAt(c, x)))].sort()), fx.cases.map(c => c.r)],
+        [[[10, 7, 8, 9], [10, 7, 8, 9]], [94, 95, 96, 97, 127]]);
+}
+
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
    House rule 2: python tools/sample.py --state p1 --at 0xAE29 --script
    (keys BY PASS) --json build/live_p1.json samples the machine at every
@@ -1527,7 +1566,7 @@ function liveGate(L, who, how){
   const out = bout ?? marked[marked.length - 1] ?? -1;
   const outKind = out < 0 ? null : L.rows[out].m.includes(0xACA6) ? how
     : L.rows[out].m.includes(0xAE67) ? 'end' : 'point';
-  const pcNow = () => g.exit ? g.exit.at : g.enter ? 0xAD18 : g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
+  const pcNow = () => g.exit ? g.exit.at : g.enter ? 0xAD18 : g.demoAt ? 0xAC3C : g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
   /* won and drawn bouts go on through the setup's tune (charged in the
      pass that reaches $AC5F) and its rest (a pass of its own) to the CALL
      $AD18, sampled there; with a new stage the text rows are in the font
@@ -1535,9 +1574,9 @@ function liveGate(L, who, how){
      pass of its own then enters the next bout's round_loop at $AE29, and
      the gate follows that bout to the fixture's last row */
   const disp = L.hash.findIndex(([lo, hi]) => lo === 0x4000);
-  let at = -1, k = 0, round = 0, subs = 0, setupT = 0, setupM = 0, edges = -1, logN = 0, tail = -1, enters = [], enterT = [], blind = false;
+  let at = -1, k = 0, round = 0, subs = 0, setupT = 0, setupM = 0, edges = -1, logN = 0, tail = -1, enters = [], enterT = [], blind = false, demoP = -1, demoT = 0;
   for (; k < seq.length; k++){
-    if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
+    if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
     logN = g.sound.log.length;
     let cost = g.pass(kb);
     if (g.setup){
@@ -1548,6 +1587,7 @@ function liveGate(L, who, how){
     if (g.exit && g.exit.at !== seq[k].pc){ exit = g.exit.exit; at = seq[k].p; break; }
     if ((g.win || g.bonus || g.both) && seq[k].p <= out) subs++;
     if (g.enter) enters.push(seq[k].p);
+    if (g.demo && demoP < 0){ demoP = seq[k].p; demoT = cost / seq[k].t; }
     else if (seq[k - 1] && seq[k - 1].pc === 0xAD18) enterT.push(cost / seq[k].t);
     ratio.push(cost / seq[k].t);
     const got = [pcNow(), ...row(g.m, g.r)], w = [seq[k].pc, ...want(seq[k])];
@@ -1562,10 +1602,19 @@ function liveGate(L, who, how){
   }
   const what = { won: ', the victory pose and the time bonus', lost: ' and the victory pose', draw: ', the round end and the draw' }[how];
   check(`${who}: roundPass${what} follow the machine sample for sample over keyed 1P play until the bout ends`, first, '');
-  if (how === 'lost')
-    check(`${who}: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)`,
-          [at, exit, g.exit && g.exit.at, seq[k] && (seq[k].sub ? seq[k].pc : 'row'), g.win, g.bonus, g.both, g.setup, L.rows[out].m.includes(0xAC09)],
-          [out, how, 0xAC3C, 0xAC3C, 0, false, null, null, true]);
+  /* lost: the high score checked, sampled at $AC3C; Main_Game_Loop's rows
+     and Demo_Mode (demoIn, a pass of its own) into the demo's $AE29, the
+     row of the bout's end; the demo played on to the machine's first
+     return from $AE26 to $ABCB, where the engine stops (not ported yet) */
+  const demoRet = L.rows.findIndex((r, i) => i > out && r.m.includes(0xABCB));
+  if (how === 'lost'){
+    check(`${who}: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row ${demoRet}`,
+          [demoP, at, exit, g.exit && g.exit.at, g.demo, g.demoAt, g.win, g.bonus, g.both, g.setup, L.rows[out].m.includes(0xAC09)],
+          [out, demoRet, 'ret', 0xABCB, true, false, 0, false, null, null, true]);
+    /* the demo's pass is mostly the scenery: 640994 T uncontended
+       (build/callio_ac3c.json), 768438 on the machine */
+    check(`${who}: ...and the pass from $AC3C into the demo's $AE29 is charged within 0.2% of the contended machine`, Math.abs(demoT - 1) < 0.002, true);
+  }
   else {
     /* the machine's samples at the CALL $AD18: the setup's ends */
     const wantIn = L.rows.map((r, i) => subsOf(r).some(x => x.pc === 0xAD18) ? i : -1).filter(i => i >= 0);

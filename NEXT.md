@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     $AC09 Main_Game_Loop -- the text rows, Demo_Mode $AB70 and the player-count dispatch, so the lost bout (live, out at $AC3C) and boot can reach the menu
-Step:     python tools/adis.py 0xAB70 80 and walk.py from $AC09; live_p1.json rows after 336 are the machine's demo (round_loop again at $AE29): the next fixture to follow
-Then:     the menu generator (8C54 open 1), which retires D7; AD1B open 1 ($9C28 >= $80, RET M) still wants its bracket
+Unit:     $ABCB the demo's point -- $AF01, Yin_Yang_1UP, $AF36, the pose at 4 ($AE7A/$AE9D), $ABF1 back to $ABC8, so live follows the demo past row 418
+Step:     python tools/adis.py 0xABC8 30 ; callio --capture --state p1 --call 0xABCB 0xAE29,0xAC27 (after the lost bout) ; live_p1 rows 419-499
+Then:     the RET M quit to $AC27's dispatch and Start_1UP_Game $AC3E / Start_2UP_Game $AD9C; the menu generator (8C54 open 1) retires D7
 Blocked:  none
-Notes:    Check_HighScore's 2UP path (also CALLed at $ADF3) is gated by derived cases only; the 1UP compare quirk (first lower byte decides) is faithful, ledger AC39 fact 1
+Notes:    AC09 open 1 lists the demo's unported ways out; roundPass(..., demo) returns 'ret' unplayed; demoIn's $9C2B write is redundant (roundIn clears it), no mutant can see it
