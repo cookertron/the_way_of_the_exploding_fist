@@ -2037,7 +2037,8 @@ function controlPass(m, io){
    sp - 4).  Returns the uncontended T to $AE2C, A there (bit 7 set: the
    RET M at $975B; else $44, left by $9B9D for P2) and R there.  Gated
    whole against python tools/callio.py --capture --call 0xAE29 0xAE2C
-   (ledger/9745.toml). */
+   (ledger/9745.toml).  io.cost, if given, receives $BF13's split and its T
+   (.t), so a caller can charge it rfPlayT. */
 function playPass(m, io, sp){
   M1.m1 = 1;                                       // CALL $9745
   let t = 17 + boutTimer(m) + p2HitsP1(m) + p1HitsP2(m);
@@ -2055,7 +2056,9 @@ function playPass(m, io, sp){
   t += fighterStep(m, 0) + 7 + 4 + 13; M1.m1 += 3;  // LD C,$40: XOR A: LD ($9C29),A
   m[0x9C29] = 0;
   t += fighterStep(m, 0x40) + yinYang2P(m) + fighterMotion(m);
-  t += 17 + renderFighters(m, null, (sp - 4) & 0xFFFF); M1.m1 += 1;
+  const tr = renderFighters(m, null, (sp - 4) & 0xFFFF, io.cost);
+  if (io.cost) io.cost.t = tr;                     // $BF13's own T, for rfPlayT
+  t += 17 + tr; M1.m1 += 1;
   t += 7 + 7 + 13; M1.m1 += 3;                     // LD C,0: LD A,$40: LD ($9C29),A
   m[0x9C29] = 0x40;
   t += fighterPost(m, 0) + 7 + 4 + 13; M1.m1 += 3;  // LD C,$40: XOR A: LD ($9C29),A
@@ -2063,6 +2066,102 @@ function playPass(m, io, sp){
   t += fighterPost(m, 0x40) + 10; M1.m1 += 1;      // RET
   return { t, a: 0x44, r: rAt() };
   function rAt(){ return (c.r & 0x80) | ((c.r + M1.m1) & 0x7F); }
+}
+
+/* ---- round_loop $AE26: the body from the CALL at $AE29 back to it ------
+   playPass, then $AE2C-$AE65 from the listing (python tools/adis.py 0xAE26
+   40): the quit, $C427 from the fighters' moves $AA04/$AA44 and the table
+   at $A900, and the two ways out.  Per instruction T and one M1 each (no
+   prefixes).  io as playPass.  Returns T from $AE29 to the next $AE29 (or
+   to the way out), R there, and exit: null to loop, 'quit' (the RET M at
+   $AE2D), 'ret' (the RET NZ at $AE60 on $9C28, A its value) or 'end' (the
+   round end at $AE67: $ACF0 and $AF1A, not ported yet).  roundTail is
+   the body from $AE2C alone, A and R there, gated exactly against python
+   tools/callio.py --capture --call 0xAE2C 0xAE29 (build/callio_ae2c.json). */
+function roundPass(m, io, sp){
+  const p = playPass(m, io, sp), b = roundTail(m, p.a, p.r);
+  b.t += p.t;
+  return b;
+}
+function roundTail(m, a, r){
+  let t = 4 + 5, n = 2;                            // AND A: RET M
+  const out = (exit, a) => ({ t, r: (r & 0x80) | ((r + n) & 0x7F), exit, a });
+  if (a & 0x80) return (t += 6, out('quit', a));   // RET M taken: 11, not 5
+  const at = a => m[0xA900 | ((m[a] + 0x0D) & 0xFF)];  // LD HL,$A90D: ADD A,L: LD L,A: LD A,(HL)
+  let one;
+  t += 13 + 7; n += 2;                             // LD A,($AA44): CP $11
+  if (m[0xAA44] === 0x11){ t += 12; n += 1; one = 0; }
+  else {
+    t += 7 + 13 + 7; n += 3;                       // JR Z: LD A,($AA04): CP $11
+    if (m[0xAA04] === 0x11){ t += 12; n += 1; one = 1; }
+    else {
+      t += 7 + 10 + 4 + 4 + 7 + 4; n += 6;         // JR Z: LD HL..AND A
+      if (at(0xAA04)){ t += 12; n += 1; one = 0; }
+      else {
+        t += 7 + 13 + 10 + 4 + 4 + 7 + 4; n += 7;  // JR NZ: LD A,($AA44)..AND A
+        if (at(0xAA44)){ t += 12; n += 1; one = 1; }
+        else { t += 7; n += 1; one = 0; }
+      }
+    }
+  }
+  if (one){ t += 7 + 13; n += 2; m[0xC427] = 1; }      // LD A,1: LD ($C427),A
+  else { t += 4 + 13 + 12; n += 3; m[0xC427] = 0; }    // XOR A: LD ($C427),A: JR
+  t += 13 + 4; n += 2;                             // LD A,($9C28): AND A
+  if (m[0x9C28]) return (t += 11, n += 1, out('ret', m[0x9C28]));
+  t += 5 + 13 + 4; n += 3;                         // RET NZ: LD A,($9C2B): AND A
+  if (!m[0x9C2B]) return (t += 12, n += 1, out(null, 0));
+  return (t += 7, n += 1, out('end', m[0x9C2B]));
+}
+
+/* ---- the live game: round_loop on the 7.2 accumulator ------------------
+   Starts from the machine at the CALL at $AE29 (build/live_p1.json, from
+   python tools/sample.py --json: a mid-bout state, scaffolding until the
+   boot and menu are ported, D7) and runs whole passes against a T budget
+   of one 48K frame (69888 T) a video frame.  Each pass is charged its
+   uncontended T with $BF13's contention means (rfPlayT, D4) and the effect's
+   $FE writes go to the beeper log at their T.  A way out of the loop that
+   is not ported stops the engine and says so in .exit. */
+const T_FRAME = 69888;                             // 48K: 224 T x 312 lines
+const fromHex = h => Uint8Array.from(h.match(/../g), x => parseInt(x, 16));
+function specPort(kb, p){                          // IN as the machine answers
+  if ((p & 0xFF) === 0x1F) return kb.kempston;     // Kempston, active high
+  return (p & 1) ? 0xFF : kb.port(p >> 8);
+}
+class Fist {
+  constructor(st){
+    this.m = new Uint8Array(0x10000); this.m.set(fromHex(st.ram), 0x4000);
+    this.r = st.r; this.sp = st.sp;
+    this.passes = 0; this.simT = 0; this.acc = 0; this.exit = null;
+    this.frame = 0; this.lvl = 0; this.border = 0;
+    this.sound = { log: [] };
+    this.scr = new SpecScreen();
+    this.script = null;                            // [[passes, keys]], as sample.py --script
+  }
+  get simFrame(){ return this.simT / T_FRAME; }
+  /* one pass with these keys; returns its charged T */
+  pass(kb){
+    const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
+    const res = roundPass(this.m, io, this.sp);
+    const cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
+    for (const [t, v] of io.out){
+      this.border = v & 7;
+      const lv = (v >> 4) & 1;
+      if (lv !== this.lvl){ this.lvl = lv; this.sound.log.push([(this.simT + t) / T_FRAME, lv]); }
+    }
+    this.simT += cost; this.r = res.r; this.passes++;
+    if (res.exit) this.exit = res;
+    return cost;
+  }
+  /* one video frame: spend its T on whole passes (a pass that overruns is
+     paid back by the next frames, as the original's own slow passes are) */
+  step(kb){
+    if (!this.exit){
+      this.acc += T_FRAME;
+      while (this.acc > 0 && !this.exit) this.acc -= this.pass(kb);
+    }
+    this.frame++;
+  }
+  show(){ this.scr.load(this.m.subarray(0x4000)); }
 }
 
 /* ---- the demo "game"------------------------------------------------- */
@@ -2124,6 +2223,7 @@ class Demo {
 /* ---- driver ---------------------------------------------------------- */
 const cvs = document.getElementById('scr'), ctx = cvs.getContext('2d');
 const demo = new Demo();
+const game = new Fist(A.live.start);
 /* created here, STARTED from the first gesture -- a browser will not run an
    AudioContext before one */
 const sound = new SoundOut();
@@ -2132,18 +2232,19 @@ attachKeyboard(keyboard, { onGesture(){ sound.start(); } });
 const loop = makeLoop({
   hz: FRAME_HZ,
   poll(){ pollGamepads(keyboard); },
-  step(){ demo.step(keyboard); },
+  step(){ game.step(keyboard); },
   draw(){
     /* the bridge is handed the driver's log and the SIMULATED frame the
        engine has reached -- never wall time */
-    sound.flush(demo.sound.log, demo.simFrame);
-    paintBorder(demo.border);
-    renderScreen(ctx, demo.scr, demo.frame);
+    sound.flush(game.sound.log, game.simFrame);
+    paintBorder(game.border);
+    game.show();
+    renderScreen(ctx, game.scr, game.frame);
   },
 });
 installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

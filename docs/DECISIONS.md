@@ -16,3 +16,5 @@ D4. **contention charged as play-weighted means, not by frame phase (3.8, 7.2)**
 D5. **ROM font -- an independently drawn lookalike (manual 0.5)** (2026-10-06).  User's choice: the $3D00 font read via $923A is replaced by our own 8x8 glyphs in the same layout; no ROM byte is committed or built in (callio keeps ROM reads, --blind outputs, as addresses). Missing glyphs are counted. $95D4 stays open.
 
 D6. **ROM-driven sound -- substituted pulse widths, exact timing (manual 0.5, 3.7)** (2026-10-07).  User's choice: $B15A fx 1,2,3,5,6 take half-periods from ROM AND mask; the JS reads a fixed substitute per effect with the real count, sum and zero count, so edges and total T match (tools/sfx.py). fx4 exact. No ROM byte built in.
+
+D7. **live start state -- a p1 snapshot at $AE29, scaffolding (manual 0.4, rule 7)** (2026-10-07).  Until boot and menu are ported the page starts from the machine at the CALL at $AE29 in p1 (sample.py --json build/live_p1.json, gitignored); an unported way out of round_loop stops the engine, .exit set. Ends when the menu reaches $AE29.

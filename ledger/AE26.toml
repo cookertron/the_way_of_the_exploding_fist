@@ -1,0 +1,35 @@
+# ledger/AE26.toml -- current truth about round_loop (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "round_loop"
+entries  = ["$AE26"]
+fixtures = ["tail_ae2c", "live"]
+port     = "roundPass"
+manual   = ["7.2", "3.8", "Q11"]
+
+[[fact]]
+kind   = "insn"
+at     = "$AE2C"
+says   = "body after the pass: RET M (quit); $C427 = 0 if $AA44=$11, 1 if $AA04=$11, 0 if byte $A900+(($AA04+$0D)&$FF) nz, 1 if that for $AA44 nz, else 0; RET NZ on $9C28; JR Z $AE29 on $9C2B; else round end $AE67"
+by     = "python tools/adis.py 0xAE26 40"
+
+[[fact]]
+kind   = "measured"
+says   = "roundTail matches the machine's $AE2C-$AE65 on 9 cases (8 played, $AA44=$11 derived): $C427, uncontended T 121-228, R"
+by     = "python tools/callio.py --check --state s1 --fixture build/callio_ae2c.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "Fist on roundPass follows p1 row for row (vars, R, hashes of $5C00-$FFFF and the display less the timer cells) for 168 keyed passes and leaves on the machine's pass by the RET NZ at $AE60"
+by     = "python tools/sample.py --state p1 --at 0xAE29 --passes 400 --script (in ledger notes of the commit) --mark 0xABCB --mark 0xAD1B --mark 0xAE17 --mark 0xAE67 --json build/live_p1.json"
+
+[[fact]]
+kind   = "measured"
+says   = "7.2 charge (uncontended T plus D4 means on $BF13) over the round is 0.26% under the contended machine on average, worst pass 2.42%"
+by     = "node test/kit.test.js (round_loop block: charged / sample.py row t)"
+
+[[fact]]
+kind   = "insn"
+at     = "$AD18"
+says   = "$AE26 has three callers, $ABC8, $AD18 (p1 here) and $AE14; after a point the machine is back at $AE29 within one visit (13-18k T uncontended via $AF01, $900E, $AF36, $9CA8)"
+by     = "python tools/grepbytes.py \"CD 26 AE\" ; python tools/callio.py --state p1 --call 0xAE2C 0xAE29 --frames 600"

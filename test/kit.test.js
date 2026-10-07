@@ -455,18 +455,19 @@ const mockCtx = (state) => ({
   /* the keydown tests above already gestured start() in a sandbox with no
      AudioContext, which correctly switched audio OFF; hand it a mock now */
   P.sound.on = true; P.sound.ctx = mockCtx(st); P.sound.gain = { connect() {} }; P.sound.chip = new S.BeeperChip(44100);
+  /* the page runs the game now (round_loop $AE26): the same loop checks
+     against it, the bridge fed with the engine's simulated frame */
   const cb = rig.raf();
-  const before = P.demo.frame;
+  const before = P.game.frame;
   cb(0);
-  check('the first rAF only sets the clock', P.demo.frame - before, 0);
+  check('the first rAF only sets the clock', P.game.frame - before, 0);
   cb(3.5 / FRAME_HZ * 1000);
-  check('3.5 frames of wall time step the simulation exactly 3 frames', P.demo.frame - before, 3);
-  P.keyboard.press('SPACE');
-  cb(4.5 / FRAME_HZ * 1000); cb(6.5 / FRAME_HZ * 1000);
-  checkTrue('holding fire reaches the bridge: buffers were scheduled from draw', st.started >= 1 && P.sound.next === P.demo.simFrame);
-  P.keyboard.releaseAll();
+  check('3.5 frames of wall time step the simulation exactly 3 frames', P.game.frame - before, 3);
+  cb(40 / FRAME_HZ * 1000); cb(80 / FRAME_HZ * 1000);
+  checkTrue('the game reaches the bridge: buffers were scheduled from draw at its simulated frame',
+            st.started >= 1 && P.sound.next === P.game.simFrame, `${st.started} started, next ${P.sound.next}, sim ${P.game.simFrame}`);
   cb(4000);
-  checkTrue('a long stall is capped at maxDt, not replayed', P.demo.frame - before <= 6 + Math.ceil(0.25 * FRAME_HZ));
+  checkTrue('a long stall is capped at maxDt, not replayed', P.game.frame - before <= 80 + Math.ceil(0.25 * FRAME_HZ));
 }
 
 /* =======================================================================
@@ -1087,6 +1088,89 @@ const mockCtx = (state) => ({
         pcs.some(s => s.has(0x975B) && !s.has(0x975C)), true);
   check('the pass cases wrap R\'s low seven bits between $AE29 and $AE2C (the carry is mod 128)',
         fx.cases.some(c => (c.rx & 0x7F) < (c.r & 0x7F)), true);
+}
+
+/* ---- round_loop $AE26, the body from $AE2C, against its frozen oracle ----
+   python tools/callio.py --capture --call 0xAE2C 0xAE29 (p1, s1; the $AA44
+   = $11 arm derived: no play reached it).  Exact: $C427, T, R. */
+{
+  const fx = P.assets.tail_ae2c;
+  const iA = fx.regs.indexOf(0);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    const res = P.roundTail(m, c.regs[iA], c.r);
+    const got = [res.exit, res.t, res.r, m.findIndex((v, a) => v !== want[a])];
+    if (JSON.stringify(got) !== JSON.stringify([null, c.t, c.rx, -1]) && !bad++)
+      first = `case ${i}: exit, T, R, first bad byte ${JSON.stringify(got)} want ${JSON.stringify([null, c.t, c.rx, -1])}`;
+  }
+  check('roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly', [bad, first], [0, '']);
+  check('...and the cases reach both $11 arms ($AA04, and $AA44 derived)',
+        [0xAA04, 0xAA44].map(a => fx.cases.some(c => c.in.some(([x, h]) => x === a && h === '11'))), [true, true]);
+}
+
+{
+  /* the page's IN: what tools/harness.py Ports.read_port answers */
+  const kb = new S.Keyboard(); kb.press('Q'); kb.kempston = 0x10;
+  check('specPort answers as the harness Ports do: Kempston on $1F, half-rows on even ports, $FF elsewhere',
+        [0x001F, 0xFBFE, 0xF7FE, 0xFBFD, 0x00FF].map(p => P.specPort(kb, p)), [0x10, 0xFE, 0xFF, 0xFF, 0xFF]);
+}
+
+/* ---- round_loop $AE26, the live loop, against the machine pass by pass --
+   House rule 2: python tools/sample.py --state p1 --at 0xAE29 --script
+   (keys BY PASS) --json build/live_p1.json samples the machine at every
+   visit to $AE29; the engine starts from the first visit's RAM, R and SP and
+   runs roundPass with the same keys on the same pass.  Every row: the named
+   bytes, R, and FNV hashes of $5C00-$FFFF and the display file (the timer
+   cells left out: D5).  The first differing row names the bug.  T is
+   compared apart: the engine charges D4's means, the machine is contended. */
+{
+  const L = P.assets.live;
+  const fnv = (m, lo, hi) => { let h = 0x811C9DC5;
+    for (let a = lo; a <= hi; a++){
+      if (L.skip.some(([s, e]) => s <= a && a <= e)) continue;
+      h = Math.imul(h ^ m[a], 0x01000193) >>> 0;
+    } return h; };
+  const plan = [];
+  for (const seg of (L.script || '').split(',')){
+    const [n, keys] = seg.split(':');
+    for (let i = 0; i < +n; i++) plan.push(keys ? keys.split('+') : []);
+  }
+  const row = (m, r) => [...L.vars.map(([, a, n]) => n > 1
+      ? Buffer.from(m.subarray(a, a + n)).toString('hex').toUpperCase()
+      : m[a].toString(16).toUpperCase().padStart(2, '0')), r, ...L.hash.map(([lo, hi]) => fnv(m, lo, hi))];
+  const want = r => [...r.v, r.r, ...r.h];
+  const g = new P.Fist(L.start), kb = new S.Keyboard();
+  let first = '', exit = null, ratio = [];
+  check('the engine starts from the first row the machine sampled', row(g.m, g.r), want(L.rows[0]));
+  /* the machine's way out: the first row whose marks (sample.py --mark)
+     show a return from $AE26 to one of its three callers, or $AE67 */
+  const RETS = [0xABCB, 0xAD1B, 0xAE17];
+  const out = L.rows.findIndex(r => r.m.some(x => RETS.includes(x) || x === 0xAE67));
+  const outKind = out < 0 ? null : L.rows[out].m.includes(0xAE67) ? 'end' : 'ret';
+  let at = -1;
+  for (let p = 0; p + 1 < L.rows.length; p++){
+    kb.releaseAll(); for (const k of plan[p] || []) kb.press(k);
+    const cost = g.pass(kb);
+    if (g.exit){ exit = g.exit.exit; at = p + 1; break; }
+    ratio.push(cost / L.rows[p + 1].t);
+    const got = row(g.m, g.r), w = want(L.rows[p + 1]);
+    if (JSON.stringify(got) !== JSON.stringify(w)){
+      const names = [...L.vars.map(v => v[0]), 'R', ...L.hash.map(([lo, hi]) => `hash $${lo.toString(16)}-$${hi.toString(16)}`)];
+      const k = got.findIndex((x, i) => x !== w[i]);
+      first = `pass ${p}: ${names[k]} ${got[k]} want ${w[k]}`; break;
+    }
+  }
+  check('roundPass follows the machine row for row over keyed 1P play until it leaves the loop', first, '');
+  check('...and leaves on the pass the machine left, the same way (a point scored: the RET NZ at $AE60)',
+        [at, exit], [out, outKind]);
+  check('...which the script reaches: the fixture holds a way out', outKind, 'ret');
+  const sum = ratio.reduce((a, b) => a + b, 0) / ratio.length, worst = Math.max(...ratio.map(x => Math.abs(x - 1)));
+  checkTrue('the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round',
+            Math.abs(sum - 1) < 0.005, `mean ${sum.toFixed(5)}, worst pass ${(worst * 100).toFixed(2)}% off`);
 }
 
 rig.done();

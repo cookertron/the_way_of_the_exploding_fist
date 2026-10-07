@@ -2490,8 +2490,8 @@
  {
   "file": "template.html",
   "label": "9745 pass: $BF13 SP two high",
-  "old": "renderFighters(m, null, (sp - 4) & 0xFFFF)",
-  "new": "renderFighters(m, null, (sp - 2) & 0xFFFF)",
+  "old": "renderFighters(m, null, (sp - 4) & 0xFFFF, io.cost)",
+  "new": "renderFighters(m, null, (sp - 2) & 0xFFFF, io.cost)",
   "increment": "9745-pass",
   "kills": "playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)"
  },
@@ -2522,8 +2522,8 @@
  {
   "file": "template.html",
   "label": "9745 pass: CALL $BF13 not charged",
-  "old": "  t += 17 + renderFighters(",
-  "new": "  t += renderFighters(",
+  "old": "  t += 17 + tr; M1.m1 += 1;",
+  "new": "  t += tr; M1.m1 += 1;",
   "increment": "9745-pass",
   "kills": "playPass tallies the uncontended T of every case exactly"
  },
@@ -2582,5 +2582,189 @@
   "new": "  t += yinYang2P(m) + fighterMotion(m) + fighterStep(m, 0x40);",
   "increment": "9745-pass",
   "kills": "playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: AND A: RET M charged 9 T not 4+5",
+  "old": "  let t = 4 + 5, n = 2;",
+  "new": "  let t = 4 + 4, n = 2;",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: M1 of AND A: RET M counted 1",
+  "old": "  let t = 4 + 5, n = 2;",
+  "new": "  let t = 4 + 5, n = 1;",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: $C427 table at $A90C",
+  "old": "m[0xA900 | ((m[a] + 0x0D) & 0xFF)]",
+  "new": "m[0xA900 | ((m[a] + 0x0C) & 0xFF)]",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: $AA44=$11 gives 1",
+  "old": "  if (m[0xAA44] === 0x11){ t += 12; n += 1; one = 0; }",
+  "new": "  if (m[0xAA44] === 0x11){ t += 12; n += 1; one = 1; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: $AA04=$11 gives 0",
+  "old": "    if (m[0xAA04] === 0x11){ t += 12; n += 1; one = 1; }",
+  "new": "    if (m[0xAA04] === 0x11){ t += 12; n += 1; one = 0; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: table at $AA04 gives 1",
+  "old": "      if (at(0xAA04)){ t += 12; n += 1; one = 0; }",
+  "new": "      if (at(0xAA04)){ t += 12; n += 1; one = 1; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: table at $AA44 gives 0",
+  "old": "        if (at(0xAA44)){ t += 12; n += 1; one = 1; }",
+  "new": "        if (at(0xAA44)){ t += 12; n += 1; one = 0; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: neither in the table gives 1",
+  "old": "        else { t += 7; n += 1; one = 0; }",
+  "new": "        else { t += 7; n += 1; one = 1; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: table read for $AA44 first",
+  "old": "      if (at(0xAA04)){ t += 12; n += 1; one = 0; }",
+  "new": "      if (at(0xAA44)){ t += 12; n += 1; one = 0; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: M1 of the $AA04 table read counted 5",
+  "old": "      t += 7 + 10 + 4 + 4 + 7 + 4; n += 6;",
+  "new": "      t += 7 + 10 + 4 + 4 + 7 + 4; n += 5;",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: M1 of the $AA44 table read counted 6",
+  "old": "        t += 7 + 13 + 10 + 4 + 4 + 7 + 4; n += 7;",
+  "new": "        t += 7 + 13 + 10 + 4 + 4 + 7 + 4; n += 6;",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: M1 of the zero arm counted 2",
+  "old": "  else { t += 4 + 13 + 12; n += 3; m[0xC427] = 0; }",
+  "new": "  else { t += 4 + 13 + 12; n += 2; m[0xC427] = 0; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: M1 of the one arm counted 3",
+  "old": "  if (one){ t += 7 + 13; n += 2; m[0xC427] = 1; }",
+  "new": "  if (one){ t += 7 + 13; n += 3; m[0xC427] = 1; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: M1 to the JR back counted 4",
+  "old": "  t += 5 + 13 + 4; n += 3;",
+  "new": "  t += 5 + 13 + 4; n += 4;",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: $9C28 not a way out",
+  "old": "  if (m[0x9C28]) return (t += 11, n += 1, out('ret', m[0x9C28]));",
+  "new": "  if (false) return (t += 11, n += 1, out('ret', m[0x9C28]));",
+  "increment": "AE26-loop",
+  "kills": "...and leaves on the pass the machine left, the same way (a point scored: the RET NZ at $AE60)"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: $9C2B tested inverted",
+  "old": "  if (!m[0x9C2B]) return (t += 12, n += 1, out(null, 0));",
+  "new": "  if (m[0x9C2B]) return (t += 12, n += 1, out(null, 0));",
+  "increment": "AE26-loop",
+  "kills": "...and leaves on the pass the machine left, the same way (a point scored: the RET NZ at $AE60)"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: M1 of the JR Z back not counted",
+  "old": "  if (!m[0x9C2B]) return (t += 12, n += 1, out(null, 0));",
+  "new": "  if (!m[0x9C2B]) return (t += 12, out(null, 0));",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: no contention charged on $BF13",
+  "old": "    const cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;",
+  "new": "    const cost = res.t;",
+  "increment": "AE26-loop",
+  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: R not carried pass to pass",
+  "old": "    this.simT += cost; this.r = res.r; this.passes++;",
+  "new": "    this.simT += cost; this.passes++;",
+  "increment": "AE26-loop",
+  "kills": "roundPass follows the machine row for row over keyed 1P play until it leaves the loop"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: Kempston answered on every odd port",
+  "old": "  if ((p & 0xFF) === 0x1F) return kb.kempston;",
+  "new": "  if (p & 1) return kb.kempston;",
+  "increment": "AE26-loop",
+  "kills": "specPort answers as the harness Ports do: Kempston on $1F, half-rows on even ports, $FF elsewhere"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: playPass not handed $BF13's split",
+  "old": "  const tr = renderFighters(m, null, (sp - 4) & 0xFFFF, io.cost);",
+  "new": "  const tr = renderFighters(m, null, (sp - 4) & 0xFFFF);",
+  "increment": "AE26-loop",
+  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: $C427 written the other way round",
+  "old": "  if (one){ t += 7 + 13; n += 2; m[0xC427] = 1; }",
+  "new": "  if (!one){ t += 7 + 13; n += 2; m[0xC427] = 1; }",
+  "increment": "AE26-loop",
+  "kills": "roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AE26 loop: odd ports answered as the ULA",
+  "old": "  return (p & 1) ? 0xFF : kb.port(p >> 8);",
+  "new": "  return kb.port(p >> 8);",
+  "increment": "AE26-loop",
+  "kills": "specPort answers as the harness Ports do: Kempston on $1F, half-rows on even ports, $FF elsewhere"
  }
 ]

@@ -24,3 +24,5 @@ claude-resume.txt
 build/mutants/
 # the built page: it inlines tape-derived assets (rule 7)
 web/fist.html
+# the live start state is a RAM image (rule 7)
+build/live_*.json

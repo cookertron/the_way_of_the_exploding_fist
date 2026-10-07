@@ -83,6 +83,18 @@
       "file": "build/callio_ae29.json",
       "required": true,
       "note": "oracle for play_pass $9745, the whole pass: python tools/callio.py --capture --call 0xAE29 0xAE2C (s1, p1, s1 --poke 0x9C2C=2,0xAA46=0; --blind each timer row $400B-$470F), --derive the quit, then --cover"
+    },
+    {
+      "key": "tail_ae2c",
+      "file": "build/callio_ae2c.json",
+      "required": true,
+      "note": "oracle for round_loop $AE26, the body from $AE2C: python tools/callio.py --capture --call 0xAE2C 0xAE29 (p1, s1 --append; cases that left the loop removed), --derive case 0 --set 0xAA44=0x11"
+    },
+    {
+      "key": "live",
+      "file": "build/live_p1.json",
+      "required": true,
+      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --json build/live_p1.json (the script, vars, marks and ranges are stored in the file)"
     }
   ],
   "tape": {

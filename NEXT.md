@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     $9745 play_pass -- composed, gated whole (25 cases), every composition mutant killed (165/165 affected)
-Step:     wire playPass into the live loop with the 7.2 accumulator (rfPlayT for $BF13, effects through the beeper)
-Then:     the menu generator (8C54 open 1)
+Unit:     $AE26 round_loop -- live on the 7.2 accumulator, gated row for row against p1 to the first point (168 passes), 23/23 loop mutants killed
+Step:     the point-to-point path back into the loop from $AD18: $AF01, $900E, $AF36, $9CA8 (13-18k T; bracket from the CALL at $AD18 so the RET NZ frame is inside)
+Then:     the menu generator (8C54 open 1), which retires D7
 Blocked:  none
-Notes:    ROM effects: pass gate checks $FE writes in count, value, first T only (D6); gate stops at the first bad case ($A5 poison makes a wrong pass hang); a full --background mutant run is due at the live-loop milestone
+Notes:    page starts mid-bout (D7) and stops at the first point; live_p1.json rows run to pass 400 with a second point at 336; full --background mutant run started at this milestone
