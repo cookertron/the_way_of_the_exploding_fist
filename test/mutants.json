@@ -1802,8 +1802,8 @@
  {
   "file": "template.html",
   "label": "yy: 2UP RET Z charged as not taken",
-  "old": "if (!m[0xAA48]) return t + 11;",
-  "new": "if (!m[0xAA48]) return t + 5;",
+  "old": "\n  if (!m[0xAA48]) return t + 11;",
+  "new": "\n  if (!m[0xAA48]) return t + 5;",
   "increment": "900E",
   "kills": "yinYang2P tallies the uncontended T of every case exactly"
  },
@@ -2766,5 +2766,205 @@
   "new": "  return kb.port(p >> 8);",
   "increment": "AE26-loop",
   "kills": "specPort answers as the harness Ports do: Kempston on $1F, half-rows on even ports, $FF elsewhere"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: score add: CP 10 arm off",
+  "old": "  if (b === 10){ b = 0x10; t += 7 + 7; M1.m1 += 1; } else t += 12;",
+  "new": "  if (b === 11){ b = 0x10; t += 7 + 7; M1.m1 += 1; } else t += 12;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: score add: DAA low fix on half-carry dropped",
+  "old": "    let fix = h || (a & 15) > 9 ? 6 : 0;",
+  "new": "    let fix = (a & 15) > 9 ? 6 : 0;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: score add: DAA carry out ignored",
+  "old": "    if (c || a > 0x99){ fix |= 0x60; c = 1; }",
+  "new": "    if (a > 0x99){ fix |= 0x60; c = 1; }",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: score add: ADC carry dropped",
+  "old": "    const x = m[de + i], y = i ? 0 : b, s = x + y + c;",
+  "new": "    const x = m[de + i], y = i ? 0 : b, s = x + y;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: score buffer: digits low first",
+  "old": "    m[de++] = 0x30 + (v >> 4); m[de++] = 0x30 + (v & 15);",
+  "new": "    m[de++] = 0x30 + (v & 15); m[de++] = 0x30 + (v >> 4);",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: score buffer: 6 leading zeros blanked, not 7",
+  "old": "  for (let p = 0xB024, b = 7; ; ){",
+  "new": "  for (let p = 0xB024, b = 6; ; ){",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: score buffer: blank loop exit T",
+  "old": "    if (--b) t += 13; else { M1.m1 += 1; return t + 8 + 10; }",
+  "new": "    if (--b) t += 13; else { M1.m1 += 1; return t + 8 + 11; }",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: award: P1 shown in any mode",
+  "old": "show = m[0x9C2C] !== 0, hl = 0xB02F",
+  "new": "show = true, hl = 0xB02F",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: award: P2 shown in 1P too",
+  "old": "show = m[0x9C2C] === 2; hl = 0xB032",
+  "new": "show = m[0x9C2C] !== 0; hl = 0xB032",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: award: one point not halved",
+  "old": "  if (m[pts] === 1){ b >>= 1;",
+  "new": "  if (m[pts] === 1){ b >>= 0;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: award: count not added",
+  "old": "  m[cnt] = (b + m[cnt]) & 0xFF;",
+  "new": "  m[cnt] = m[cnt];",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: award: points left set",
+  "old": "  m[pts] = 0;\n  if (!show)",
+  "new": "  if (!show)",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: award: P2 printed at P1's column",
+  "old": "hl = 0xB032; pos = 0x1600;",
+  "new": "hl = 0xB032; pos = 0x0100;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: a402: table at $B426 read as $B401",
+  "old": "m[0xA615] = at(0xB426);",
+  "new": "m[0xA615] = at(0xB401);",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: a402: $A616 set 1",
+  "old": "m[0xA616] = 2;",
+  "new": "m[0xA616] = 1;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: reel bits compared on bit 3",
+  "old": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);",
+  "new": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x08){\n    t += yinYang(m) + award(m);",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: P1 wins at 3",
+  "old": "    if (m[0xAA01] >= 4) return (t += 5, out('p1'));",
+  "new": "    if (m[0xAA01] >= 3) return (t += 5, out('p1'));",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: P2 win exit not taken",
+  "old": "    if (m[0xAA41] >= 4) return out('p2');",
+  "new": "    if (m[0xAA41] >= 5) return out('p2');",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: time-up exit not taken",
+  "old": "  if (m[0x9C2B]) return out('time');",
+  "new": "  if (0) return out('time');",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: R stored before LD A,R's own fetches",
+  "old": "  m[0xA645] = (r & 0x80) | ((r + M1.m1) & 0x7F);",
+  "new": "  m[0xA645] = (r & 0x80) | ((r + M1.m1 - 2) & 0x7F);",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: P2 x reset to $3D",
+  "old": "m[0xAA59] = 0x3C;",
+  "new": "m[0xAA59] = 0x3D;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: second swap the wrong way",
+  "old": "  t += swap(0xAA40, 0xAA00) + aux(0xAA77)",
+  "new": "  t += swap(0xAA00, 0xAA40) + aux(0xAA77)",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: point: $9D29 charged its CALL",
+  "old": "  t += p1HitsP2(m) - 17; M1.m1 -= 1;",
+  "new": "  t += p1HitsP2(m); M1.m1 -= 1;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: copy: LDIR M1 one per byte",
+  "old": "  M1.m1 += 3 + 2 * len;",
+  "new": "  M1.m1 += 3 + len;",
+  "increment": "AD1B-point",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD1B point: round: a point stops the engine again",
+  "old": "  if (b.exit !== 'ret') return b;",
+  "new": "  if (b.exit !== 'ret' || 1) return b;",
+  "increment": "AD1B-point",
+  "kills": "roundPass follows the machine row for row over keyed 1P play until it leaves the loop"
  }
 ]

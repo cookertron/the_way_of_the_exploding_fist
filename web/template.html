@@ -2074,14 +2074,18 @@ function playPass(m, io, sp){
    at $A900, and the two ways out.  Per instruction T and one M1 each (no
    prefixes).  io as playPass.  Returns T from $AE29 to the next $AE29 (or
    to the way out), R there, and exit: null to loop, 'quit' (the RET M at
-   $AE2D), 'ret' (the RET NZ at $AE60 on $9C28, A its value) or 'end' (the
-   round end at $AE67: $ACF0 and $AF1A, not ported yet).  roundTail is
+   $AE2D), 'end' (the round end at $AE67: $ACF0 and $AF1A, not ported yet)
+   or, after a point (the RET NZ at $AE60 on $9C28), pointPath's own: the
+   point is played on into the next $AE29 in the same pass.  roundTail is
    the body from $AE2C alone, A and R there, gated exactly against python
    tools/callio.py --capture --call 0xAE2C 0xAE29 (build/callio_ae2c.json). */
 function roundPass(m, io, sp){
   const p = playPass(m, io, sp), b = roundTail(m, p.a, p.r);
   b.t += p.t;
-  return b;
+  if (b.exit !== 'ret') return b;
+  const q = pointPath(m, b.a, b.r);                // a point: on to the next $AE29, or out
+  q.t += b.t;
+  return q;
 }
 function roundTail(m, a, r){
   let t = 4 + 5, n = 2;                            // AND A: RET M
@@ -2111,6 +2115,121 @@ function roundTail(m, a, r){
   t += 5 + 13 + 4; n += 3;                         // RET NZ: LD A,($9C2B): AND A
   if (!m[0x9C2B]) return (t += 12, n += 1, out(null, 0));
   return (t += 7, n += 1, out('end', m[0x9C2B]));
+}
+
+/* ---- the point path: $AD1B-$AD42, back into round_loop by $AD18 ----------
+   From the RET NZ at $AE60 (a point: A = $9C28) to the next $AE29, from the
+   listing (python tools/adis.py 0xAD18 50).  $AF01: when the fighters' reel
+   bits ($AA03, $AA43 AND $10) differ, Yin_Yang_1UP $900E draws the points
+   and $AF36 scores them; a count $AA01/$AA41 at 4 wins the bout.  Then the
+   points $AA08/$AA48 are cleared and, unless time is up ($9C2B), $AD18
+   calls $AE26 again: $9CA8 resets the fighters (and the AI's copies through
+   $A402), falling into $9D29 at its end.  Returns T from $AD1B to $AE29 or
+   to the way out, R there, and exit: null (back at $AE29), 'quit' (the RET
+   M at $AD1C), 'p1' ($AD5F), 'p2' ($AD94) or 'time' ($AD44), none of which
+   is ported yet.  Gated against python tools/callio.py --capture --call
+   0xAD1B 0xAE29,0xAD5F,0xAD94,0xAD44 (build/callio_ad1b.json). */
+function scoreAdd(m, de, b){                       // $AFC2 with its CALL: BCD add b (10 as $10) to the 3 bytes at de, low first
+  let t = 17 + 4 + 7; M1.m1 += 1 + 3;              // CALL: LD A,B: CP 10: JR NZ
+  if (b === 10){ b = 0x10; t += 7 + 7; M1.m1 += 1; } else t += 12;
+  let c = 0;
+  for (let i = 0; i < 3; i++){                     // ADD A,B then ADC A,0 twice, each with DAA
+    const x = m[de + i], y = i ? 0 : b, s = x + y + c;
+    const h = (x & 15) + (y & 15) + c > 15, a = s & 0xFF;
+    let fix = h || (a & 15) > 9 ? 6 : 0;
+    c = s > 0xFF ? 1 : 0;
+    if (c || a > 0x99){ fix |= 0x60; c = 1; }
+    m[de + i] = (a + fix) & 0xFF;
+  }
+  M1.m1 += 5 + 5 + 4 + 1;
+  return t + 28 + 31 + 25 + 10;
+}
+function scoreBuffer(m, hl){                       // Populate_Score_Buffer $AFDA and Write_00 $AFED, each with its CALL
+  let de = 0xB024, t = 17 + 10; M1.m1 += 2;
+  for (let b = 3; b > 0; b--){                     // two digits a byte, high first, down from hl
+    const v = m[hl];
+    m[de++] = 0x30 + (v >> 4); m[de++] = 0x30 + (v & 15);
+    hl--; t += 7 + 16 + 54 + 7 + 54 + 6 + (b > 1 ? 13 : 8); M1.m1 += 20;
+  }
+  t += 10; M1.m1 += 1;
+  m[de++] = 0x30; m[de++] = 0x30; m[de] = 0;
+  t += 17 + 7 + 7 + 6 + 7 + 6 + 4 + 7 + 10 + 7; M1.m1 += 10;
+  for (let p = 0xB024, b = 7; ; ){                 // $AFF3 Zero_To_Space: leading '0's of 7 to spaces
+    t += 7 + 7; M1.m1 += 3;
+    if (m[p] !== 0x30) return t + 11;
+    m[p++] = 0x20; t += 5 + 10 + 6; M1.m1 += 3;
+    if (--b) t += 13; else { M1.m1 += 1; return t + 8 + 10; }
+  }
+}
+function award(m){                                 // $AF36 with its CALL: score the points of one side
+  let t = 17 + 13 + 7 + 10; M1.m1 += 4;            // LD A,($AA08): CP 0: JP Z
+  let pts = 0xAA08, cnt = 0xAA02, sc = 0xB02D, show = m[0x9C2C] !== 0, hl = 0xB02F, pos = 0x0100;
+  if (!m[pts]){
+    t += 13 + 7; M1.m1 += 3;                       // $AF7D: LD A,($AA48): CP 0: RET Z
+    if (!m[0xAA48]) return t + 11;
+    t += 5;
+    pts = 0xAA48; cnt = 0xAA42; sc = 0xB030; show = m[0x9C2C] === 2; hl = 0xB032; pos = 0x1600;
+  }
+  let b = m[(0xB00B + m[0xAA3F]) & 0xFFFF];        // the table at $B00B by $AA3F (ADD HL,BC)
+  t += 72; M1.m1 += 8;
+  if (m[pts] === 1){ b >>= 1; t += 7 + 8; M1.m1 += 3; } else { t += 12; M1.m1 += 1; }   // SRL B
+  m[cnt] = (b + m[cnt]) & 0xFF;
+  t += 38 + scoreAdd(m, sc, b) + 37; M1.m1 += 5 + 4 + 1;   // ... LD DE: CALL $AFC2: XOR A..CP: RET cc
+  m[pts] = 0;
+  if (!show) return t + 11;
+  t += 5 + 17 + scoreBuffer(m, hl) + 20; M1.m1 += 4 + 1;   // LD HL: LD B: LD DE: LD HL, and the RET
+  return t + printString(m, pos, 0xB024, M1) + 10;
+}
+function a402(m){                                  // $A402 with its CALL: the AI's state in the copies, from tables by $A614
+  const b = m[0xA614], at = base => m[(base & 0xFF00) | ((base + b) & 0xFF)];
+  m[0xA60F] = at(0xB3D6); m[0xA616] = 2;
+  m[0xA612] = at(0xB3EC); m[0xA615] = at(0xB426);
+  m[0xA61C] = 0x80; m[0xA5F1] = 1;
+  m[0xA617] = at(0xB401);
+  m[0xA611] = 0x80; m[0xA60E] = 0; m[0xA618] = 0;
+  m[0xA646] = at(0xB432); m[0xA619] = at(0xB40D); m[0xA61A] = at(0xB41A);
+  m[0xA610] = 1; m[0xA61B] = 0x80;
+  m[0xA60B] = at(0xB43E);
+  M1.m1 += 1 + 65;
+  return 17 + 512;
+}
+function copyLdir(m, s, d, len){                   // LD HL: LD DE: LD BC: LDIR
+  for (let i = 0; i < len; i++) m[d + i] = m[s + i];
+  M1.m1 += 3 + 2 * len;
+  return 30 + 21 * len - 5;
+}
+function pointPath(m, a, r){
+  M1.m1 = 0;
+  let t = 4 + 5; M1.m1 += 2;                       // AND A: RET M
+  const out = exit => ({ t, r: (r & 0x80) | ((r + M1.m1) & 0x7F), exit });
+  if (a & 0x80) return (t += 6, out('quit'));
+  t += 17 + 47 + 7; M1.m1 += 1 + 5 + 1;            // CALL $AF01 and its body, JR Z
+  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){
+    t += yinYang(m) + award(m);
+    t += 13 + 7 + 7; M1.m1 += 3;                   // LD A,($AA01): CP 4: JR NC
+    if (m[0xAA01] >= 4) return (t += 5, out('p1'));
+    t += 13 + 7 + 10; M1.m1 += 3;                  // LD A,($AA41): CP 4: JP NC
+    if (m[0xAA41] >= 4) return out('p2');
+  } else t += 5;                                   // the JR Z taken
+  m[0xAA08] = 0; m[0xAA48] = 0;
+  t += 4 + 13 + 13 + 13 + 4 + 7; M1.m1 += 6;       // XOR A .. AND A: JR Z
+  if (m[0x9C2B]) return out('time');
+  t += 5 + 17 + 17 + 9; M1.m1 += 1 + 1 + 2;        // CALL $AE26: CALL $9CA8: LD A,R
+  m[0xA645] = (r & 0x80) | ((r + M1.m1) & 0x7F);
+  for (const z of [0x9C2B, 0x9CA7, 0xAA4D, 0xAA0D, 0xAA03, 0xAA43, 0xAA16, 0xAA56, 0xAA17,
+                   0xAA0B, 0xAA4B, 0xAA09, 0xAA49, 0x9C28]) m[z] = 0;
+  m[0xAA19] = 0x20; m[0xAA59] = 0x3C; m[0xAA18] = m[0xAA58] = 0x7A;
+  for (const z of [0xAA0C, 0xAA4C, 0xAA05, 0xAA45, 0xAA04, 0xAA44]) m[z] = 0x17;
+  m[0xAA0A] = m[0xAA4A] = 1; m[0xAA57] = 1;
+  t += 13 + 4 + 14 * 13 + 4 * 7 + 4 * 13 + 6 * 13 + 7 + 2 * 13 + 7 + 13; M1.m1 += 35;   // to LD ($AA57),A
+  const swap = (me, them) => 17 + copyLdir(m, me, 0xA5F1, 0x1A) + copyLdir(m, them, 0xA62B, 0x1A) + 10;
+  const back = (me, them) => 17 + copyLdir(m, 0xA5F1, me, 0x1A) + copyLdir(m, 0xA62B, them, 0x1A) + 10;
+  const aux = s => 17 + copyLdir(m, s, 0xA60B, 0x12) + 10, unaux = d => 17 + copyLdir(m, 0xA60B, d, 0x12) + 10;
+  t += swap(0xAA00, 0xAA40) + aux(0xAA8B) + a402(m) + back(0xAA00, 0xAA40) + unaux(0xAA8B);   // $AADC $AB0A $A402 $AAF3 $AB16
+  t += swap(0xAA40, 0xAA00) + aux(0xAA77) + a402(m) + back(0xAA40, 0xAA00) + unaux(0xAA77);   // $AB22 $AB50 $A402 $AB39 $AB5C
+  M1.m1 += 8 * 2;                                  // the eight CALLs and RETs of the copies
+  t += p1HitsP2(m) - 17; M1.m1 -= 1;               // $9D29 fallen into, not called
+  return out(null);
 }
 
 /* ---- the live game: round_loop on the 7.2 accumulator ------------------
@@ -2246,5 +2365,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

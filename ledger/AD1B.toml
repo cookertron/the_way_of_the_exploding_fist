@@ -1,0 +1,29 @@
+# ledger/AD1B.toml -- current truth about point_path (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "point_path"
+entries  = ["$AD1B"]
+fixtures = ["point_ad1b", "live"]
+port     = "pointPath"
+manual   = ["7.2", "Q11"]
+
+[[fact]]
+kind   = "measured"
+says   = "pointPath matches the machine from $AD1B to $AE29 or its way out on 16 cases (2 played in p1, 14 derived): bytes (score row blind, D5), exit PC, uncontended T 139-28433, R"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ad1b.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "insn"
+at     = "$AD1B"
+says   = "after a point: $AF01 reel bits differ -> $900E draws, $AF36 scores (table $B00B by $AA3F, halved for 1); count >= 4 wins ($AD5F/$AD94); $9C2B -> $AD44; else $AD18 calls $AE26: $9CA8 resets, falling into $9D29"
+by     = "python tools/adis.py 0xAD18 50 ; python tools/adis.py 0xAF36 50 ; python tools/adis.py 0x9CA8 60"
+
+[[fact]]
+kind   = "gated"
+says   = "Fist on roundPass+pointPath follows p1 row for row for 335 keyed passes, through the point at pass 169, and leaves by $AD94 (P2 wins) on the machine's pass; charge 0.26% under the machine, worst pass 2.42%"
+by     = "node test/kit.test.js (round_loop live block)"
+
+[[open]]
+ask    = "can $9C28 hold a value >= $80, taking the RET M at $AD1C (pointPath 'quit', ported from the listing, ungated)?"
+tried  = "callio --derive --reg 0=0x80 runs out of the bracket into the caller of $AD18 (641k T) -- no case"
+settle = "bracket from the caller of $AD18 when it is ported, or find every write to $9C28 (grepbytes 32 28 9C)"

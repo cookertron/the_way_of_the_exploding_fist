@@ -1112,6 +1112,45 @@ const mockCtx = (state) => ({
         [0xAA04, 0xAA44].map(a => fx.cases.some(c => c.in.some(([x, h]) => x === a && h === '11'))), [true, true]);
 }
 
+/* ---- the point path $AD1B back to $AE29, against its frozen oracle -----
+   python tools/callio.py --capture --call 0xAD1B 0xAE29,0xAD5F,0xAD94,0xAD44
+   (p1: both points of the script; the other arms derived, port.json).
+   Exact: every byte outside the score row, the score-row bytes written (D5:
+   ROM glyphs), the way out (xpc), T and R. */
+{
+  const fx = P.assets.point_ad1b;
+  const iA = fx.regs.indexOf(0);
+  const EXIT = { 0xAE29: null, 0xAD5F: 'p1', 0xAD94: 'p2', 0xAD44: 'time' };
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    const res = P.pointPath(m, c.regs[iA], c.r);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
+      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
+    }
+    const wrote = [], blind = [];
+    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
+    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
+    const got = [res.exit, res.t, res.r, diff, wrote.join() === blind.join()];
+    const w = [EXIT[c.xpc], c.t, c.rx, -1, true];
+    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
+      first = `case ${i}: exit, T, R, first bad byte, score row ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
+  }
+  check('pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly', [bad, first], [0, '']);
+  check('...and the cases take every way out: back in, P1 wins, P2 wins, time up',
+        [0xAE29, 0xAD5F, 0xAD94, 0xAD44].map(x => fx.cases.some(c => c.xpc === x)), [true, true, true, true]);
+  const set = c => (c.derived || {}).set || {};
+  check('...and the derived cases hold a count of 3 (no win), a binary carry into DAA and a half-carry under 10',
+        [fx.cases.some(c => set(c).aa08 === 1 && set(c).aa01 === 2), fx.cases.some(c => set(c).b030 === 0xF5),
+         fx.cases.some(c => set(c).b019 === 8 && set(c).b030 === 9)], [true, true, true]);
+}
+
 {
   /* the page's IN: what tools/harness.py Ports.read_port answers */
   const kb = new S.Keyboard(); kb.press('Q'); kb.kempston = 0x10;
@@ -1149,8 +1188,11 @@ const mockCtx = (state) => ({
   /* the machine's way out: the first row whose marks (sample.py --mark)
      show a return from $AE26 to one of its three callers, or $AE67 */
   const RETS = [0xABCB, 0xAD1B, 0xAE17];
-  const out = L.rows.findIndex(r => r.m.some(x => RETS.includes(x) || x === 0xAE67));
-  const outKind = out < 0 ? null : L.rows[out].m.includes(0xAE67) ? 'end' : 'ret';
+  const marked = L.rows.map((r, i) => r.m.some(x => RETS.includes(x) || x === 0xAE67) ? i : -1).filter(i => i >= 0);
+  /* a point ($AD1B) is played through by pointPath; this script's second
+     point wins the bout for P2 ($AD94: point_ad1b case 1 is that call) */
+  const out = marked[marked.length - 1] ?? -1;
+  const outKind = out < 0 ? null : L.rows[out].m.includes(0xAE67) ? 'end' : 'p2';
   let at = -1;
   for (let p = 0; p + 1 < L.rows.length; p++){
     kb.releaseAll(); for (const k of plan[p] || []) kb.press(k);
@@ -1165,9 +1207,10 @@ const mockCtx = (state) => ({
     }
   }
   check('roundPass follows the machine row for row over keyed 1P play until it leaves the loop', first, '');
-  check('...and leaves on the pass the machine left, the same way (a point scored: the RET NZ at $AE60)',
+  check('...and leaves on the pass the machine left, the same way (the bout won by P2 at $AD94)',
         [at, exit], [out, outKind]);
-  check('...which the script reaches: the fixture holds a way out', outKind, 'ret');
+  check('...which the script reaches through a point played on: two points, the way out the second',
+        [marked.length, outKind], [2, 'p2']);
   const sum = ratio.reduce((a, b) => a + b, 0) / ratio.length, worst = Math.max(...ratio.map(x => Math.abs(x - 1)));
   checkTrue('the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round',
             Math.abs(sum - 1) < 0.005, `mean ${sum.toFixed(5)}, worst pass ${(worst * 100).toFixed(2)}% off`);

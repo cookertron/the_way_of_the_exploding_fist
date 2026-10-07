@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     $AE26 round_loop -- live on the 7.2 accumulator, gated row for row against p1 to the first point (168 passes), 23/23 loop mutants killed
-Step:     the point-to-point path back into the loop from $AD18: $AF01, $900E, $AF36, $9CA8 (13-18k T; bracket from the CALL at $AD18 so the RET NZ frame is inside)
+Unit:     $AD1B point_path -- the point played on into the next $AE29, 16 cases exact, live gate row for row to pass 336 where P2 wins the bout by $AD94
+Step:     the bout's end: $AD94 (P2 wins) as the live script reaches it, then $AD5F and $AD44 (time) -- bracket each from its first instruction to the next $AE29 or the menu
 Then:     the menu generator (8C54 open 1), which retires D7
 Blocked:  none
-Notes:    page starts mid-bout (D7) and stops at the first point; live_p1.json rows run to pass 400 with a second point at 336; full --background mutant run started at this milestone
+Notes:    callio --call RET may now be a comma list (xpc per case) and --derive takes --reg; AD1B open 1 (RET M at $AD1C ungated); full --background mutant run started after this commit

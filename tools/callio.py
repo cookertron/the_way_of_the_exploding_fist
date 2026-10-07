@@ -72,6 +72,9 @@ how many reads were fetches.
              took, which --capture drops as a repeat PC set.  The derived
              case must read the same ports in the same order, or stop
              early (a key that ends the routine): it keeps the reads made.
+             --reg I=VAL[,...] sets register I (a SkoolKit index the
+             fixture records in regs; A is 0) at the CALL: a value the
+             routine is entered with that play never held.
              --script "FRAMES:KEYS,..." answers every port read live from
              a key script instead (keyprobe's syntax), timed by the twin's
              uncontended T from the CALL in frames of the target: for a
@@ -85,6 +88,11 @@ how many reads were fetches.
              whose cases are large (a whole pass, ~16 KB each) where the
              parts are gated alone and the whole-call gate checks the
              composition.  Not for a fixture whose gate counts cases.
+
+RET may be a comma list: the bracket ends at the first of them reached, and
+the case's exit registers (PC among them) say which -- a path with several
+ways out, gated in one fixture; each case then records the PC it left by
+(xpc), which --check compares.
 
 Usage:
     python tools/callio.py --state NAME --call SITE RET [--frames 1500] [--keys D+W]
@@ -212,6 +220,15 @@ class ScriptPorts:
         pass
 
 
+def parse_ret(s):
+    """RET as given: one address, or a comma list -- a bracket with several ways out."""
+    v = [int(x, 0) for x in s.split(',')]
+    return v[0] if len(v) == 1 else v
+
+def ends(ret):
+    return list(ret) if isinstance(ret, (list, tuple)) else [ret]
+
+
 def run_alone(mem, regs, ret, limit=20_000_000, ports=None):
     sim = Simulator(mem, config=FLAT)
     if ports is not None:
@@ -220,15 +237,15 @@ def run_alone(mem, regs, ret, limit=20_000_000, ports=None):
     sim.registers[:] = regs
     r, ops, t0 = sim.registers, sim.opcodes, regs[T]
     mem.regs = r
-    pcs = set()
+    pcs, stop = set(), set(ends(ret))
     for _ in range(limit):
         pc = r[PC]
-        if pc == ret:
+        if pc in stop:
             mem.exit = list(r)
             return r[T] - t0, pcs
         pcs.add(pc)
         ops[mem.m[pc]]()
-    sys.exit(f'callio: call never returned to ${ret:04X}')
+    sys.exit('callio: call never returned to ' + ','.join(f'${e:04X}' for e in stop))
 
 
 REGS = [i for i in range(24) if i not in (SP, 13, R)]   # 13 unused; R is kept apart, in r / rx
@@ -302,7 +319,7 @@ def capture(args):
     while args:
         a = args[0]
         if a == '--call':
-            calls.append((int(args[1], 0), int(args[2], 0))); del args[:3]
+            calls.append((int(args[1], 0), parse_ret(args[2]))); del args[:3]
         elif a == '--frames':
             frames = int(args[1], 0); del args[:2]
         elif a == '--keys':
@@ -360,7 +377,7 @@ def capture(args):
         lm = Logged(pre, frame(sp))
         pl = PortLog(live=h.ports)
         dt, pcs = run_alone(lm, regs_in, rets[site], ports=pl)
-        h.run_until([rets[site]], limit=20_000_000)    # the real call, interrupts on
+        h.run_until(ends(rets[site]), limit=20_000_000)    # the real call, interrupts on
         n += 1
         drift = [a for a in lm.fetched | pcs if pre[a] != image[a]]
         if drift:
@@ -375,6 +392,7 @@ def capture(args):
         fx['cases'].append({'site': site, 'sp': sp, 'regs': [regs_in[i] for i in REGS],
                             **case_io(pre, lm, blind),
                             'exit': [lm.exit[i] for i in REGS], 'r': regs_in[R], 'rx': lm.exit[R],
+                            **({'xpc': lm.exit[PC]} if len(ends(rets[site])) > 1 else {}),
                             **({'ports': pl.log} if pl.log else {}),
                             **({'outs': pl.outs} if pl.outs else {}), 't': dt, 'sig': sig,
                             **({'poked': {f'{a:04x}': v for a, v in pokes.items()}} if pokes else {})})
@@ -434,6 +452,7 @@ def check(args):
         dt, _ = run_alone(lm, regs, rets[c['site']], ports=pl)
         portsok = not pl.bad and not pl.left() and ('rx' not in c or lm.exit[R] == c['rx'])
         portsok = portsok and pl.outs == c.get('outs', [])
+        portsok = portsok and lm.exit[PC] == c.get('xpc', lm.exit[PC])
         hid = addrs(fx.get('blind', []))
         out = {a: lm.m[a] for a in lm.writes if a not in hid}
         seen = sorted(a for a in lm.writes if a in hid) == sorted(addrs(c.get('blind', [])))
@@ -462,7 +481,7 @@ def check(args):
 
 def derive(args):
     t = parse_target(args)
-    fixture, base, sets, rset, psets, script = None, None, {}, None, {}, None
+    fixture, base, sets, rset, psets, script, rsets = None, None, {}, None, {}, None, {}
     while args:
         if args[0] == '--fixture':
             fixture = args[1]; del args[:2]
@@ -475,6 +494,11 @@ def derive(args):
             del args[:2]
         elif args[0] == '--r':
             rset = int(args[1], 0); del args[:2]
+        elif args[0] == '--reg':
+            for kv in args[1].split(','):
+                i, v = kv.split('=')
+                rsets[int(i, 0)] = int(v, 0)
+            del args[:2]
         elif args[0] == '--port':
             for kv in args[1].split(','):
                 i, v = kv.split('=')
@@ -486,7 +510,7 @@ def derive(args):
             sys.exit(f'callio: unknown argument {args[0]}')
     if script is not None and psets:
         sys.exit('callio: --script answers every port read; it cannot be combined with --port')
-    if not fixture or base is None or not (sets or psets or rset is not None or script):
+    if not fixture or base is None or not (sets or psets or rsets or rset is not None or script):
         sys.exit('callio: --derive needs --fixture FILE --case N --set ADDR=VAL[,ADDR=VAL...]')
     h = boot_target(t, 'callio')
     fx = json.load(open(fixture))
@@ -511,6 +535,10 @@ def derive(args):
         if 'r' not in c:
             sys.exit('callio: --r needs a fixture that records R (r, rx)')
         regs[R] = rset
+    if any(i not in fx['regs'] for i in rsets):
+        sys.exit(f'callio: --reg takes the SkoolKit indices the fixture records: {fx["regs"]}')
+    for i, v in rsets.items():
+        regs[i] = v
     ports = [list(p) for p in c.get('ports', [])]
     if any(not 0 <= i < len(ports) for i in psets):
         sys.exit(f'callio: --port indexes the parent\'s {len(ports)} logged reads')
@@ -527,14 +555,16 @@ def derive(args):
     old = {a for s in (x['sig'] for x in fx['cases']) for a in (int(s[i:i + 4], 16) for i in range(0, len(s), 4))}
     code = {a for lo, hi in fx['code'] for a in range(lo, hi + 1)} | lm.fetched | pcs
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
-    fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': c['regs'],
+    fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': [regs[k] for k in fx['regs']],
                         **case_io(mem, lm, fx.get('blind', [])),
                         'exit': [lm.exit[k] for k in fx['regs']],
+                        **({'xpc': lm.exit[PC]} if len(ends(dict((s, e) for s, e in fx['calls'])[c['site']])) > 1 else {}),
                         **({'r': regs[R], 'rx': lm.exit[R]} if 'r' in c else {}),
                         **({'ports': pl.log} if pl.log else {}),
                         **({'outs': pl.outs} if pl.outs else {}), 't': dt, 'sig': sig,
                         'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()},
                                     **({'r': rset} if rset is not None else {}),
+                                    **({'reg': {str(i): v for i, v in rsets.items()}} if rsets else {}),
                                     **({'port': {str(i): v for i, v in psets.items()}} if psets else {}),
                                     **({'script': script} if script is not None else {})}})
     with open(fixture, 'w') as f:
@@ -585,7 +615,7 @@ def main():
     while args:
         a = args[0]
         if a == '--call':
-            site, ret = int(args[1], 0), int(args[2], 0); del args[:3]
+            site, ret = int(args[1], 0), parse_ret(args[2]); del args[:3]
         elif a == '--frames':
             frames = int(args[1], 0); del args[:2]
         elif a == '--keys':
@@ -612,7 +642,7 @@ def main():
         sp = r[SP]
         lm = Logged(bytes(m), {a & 0xFFFF for a in range(sp - 128, sp + 2)})
         dt, pcs = run_alone(lm, list(r), ret, ports=PortLog(live=h.ports))
-        h.run_until([ret], limit=20_000_000)           # the real call, interrupts on
+        h.run_until(ends(ret), limit=20_000_000)           # the real call, interrupts on
         calls += 1
         ts.append(dt)
         fetches += lm.fetches
@@ -626,7 +656,7 @@ def main():
             vals.setdefault(a, set()).add(lm.m[a])
     if not calls:
         sys.exit(f'callio: ${site:04X} never reached in {frames} frames')
-    print(f'callio: ${site:04X} -> ${ret:04X}, {source_label(t)}, {frames} frames'
+    print(f'callio: ${site:04X} -> ' + ','.join(f'${e:04X}' for e in ends(ret)) + f', {source_label(t)}, {frames} frames'
           + (f', keys {"+".join(keys)}' if keys else '') + f': {calls} calls, '
           f'uncontended T min {min(ts)} median {int(statistics.median(ts))} max {max(ts)}')
     print(f'self-check: {fetches} reads dropped as fetches; {len(ins)} input and {len(outs)} output bytes kept')
