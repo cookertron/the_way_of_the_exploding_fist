@@ -940,4 +940,45 @@ const mockCtx = (state) => ({
           .filter(([a, b]) => !pcs.some(s => s.has(a) && !s.has(b))).map(([a]) => a.toString(16)), []);
 }
 
+/* ---- the sound effect $B15A against its frozen oracle -------------------
+   python tools/sfx.py --capture: each call alone, uncontended, from s1.
+   The ROM effects run the real code over the D6 substitutes poked into
+   the ROM (--measure checks they keep the real ROM's T); effect 4 runs a
+   chain of LFSR states from play and two derived ones whose first delay
+   wraps BC to 65536 passes. */
+{
+  const fx = P.assets.sfx;
+  let badW = 0, badT = 0, badM = 0, firstW = '', firstT = '', firstM = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    m.set(Buffer.from(c.mem_in, 'hex'), 0xB150);
+    m.set(Buffer.from(c.lfsr, 'hex'), 0xB153);
+    m[0xB2FA] = c.flag;
+    for (let j = 0; j < 12; j++) m[0xB144 + j] = [0x79, 0xB1, 0x85, 0xB1, 0x91, 0xB1, 0x9D, 0xB1, 0xFB, 0xB1, 0x21, 0xB2][j];
+    const out = [];
+    const t = P.soundEffect(m, c.a, out);
+    const w = JSON.stringify(out), want = JSON.stringify(c.writes);
+    if (w !== want && !badW++){
+      const k = out.findIndex((e, j) => !c.writes[j] || e[0] !== c.writes[j][0] || e[1] !== c.writes[j][1]);
+      firstW = `case ${i}: write ${k} ${JSON.stringify(out[k])} want ${JSON.stringify(c.writes[k])} (${out.length}/${c.writes.length})`;
+    }
+    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
+    const mem = Buffer.from(m.slice(0xB150, 0xB15A)).toString('hex');
+    if (mem !== c.mem_out && !badM++) firstM = `case ${i}: $B150-$B159 ${mem} want ${c.mem_out}`;
+  }
+  check('soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)', [badW, firstW], [0, '']);
+  check('soundEffect tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  check('soundEffect leaves $B150-$B159 (request, delay, LFSR, end, mask) as the real code did', [badM, firstM], [0, '']);
+  check('the sfx cases cover the early returns, all six effects and the BC wrap',
+        [[0, 1], [2, 0], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1]]
+          .filter(([a, f]) => !fx.cases.some(c => c.a === a && c.flag === f)).map(String)
+          .concat(fx.cases.some(c => c.kind === 'derived') ? [] : ['derived']), []);
+  /* D6: the substitutes keep the real ROM's count, sum and zeros per segment */
+  check('every D6 substitute keeps its segment count, masked sum and zeros, with bits above the mask',
+        Object.values(fx.segments).flat().filter(s => s.vals.length !== s.n || (s.mask < 0xFF && !s.vals.some(v => v > s.mask))
+          || s.vals.reduce((a, v) => a + ((v & s.mask) || 1), 0) !== s.sum || s.vals.filter(v => !(v & s.mask)).length !== s.zeros)
+          .map(s => s.de.toString(16)), []);
+}
+
 rig.done();

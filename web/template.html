@@ -953,6 +953,108 @@ function yinYang2P(m){
   return t + 30;
 }
 
+/* ---- the sound effect $B15A: effect a, inline and blocking --------------
+   Effects 1,2,3,5,6 are pulse trains whose half-periods are ROM bytes AND
+   a mask, 0 read as 1 ($B25B, $B297); effect 4 takes its delays from the
+   24-bit LFSR $B153-$B155 ($B2D7), carried for the whole session.  D6: the
+   ROM bytes are replaced by the substitutes in the sfx asset, which keep
+   each segment's count, sum and zeros, so edges and T are the machine's
+   (tools/sfx.py --measure).  Each $FE write goes to `out` as [T from entry
+   at the start of its OUT, value]; returns the T from $B15A to its RET,
+   uncontended (OUT and the stack in contended RAM add 0.02-0.25%, not
+   charged).  ledger/B15A.toml. */
+const SFX_ROM = (() => {
+  const rom = {};
+  for (const [e, segs] of Object.entries(A.sfx.segments)){
+    const r = rom[e] = new Uint8Array(0x4000);
+    for (const s of segs){
+      let a = s.de, i = 0;
+      do { r[a] = s.vals[i++]; r[a + 1] = s.vals[i++]; a += 2; } while (a < s.hl);
+    }
+  }
+  return rom;
+})();
+function soundEffect(m, a, out){
+  let t = 4;                                       // AND A
+  if (!a) return t + 11;
+  t += 5 + 4 + 13 + 4 + 4;                         // LD C,A: LD A,(Flag_Sound): AND A: LD A,C
+  if (!m[0xB2FA]) return t + 11;
+  t += 5 + 4 + 4 + 4 + 7 + 10 + 11 + 7 + 6 + 7 + 4 + 17 + 4;   // to JP (HL)
+  const at = 0xB144 + 2 * ((a - 1) & 0x7F);
+  const rom = SFX_ROM[a] || new Uint8Array(0x4000);
+  const edge = v => out.push([t, v]);
+  const delay = (n, per) => { t += (n || 0x10000) * per - 5; };   // DEC BC .. JR NZ with BC = n
+
+  function pulses(mask, de, hl, nops){             // $B25B (4 NOPs) / $B297 (6 NOPs)
+    m[0xB156] = hl & 0xFF; m[0xB157] = hl >> 8; m[0xB158] = mask;
+    t += 16 + 13;
+    for (;;){
+      t += 13 + 4;                                 // LD A,(B158): LD H,A
+      for (const low of [0x1F, 0x07]){
+        const v = (de < 0x4000 ? rom[de] : m[de]) & m[0xB158];
+        de = (de + 1) & 0xFFFF;
+        t += 7 + 6 + 4 + (v ? 12 : 11) + 4 + 13 + 7;
+        edge(m[0xB159] & low); t += 11;
+        t += (v || 1) * (4 * nops + 13) - 5;       // the NOPs and DJNZ
+      }
+      const left = (m[0xB156] | m[0xB157] << 8) - de;
+      t += 16 + 4 + 15;
+      if (!left) return t += 11;
+      t += 5;
+      if (left < 0) return t += 7 + 10;
+      t += 12;
+    }
+  }
+  function lfsr(low){                              // $B22D (low $1F) / $B244 (low 7): returns BC
+    t += 13 + 7; edge(m[0xB159] & low); t += 11 + 17;
+    const x = m[0xB155] ^ (m[0xB154] << 1 & 0xFF);
+    const c3 = m[0xB153] & 1, c4 = m[0xB154] & 1;
+    m[0xB153] = (x << 1 & 0x80) | m[0xB153] >> 1;
+    m[0xB154] = c3 << 7 | m[0xB154] >> 1;
+    m[0xB155] = c4 << 7 | m[0xB155] >> 1;
+    t += 144 + 59;                                 // $B2D7 and the tail
+    const c = m[0xB153] | m[0xB154];
+    return (c & 1) << 8 | c;
+  }
+  function noise(d0, per, keepB){                  // one PUSH DE .. JR NZ block of $B19D
+    t += 10;                                       // LD DE
+    for (let d = d0; d; d--){
+      t += 11;                                     // PUSH DE
+      for (let e = 8; e; e--){
+        t += 17; let bc = lfsr(0x1F);
+        if (!keepB){ bc &= 0xFF; t += 7; }         // LD B,0
+        delay(bc, per);
+        t += 17; bc = lfsr(0x07);
+        if (!keepB){ bc &= 0xFF; t += 7; }
+        delay(bc, per);
+        t += 4 + (e > 1 ? 12 : 7);                 // DEC E: JR NZ
+      }
+      t += 10 + 4 + (d > 1 ? 12 : 7);              // POP DE: DEC D: JR NZ
+    }
+  }
+
+  switch (m[at] | m[at + 1] << 8){
+    case 0xB179: t += 7 + 10 + 10 + 17; pulses(0x7F, 0x000A, 0x0400, 4); t += 10; break;
+    case 0xB185: t += 7 + 10 + 10 + 17; pulses(0x3F, 0x000A, 0x0300, 6); t += 10; break;
+    case 0xB191: t += 7 + 10 + 10 + 17; pulses(0x3F, 0x00C0, 0x0100, 6); t += 10; break;
+    case 0xB221: t += 7 + 10 + 10 + 17; pulses(0x3F, 0x0080, 0x0100, 6); t += 10; break;
+    case 0xB19D:
+      noise(3, 26, false);                         // DEC BC: LD A,B: OR C: JR NZ
+      noise(2, 30, true);                          // .. with a NOP
+      noise(2, 38, true);                          // .. with three
+      t += 10; break;
+    case 0xB1FB:
+      t += 7 + 10 + 10 + 17; pulses(0xFF, 0x00E0, 0x0120, 6);
+      m[0xB151] = 0x00; m[0xB152] = 0x20; t += 10 + 16 + 17 + 20;   // $B2F0 with BC = $2000
+      delay(0x2000, 26); t += 10;
+      m[0xB151] = 0xFF; m[0xB152] = 0xFF; t += 10 + 16;
+      t += 7 + 10 + 10 + 17; pulses(0xFF, 0x03C0, 0x0400, 6); t += 10; break;
+    default: throw new Error(`soundEffect: effect ${a} jumps to an unported address`);
+  }
+  m[0xB150] = 0;
+  return t + 4 + 13 + 10;                          // XOR A: LD ($B150),A: RET
+}
+
 /* ---- the hit tests $9D29 / $9ED2: does one fighter's move land ---------
    The two routines are one body with the fighters' blocks swapped: A is
    the attacker's ($AA00 P1, $AA40 P2), V the victim's, and xa, xv their
@@ -1967,5 +2069,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, font, fontMiss };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, font, fontMiss };
 </script>

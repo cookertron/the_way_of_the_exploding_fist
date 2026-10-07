@@ -1,0 +1,43 @@
+# ledger/B15A.toml -- current truth about sound_effect (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "sound_effect"
+entries  = ["$B15A"]
+oracle   = "tools/sfx.py"
+fixtures = ["sfx"]
+port     = "soundEffect"
+manual   = ["P11", "3.7", "0.5"]
+
+[[fact]]
+kind   = "insn"
+at     = "$B15A"
+says   = "A = effect 1-6 (0 returns; Flag_Sound $B2FA = 0 returns); jumps via word table $B144 to $B179 $B185 $B191 $B19D $B1FB $B221; clears request $B150 after; play_pass passes A = ($B150) from $9751"
+by     = "python tools/adis.py 0xB144 40"
+
+[[fact]]
+kind   = "data"
+says   = "requests -- $A073 table by move gives 0/2/3/6 (stored at $9E8B, $A028); $9EB5 and $A052 store 4; $99D9 stores 5; nothing stores 1 (fx1 has no writer: grepbytes finds $B179 only in the table)"
+by     = "python tools/grepbytes.py \"50 B1\" ; python tools/hexdump.py build/image.bin --offset 0xA073 --len 32 --base 0 ; python tools/grepbytes.py \"79 B1\""
+
+[[fact]]
+kind   = "insn"
+at     = "$B25B"
+says   = "fx 1,2,3,5,6: half-periods are ROM bytes AND mask ($7F/$3F/$FF; 0 read as 1) from DE up to HL; $B25B 4 NOPs per DJNZ, $B297 6. fx4 $B19D uses the 24-bit LFSR $B153-$B155 ($B2D7), no ROM. Border byte $B159 = $1D"
+by     = "python tools/adis.py 0xB19D 120 ; python tools/adis.py 0xB273 70 ; python tools/adis.py 0xB2D7 30"
+
+[[fact]]
+kind   = "measured"
+says   = "uncontended T over real ROM = over the D6 substitute for all 6 (fx1 2117832, fx2 746045, fx3 37736, fx5 731690, fx6 93411; fx4 674634 from s1, LFSR-driven); contended s1 adds 0.02-0.25%, not charged"
+by     = "python tools/sfx.py --measure"
+
+[[fact]]
+kind   = "unreachable"
+says   = "the DE-passes-HL exit of $B25B/$B297 (JR NC falls through, RET): every segment span is even, so all six effects leave by RET Z"
+by     = "python tools/adis.py 0xB179 90"
+window = "the six table entries $B179-$B221, constant DE/HL"
+n      = 0
+
+[[fact]]
+kind   = "ported"
+says   = "soundEffect(m, a, out) in web/template.html: every $FE write at the same T, exact uncontended T and $B150-$B159 on 17 cases (fx 0-6, Flag_Sound 0, 8 chained LFSR states, 2 derived BC wraps); 24 mutants killed"
+by     = "python tools/sfx.py --capture ; python tools/build.py ; node test/kit.test.js"

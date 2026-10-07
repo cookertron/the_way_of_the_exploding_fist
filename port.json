@@ -71,6 +71,12 @@
       "file": "build/callio_976f.json",
       "required": true,
       "note": "oracle for the 2P yin-yang award $976F-$978D and Yin_Yang_1UP $900E: python tools/callio.py --capture --poke 0x9C2C=2 --call 0x976F 0x978D"
+    },
+    {
+      "key": "sfx",
+      "file": "build/sfx_cases.json",
+      "required": true,
+      "note": "the D6 substitutes the JS plays and the oracle for sound_effect $B15A: python tools/sfx.py --capture (see its --help)"
     }
   ],
   "tape": {

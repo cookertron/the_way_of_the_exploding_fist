@@ -706,8 +706,8 @@
  {
   "file": "template.html",
   "label": "923A: one row short",
-  "old": "  for (let b = 8; b > 0; b--){",
-  "new": "  for (let b = 7; b > 0; b--){",
+  "old": "  for (let b = 8; b > 0; b--){\n    const i = src - FONT_BASE;",
+  "new": "  for (let b = 7; b > 0; b--){\n    const i = src - FONT_BASE;",
   "increment": "9C6F-port",
   "kills": "boutTimer writes exactly the screen bytes the real $9C6F wrote"
  },
@@ -1806,5 +1806,197 @@
   "new": "if (!m[0xAA48]) return t + 5;",
   "increment": "900E",
   "kills": "yinYang2P tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: A=0 RET Z charged as not taken",
+  "old": "  let t = 4;                                       // AND A\n  if (!a) return t + 11;",
+  "new": "  let t = 4;                                       // AND A\n  if (!a) return t + 5;",
+  "increment": "B15A",
+  "kills": "soundEffect tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: Flag_Sound ignored",
+  "old": "if (!m[0xB2FA]) return t + 11;",
+  "new": "if (!m[0xB2FA] && 0) return t + 11;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: dispatch T short",
+  "old": "t += 5 + 4 + 4 + 4 + 7 + 10 + 11 + 7 + 6 + 7 + 4 + 17 + 4;",
+  "new": "t += 5 + 4 + 4 + 4 + 7 + 10 + 11 + 7 + 6 + 7 + 4 + 17 + 3;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: zero byte read as 0 passes",
+  "old": "t += (v || 1) * (4 * nops + 13) - 5;",
+  "new": "t += v * (4 * nops + 13) - 5;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: JR NZ on zero charged as taken",
+  "old": "t += 7 + 6 + 4 + (v ? 12 : 11) + 4 + 13 + 7;",
+  "new": "t += 7 + 6 + 4 + 12 + 4 + 13 + 7;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: mask not applied",
+  "old": "const v = (de < 0x4000 ? rom[de] : m[de]) & m[0xB158];",
+  "new": "const v = (de < 0x4000 ? rom[de] : m[de]);",
+  "increment": "B15A",
+  "kills": "soundEffect leaves $B150-$B159 (request, delay, LFSR, end, mask) as the real code did"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: edge at end of OUT",
+  "old": "edge(m[0xB159] & low); t += 11;",
+  "new": "t += 11; edge(m[0xB159] & low);",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: low half border mask",
+  "old": "for (const low of [0x1F, 0x07]){",
+  "new": "for (const low of [0x1F, 0x1F]){",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: loop ends one pass early",
+  "old": "if (!left) return t += 11;",
+  "new": "if (left <= 2) return t += 11;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: LFSR feedback bit",
+  "old": "m[0xB153] = (x << 1 & 0x80) | m[0xB153] >> 1;",
+  "new": "m[0xB153] = (x & 0x80) | m[0xB153] >> 1;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: LFSR carry into B154",
+  "old": "m[0xB154] = c3 << 7 | m[0xB154] >> 1;",
+  "new": "m[0xB154] = m[0xB154] >> 1;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: LFSR carry into B155",
+  "old": "m[0xB155] = c4 << 7 | m[0xB155] >> 1;",
+  "new": "m[0xB155] = m[0xB155] >> 1;",
+  "increment": "B15A",
+  "kills": "soundEffect leaves $B150-$B159 (request, delay, LFSR, end, mask) as the real code did"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: B from LFSR dropped",
+  "old": "return (c & 1) << 8 | c;",
+  "new": "return c;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: LD B,0 not applied",
+  "old": "if (!keepB){ bc &= 0xFF; t += 7; }         // LD B,0",
+  "new": "if (!keepB){ t += 7; }         // LD B,0",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: BC wrap to 65536 lost",
+  "old": "const delay = (n, per) => { t += (n || 0x10000) * per - 5; };",
+  "new": "const delay = (n, per) => { t += (n || 1) * per - 5; };",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: noise section 3 per-pass T",
+  "old": "noise(2, 38, true);",
+  "new": "noise(2, 34, true);",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: inner JR NZ last pass",
+  "old": "t += 4 + (e > 1 ? 12 : 7);",
+  "new": "t += 4 + 12;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: fx5 delay length",
+  "old": "delay(0x2000, 26); t += 10;",
+  "new": "delay(0x1000, 26); t += 10;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: fx5 leaves B151 at 2000",
+  "old": "m[0xB151] = 0xFF; m[0xB152] = 0xFF; t += 10 + 16;",
+  "new": "t += 10 + 16;",
+  "increment": "B15A",
+  "kills": "soundEffect leaves $B150-$B159 (request, delay, LFSR, end, mask) as the real code did"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: request not cleared",
+  "old": "  m[0xB150] = 0;\n  return t + 4 + 13 + 10;",
+  "new": "  return t + 4 + 13 + 10;",
+  "increment": "B15A",
+  "kills": "soundEffect leaves $B150-$B159 (request, delay, LFSR, end, mask) as the real code did"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: end address not stored",
+  "old": "m[0xB156] = hl & 0xFF; m[0xB157] = hl >> 8; m[0xB158] = mask;",
+  "new": "m[0xB156] = hl & 0xFF; m[0xB158] = mask; m[0xB157] = 0x55;",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "sfx: substitute read off by one",
+  "old": "do { r[a] = s.vals[i++]; r[a + 1] = s.vals[i++]; a += 2; } while (a < s.hl);",
+  "new": "do { r[a + 1] = s.vals[i++]; r[a] = s.vals[i++]; a += 2; } while (a < s.hl);",
+  "increment": "B15A",
+  "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
+ },
+ {
+  "file": "kit.test.js",
+  "label": "sfx gate: zero count unchecked",
+  "old": "s.vals.filter(v => !(v & s.mask)).length !== s.zeros)",
+  "new": "s.vals.filter(v => !(v & s.mask)).length !== s.zeros + 1)",
+  "increment": "B15A",
+  "kills": "every D6 substitute keeps its segment count, masked sum and zeros, with bits above the mask"
+ },
+ {
+  "file": "kit.test.js",
+  "label": "sfx gate: wrap case required",
+  "old": ".concat(fx.cases.some(c => c.kind === 'derived') ? [] : ['derived']), []);",
+  "new": ".concat(fx.cases.some(c => c.kind === 'derivd') ? [] : ['derived']), []);",
+  "increment": "B15A",
+  "kills": "the sfx cases cover the early returns, all six effects and the BC wrap"
  }
 ]
