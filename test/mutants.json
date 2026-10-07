@@ -1454,5 +1454,237 @@
   "new": "if (false){ k(12, 1); return start(1); }",
   "increment": "909E",
   "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: key 1 opens P2's controls",
+  "old": "return yield* controlsMenu(0x8BD2); }",
+  "new": "return yield* controlsMenu(0x8BE6); }",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: exit RET uncounted",
+  "old": "if (!keyTest(0x15)[0]){ k(10 + 10, 2); return; }",
+  "new": "if (!keyTest(0x15)[0]){ k(10, 2); return; }",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: sound on stores 0",
+  "old": "m[0xB2FA] = 1;",
+  "new": "m[0xB2FA] = 0;",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: sound off stores 1",
+  "old": "m[0xB2FA] = 0;",
+  "new": "m[0xB2FA] = 1;",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: sound off tests key 3",
+  "old": "if (!keyTest(0x0C)[0]){ m[0xB2FA]",
+  "new": "if (!keyTest(0x14)[0]){ m[0xB2FA]",
+  "increment": "8C54",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: loop JP uncounted",
+  "old": "k(10 + 10, 2);                               // $8CD7",
+  "new": "k(10, 2);                               // $8CD7",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: clear attribute 12",
+  "old": "m.fill(13, 0x5800, 0x5B00);",
+  "new": "m.fill(12, 0x5800, 0x5B00);",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: clear last LDIR at 21 T",
+  "old": "21 * 0x2FF - 5 + 10,",
+  "new": "21 * 0x2FF + 10,",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: clear LDIR M1 one short",
+  "old": "6 + 2 * 0x17FF + 5 + 2 * 0x2FF + 1);",
+  "new": "6 + 2 * 0x17FF + 5 + 2 * 0x2FF);",
+  "increment": "8C54",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: delay loop 23 T",
+  "old": "k(17 + 10 + 60000 * 24 + 10,",
+  "new": "k(17 + 10 + 60000 * 23 + 10,",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: delay loop 3 M1",
+  "old": "3 + 60000 * 4); }",
+  "new": "3 + 60000 * 3); }",
+  "increment": "8C54",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: controls screen one delay",
+  "old": "      delay(); yield; delay(); yield;\n      const set",
+  "new": "      delay(); yield;\n      const set",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Sinclair 1 stores Sinclair 2",
+  "old": "if (!keyTest(0x1C)[0]) return set(0x8C30);",
+  "new": "if (!keyTest(0x1C)[0]) return set(0x8C1E);",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Kempston pointer off by one",
+  "old": "if (!keyTest(0x04)[0]) return set(0x8C42);",
+  "new": "if (!keyTest(0x04)[0]) return set(0x8C43);",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Kempston tests key 4",
+  "old": "if (!keyTest(0x04)[0]) return set",
+  "new": "if (!keyTest(0x0C)[0]) return set",
+  "increment": "8C54",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: P2 default pointer off by one",
+  "old": "m[0x8BE6] = 0x0C; m[0x8BE7] = 0x8C;",
+  "new": "m[0x8BE6] = 0x0D; m[0x8BE7] = 0x8C;",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: default P1/P2 test inverted",
+  "old": "(m[tp] | m[tp + 1] << 8) === 0x8BD2;",
+  "new": "(m[tp] | m[tp + 1] << 8) !== 0x8BD2;",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: setter JP uncounted",
+  "old": "k(10 + 10 + 16 + 10 + 7 + 6 + 7 + 10 + 10, 9);",
+  "new": "k(10 + 16 + 10 + 7 + 6 + 7 + 10 + 10, 9);",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: keys table from Temp_Player+4",
+  "old": "let de = (hl + 2) & 0xFFFF;",
+  "new": "let de = (hl + 4) & 0xFFFF;",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Get_Key bytes swapped",
+  "old": "const key = m[p] << 8 | a;",
+  "new": "const key = a << 8 | m[p];",
+  "increment": "8C54",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Get_Key mask drops bit 4",
+  "old": "const a = ~io.in(m[p] << 8 | 0xFE) & 0x1F;",
+  "new": "const a = ~io.in(m[p] << 8 | 0xFE) & 0x0F;",
+  "increment": "8C54",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Get_Key reads the next row",
+  "old": "const a = ~io.in(m[p] << 8 | 0xFE)",
+  "new": "const a = ~io.in(m[p + 1] << 8 | 0xFE)",
+  "increment": "8C54",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Get_Key DJNZ T",
+  "old": "k(6 + (b > 1 ? 13 : 8), 2);",
+  "new": "k(6 + (b > 1 ? 8 : 13), 2);",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Get_Key restart 2 M1",
+  "old": "k(10, 1);                                  // $8E33 JP Get_Key",
+  "new": "k(10, 2);                                  // $8E33 JP Get_Key",
+  "increment": "8C54",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: Print_Key_Loop RET M1",
+  "old": "k(10 + 10, 2);                             // POP DE: RET",
+  "new": "k(10 + 10, 1);                             // POP DE: RET",
+  "increment": "8C54",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: keyboard break JP 12 T",
+  "old": "      k(10, 1);\n      delay(); yield; delay(); yield;\n      k(10, 1);",
+  "new": "      k(12, 1);\n      delay(); yield; delay(); yield;\n      k(10, 1);",
+  "increment": "8C54",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: exit text one column right",
+  "old": "[0x8EC6, 0x0765]",
+  "new": "[0x8EC6, 0x0865]",
+  "increment": "8C54",
+  "kills": "controlPass writes exactly the screen bytes the real $97CB wrote"
+ },
+ {
+  "file": "template.html",
+  "label": "menu: print M1 loses Print_String's",
+  "old": "function ps(pos, de){ const c = { m1: 0 }; k(printString(m, pos, de, c), c.m1); }",
+  "new": "function ps(pos, de){ const c = { m1: 0 }; k(printString(m, pos, de, c), 0); }",
+  "increment": "8C54",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "font: no Y glyph",
+  "old": "  0x59: [0x66, 0x66, 0x66, 0x3C,",
+  "new": "  0x7F: [0x66, 0x66, 0x66, 0x3C,",
+  "increment": "8C54",
+  "kills": "every character controlPass printed has a lookalike glyph (fontMiss unchanged)"
  }
 ]

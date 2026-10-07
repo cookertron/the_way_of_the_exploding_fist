@@ -742,6 +742,40 @@ const fontGlyphs = {
   0x37: [0x7E, 0x06, 0x0C, 0x18, 0x30, 0x30, 0x30, 0x00],
   0x38: [0x3C, 0x66, 0x66, 0x3C, 0x66, 0x66, 0x3C, 0x00],
   0x39: [0x3C, 0x66, 0x66, 0x3E, 0x06, 0x0C, 0x38, 0x00],
+  /* the options menu $8C54: punctuation it prints, and A-Z */
+  0x23: [0x00, 0x24, 0x7E, 0x24, 0x24, 0x7E, 0x24, 0x00],   // #
+  0x28: [0x0C, 0x18, 0x30, 0x30, 0x30, 0x18, 0x0C, 0x00],   // (
+  0x29: [0x30, 0x18, 0x0C, 0x0C, 0x0C, 0x18, 0x30, 0x00],   // )
+  0x2C: [0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x30],   // ,
+  0x2D: [0x00, 0x00, 0x00, 0x7E, 0x00, 0x00, 0x00, 0x00],   // -
+  0x2E: [0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x00],   // .
+  0x3A: [0x00, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00, 0x00],   // :
+  0x41: [0x3C, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00],
+  0x42: [0x7C, 0x66, 0x66, 0x7C, 0x66, 0x66, 0x7C, 0x00],
+  0x43: [0x3C, 0x66, 0x60, 0x60, 0x60, 0x66, 0x3C, 0x00],
+  0x44: [0x78, 0x6C, 0x66, 0x66, 0x66, 0x6C, 0x78, 0x00],
+  0x45: [0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x7E, 0x00],
+  0x46: [0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x60, 0x00],
+  0x47: [0x3C, 0x66, 0x60, 0x6E, 0x66, 0x66, 0x3C, 0x00],
+  0x48: [0x66, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00],
+  0x49: [0x7E, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7E, 0x00],
+  0x4A: [0x06, 0x06, 0x06, 0x06, 0x06, 0x66, 0x3C, 0x00],
+  0x4B: [0x66, 0x6C, 0x78, 0x70, 0x78, 0x6C, 0x66, 0x00],
+  0x4C: [0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x7E, 0x00],
+  0x4D: [0x63, 0x77, 0x7F, 0x6B, 0x63, 0x63, 0x63, 0x00],
+  0x4E: [0x66, 0x76, 0x7E, 0x7E, 0x6E, 0x66, 0x66, 0x00],
+  0x4F: [0x3C, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3C, 0x00],
+  0x50: [0x7C, 0x66, 0x66, 0x7C, 0x60, 0x60, 0x60, 0x00],
+  0x51: [0x3C, 0x66, 0x66, 0x66, 0x6A, 0x6C, 0x36, 0x00],
+  0x52: [0x7C, 0x66, 0x66, 0x7C, 0x6C, 0x66, 0x66, 0x00],
+  0x53: [0x3C, 0x66, 0x60, 0x3C, 0x06, 0x66, 0x3C, 0x00],
+  0x54: [0x7E, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x00],
+  0x55: [0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x3C, 0x00],
+  0x56: [0x66, 0x66, 0x66, 0x66, 0x66, 0x3C, 0x18, 0x00],
+  0x57: [0x63, 0x63, 0x63, 0x6B, 0x7F, 0x77, 0x63, 0x00],
+  0x58: [0x66, 0x66, 0x3C, 0x18, 0x3C, 0x66, 0x66, 0x00],
+  0x59: [0x66, 0x66, 0x66, 0x3C, 0x18, 0x18, 0x18, 0x00],
+  0x5A: [0x7E, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x7E, 0x00],
 };
 const font = new Uint8Array(0x300);
 for (const [c, g] of Object.entries(fontGlyphs)) font.set(g, (c - 0x20) * 8);
@@ -1108,13 +1142,13 @@ function fighterMotion(m){
    T and M1 per block are measured (python tools/blockcost.py).  Returns
    the uncontended T from the CALL at $9757 to $975A, A at the return and
    R there.  Starting a game (1/Kempston fire, 2) runs New_Round $909E and
-   returns $80; the menu ($8C54, key 0x23) is not ported yet and throws. */
+   returns $80; key 0 (code 0x23) runs the options menu $8C54 (configs,
+   below) and returns $80. */
 function controlPass(m, io){
   let t = 0, n = 0;
   const k = (T, R) => { t += T; n += R; };
   const R = () => (io.r & 0x80) | ((io.r + n) & 0x7F);
   const out = a => ({ t, a, r: R() });
-  const notYet = what => { throw new Error(`controlPass: ${what} is not ported yet`); };
   const at = (base, i) => m[(base & 0xFF00) | ((base + i) & 0xFF)];   // LD HL,base: ADD A,L: LD L,A
 
   k(17 + 27, 1 + 3);                               // CALL $97CB, $97CB-$97CF
@@ -1133,7 +1167,12 @@ function controlPass(m, io){
   k(24, 2);                                        // $9801-$9803
   if (!keyTest(0x1C)[0]){ k(7, 1); return start(2); }
   k(12 + 24, 1 + 2);                               // $9806 taken, $981A-$981C
-  if (!keyTest(0x23)[0]){ k(7 + 17, 1 + 1); return notYet('$9821 Game_Configs_Main ($8C54)'); }
+  if (!keyTest(0x23)[0]){
+    k(7 + 17, 1 + 1);                              // $9821 CALL Game_Configs_Main
+    for (const _ of configs());                    // eslint-disable-line no-unused-vars
+    k(7 + 10, 2);
+    return out(0x80);
+  }
   k(12, 1);
   return play();
 
@@ -1151,6 +1190,110 @@ function controlPass(m, io){
     const c = { m1: 0 };
     for (const pos of [0x0108, 0x0110, 0x1A08, 0x1A10]) k(20 + printString(m, pos, 0xB064, c), 2);
     k(10, 1 + c.m1);
+  }
+
+  /* $8C54 Game_Configs_Main and its screens, with its RET.  The machine
+     polls the keys inside this one call for as long as the menu is up
+     (DI, no HALT), so it is a generator: it yields before every port
+     read and after every Configs_Delay, where a live loop can suspend it
+     with t as the clock; the gate runs it to the end.  T and M1 per
+     instruction from the listing (python tools/adis.py 0x8C54 120). */
+  function* configs(){
+    const tp = 0x8E69;                             // Temp_Player
+    clearScreen();
+    for (const [de, pos] of [[0x8E6B, 0x002D], [0x8E8C, 0x1436], [0x8E99, 0x143F],
+                             [0x8EA6, 0x1448], [0x8EB3, 0x055C], [0x8EC6, 0x0765]]) print(de, pos);
+    for (;;){
+      k(7 + 17, 2); yield;
+      if (!keyTest(0x24)[0]){ k(10 + 10 + 16 + 10, 4); return yield* controlsMenu(0x8BD2); }
+      k(10 + 7 + 17, 3); yield;
+      if (!keyTest(0x1C)[0]){ k(10 + 10 + 16 + 10, 4); return yield* controlsMenu(0x8BE6); }
+      k(10 + 7 + 17, 3); yield;
+      if (!keyTest(0x15)[0]){ k(10 + 10, 2); return; }
+      k(10 + 7 + 17, 3); yield;
+      if (!keyTest(0x14)[0]){ m[0xB2FA] = 1; k(10 + 7 + 13 + 10 + 10, 5); return; }
+      k(10 + 7 + 17, 3); yield;
+      if (!keyTest(0x0C)[0]){ m[0xB2FA] = 0; k(10 + 7 + 13 + 10 + 10, 5); return; }
+      k(10 + 10, 2);                               // $8CD7 JP Game_Configs_P1
+    }
+
+    function* controlsMenu(p){                     // $8CDB Game_Configs_Controls
+      m[tp] = p & 0xFF; m[tp + 1] = p >> 8;
+      clearScreen();
+      for (const [de, pos] of [[0x8ED6, 0x012D], [0x8EF4, 0x0136], [0x8F0F, 0x013F],
+                               [0x8F2A, 0x0148], [0x8F41, 0x0151], [0x8F59, 0x0371]]) print(de, pos);
+      delay(); yield; delay(); yield;
+      const set = de => {                          // $8D75/$8D81/$8D8D: (Temp_Player) = de
+        const hl = m[tp] | m[tp + 1] << 8;
+        m[hl] = de & 0xFF; m[(hl + 1) & 0xFFFF] = de >> 8;
+        k(10 + 10 + 16 + 10 + 7 + 6 + 7 + 10 + 10, 9);
+      };
+      for (;;){
+        k(7 + 17, 2); yield;
+        if (!keyTest(0x24)[0]){                    // $8D57 Set_Default
+          const p1 = (m[tp] | m[tp + 1] << 8) === 0x8BD2;
+          if (p1){ m[0x8BD2] = 0xFA; m[0x8BD3] = 0x8B; } else { m[0x8BE6] = 0x0C; m[0x8BE7] = 0x8C; }
+          k(10 + 10 + 16 + 10 + 4 + 15 + 10 + 10 + 16 + 10 + 10, 12);
+          return;
+        }
+        k(10 + 7 + 17, 3); yield;
+        if (!keyTest(0x1C)[0]) return set(0x8C30);
+        k(10 + 7 + 17, 3); yield;
+        if (!keyTest(0x14)[0]) return set(0x8C1E);
+        k(10 + 7 + 17, 3); yield;
+        if (!keyTest(0x04)[0]) return set(0x8C42);
+        k(10 + 7 + 17, 3); yield;
+        if (!keyTest(0x0C)[0]) break;
+        k(10, 1);                                  // $8D4B JP C,Game_Controls_Defaults
+      }
+      k(10, 1);
+      delay(); yield; delay(); yield;
+      k(10, 1);                                    // $8D54 JP Game_Configs_Keys
+      clearScreen();
+      for (const [de, pos] of [[0x8F6B, 0x012D], [0x8F89, 0x0136], [0x8FA7, 0x013F]]) print(de, pos);
+      const hl = m[tp] | m[tp + 1] << 8;
+      let de = (hl + 2) & 0xFFFF;
+      m[hl] = de & 0xFF; m[(hl + 1) & 0xFFFF] = de >> 8;
+      k(16 + 20 + 6 + 6 + 7 + 6 + 7, 8);
+      for (const text of [0x8FBB, 0x8FBE, 0x8FC7, 0x8FCD, 0x8FD8, 0x8FDD, 0x8FE7, 0x8FEC, 0x8FF4]){
+        k(10 + 17 + 11 + 4 + 10, 5);              // LD HL,text: CALL $8DFC: PUSH DE: EX DE,HL: LD HL
+        ps(0x055C, text);
+        k(10 + 11 + 17, 3);                        // POP DE: PUSH DE: CALL Get_Key
+        const key = yield* getKey();
+        m[de] = key & 0xFF; m[(de + 1) & 0xFFFF] = key >> 8;
+        de = (de + 2) & 0xFFFF;
+        k(10 + 4 + 7 + 6 + 7 + 6 + 4 + 11 + 10 + 10, 10);
+        ps(0x055C, 0x9000);
+        delay(); yield; delay(); yield;
+        k(10 + 10, 2);                             // POP DE: RET
+      }
+      k(10 + 10, 2);                               // $8DF9 JP Game_Configs_Return: RET
+    }
+
+    function* getKey(){                            // $8E22 Get_Key, CALL counted by the caller
+      for (;;){
+        k(10 + 7, 2);
+        let p = 0x8E3A;
+        for (let b = 8; b; b--){
+          k(7 + 11, 2); yield;
+          const a = ~io.in(m[p] << 8 | 0xFE) & 0x1F;
+          k(4 + 7 + 10, 3);
+          if (a){ const key = m[p] << 8 | a; k(4 + 7 + 4 + 10, 4); return key; }
+          k(6 + (b > 1 ? 13 : 8), 2);
+          p++;
+        }
+        k(10, 1);                                  // $8E33 JP Get_Key
+      }
+    }
+
+    function print(de, pos){ k(20, 2); ps(pos, de); }                    // LD DE: LD HL: CALL $92E4
+    function ps(pos, de){ const c = { m1: 0 }; k(printString(m, pos, de, c), c.m1); }
+    function delay(){ k(17 + 10 + 60000 * 24 + 10, 3 + 60000 * 4); }    // CALL $8E42 Configs_Delay
+    function clearScreen(){                        // CALL $8E4C Clear_Screen
+      m.fill(0, 0x4000, 0x5800); m.fill(13, 0x5800, 0x5B00);
+      k(17 + 10 + 10 + 7 + 7 + 10 + 21 * 0x17FF - 5 + 10 + 10 + 7 + 7 + 10 + 21 * 0x2FF - 5 + 10,
+        6 + 2 * 0x17FF + 5 + 2 * 0x2FF + 1);
+    }
   }
 
   function quit(){                                 // $9827 Check_Quit_Game

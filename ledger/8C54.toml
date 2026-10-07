@@ -1,0 +1,41 @@
+# ledger/8C54.toml -- current truth about game_configs (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "game_configs"
+entries  = ["$8C54"]
+oracle   = "tools/callio.py"
+fixtures = ["control97cb"]
+manual   = ["5.1", "7.2"]
+
+[[fact]]
+kind   = "insn"
+at     = "$8C54"
+says   = "menu polls 1 P1, 2 P2, E exit, 3/4 sound on/off; controls 1 default, 2/3 Sinclair, 5 Kempston, 4 keyboard (9 x Get_Key $8E22 into Temp_Player+2); pauses are Configs_Delay $8E42 (60000 x 24 T), no HALT"
+by     = "python tools/adis.py 0x8C54 120 ; python tools/adis.py 0x8D99 140 ; python tools/adis.py 0x9C53 30"
+
+[[fact]]
+kind   = "measured"
+says   = "callio_97cb.json cases 676-688 by --derive --script from case 0: E, 3, 4, P1/P2 x default/Sinclair 1/Sinclair 2/Kempston, P1 keyboard (8 rows, Get_Key looping), P2 keyboard; --check 689/689"
+by     = "python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"
+
+[[fact]]
+kind   = "gated"
+says   = "controlPass runs the menu as a generator (yields before each IN and after each delay); all 689 cases pass: ports, bytes outside the screen, screen address set, T, A, R; the 13 menu cases end with the lookalike glyphs of their last screen"
+by     = "python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "unreachable"
+says   = "from fixed strings: $C20B fall (no bottom-third row), $C340/$C346 fall (no code $60 up); $92F2 RET Z taken is real but every string is non-empty, so no PC set shows it alone"
+by     = "python tools/branches.py --fixture build/callio_97cb.json"
+window = "$8C54-$8E68, $92E4-$92FE, $C203-$C233, $C319-$C34E"
+n      = 0
+
+[[fact]]
+kind   = "gated"
+says   = "29 menu and font mutants all killed (affected run 211 listed, 207 killed, 4 timeouts, then killed once the gate throws on a read 64 past the port log)"
+by     = "python tools/mutants.py --affected ; python tools/mutants.py --match \"Get_Key mask||Kempston tests key 4\""
+
+[[open]]
+ask    = "how does the live loop run the menu across frames -- controlPass is synchronous; configs() yields before each IN and after each delay but nothing drives it incrementally yet"
+tried  = "the gate runs it to the end in one call (for...of), fine against scripted ports, would block a browser frame for ~470 frames of T"
+settle = "when the live main loop is built, expose the generator (controlPass returns it, or takes a driver) and pace it by its T against the frame budget"

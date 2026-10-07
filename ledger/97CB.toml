@@ -67,3 +67,8 @@ n      = 0
 kind   = "gated"
 says   = "starts ported: key 1 or Kempston fire to $97EF, key 2 to $9808, then New_Round $909E (4 prints of $B064), A=$80; 3 derived cases (case 0 --port 0=0, 1=$10, 2=0), 676 in all; M1 counted through Print_String for R; only $8C54 throws"
 by     = "python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 0 --port 0=0x00 ; python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "the menu $8C54 is ported (ledger/8C54.toml): controlPass throws nowhere; fixture 689 cases with $4000-$57FF blind (D5), 3 older cases moved their screen bytes to blind"
+by     = "python tools/callio.py --check --state s1 --fixture build/callio_97cb.json ; node test/kit.test.js"

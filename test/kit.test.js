@@ -793,13 +793,23 @@ const mockCtx = (state) => ({
    --capture --call 0x9757 0x975A).  Each case carries its port reads in
    order and R at the CALL and the return: the port is served the logged
    values and must ask for the same ports, and its R -- the AI's draws --
-   must land where the machine's did (ledger/97CB.toml, A3FF.toml). */
+   must land where the machine's did (ledger/97CB.toml, A3FF.toml).  The
+   bitmap is a blind range (D5), as for $9C6F: the set of screen bytes
+   written is checked, and the menu's ($8C54, ledger/8C54.toml) last
+   screen must show the lookalike glyphs of its strings. */
 {
   const fx = P.assets.control97cb;
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
   const iA = fx.regs.indexOf(0);
-  let badBytes = 0, badT = 0, badA = 0, badR = 0, badPorts = 0;
-  let firstBytes = '', firstT = '', firstA = '', firstR = '', firstPorts = '';
+  const scr = (y, x) => 0x4000 | (y & 0xC0) << 5 | (y & 7) << 8 | (y & 0x38) << 2 | x;
+  const screens = [                                // [PC that marks it, its strings as [text, pos]]
+    [0x8D99, [[0x8F6B, 0x012D], [0x8F89, 0x0136], [0x8FA7, 0x013F], [0x9000, 0x055C]]],
+    [0x8CDB, [[0x8ED6, 0x012D], [0x8EF4, 0x0136], [0x8F0F, 0x013F], [0x8F2A, 0x0148], [0x8F41, 0x0151], [0x8F59, 0x0371]]],
+    [0x8C54, [[0x8E6B, 0x002D], [0x8E8C, 0x1436], [0x8E99, 0x143F], [0x8EA6, 0x1448], [0x8EB3, 0x055C], [0x8EC6, 0x0765]]]];
+  const missed = P.fontMiss.count;
+  let badBytes = 0, badT = 0, badA = 0, badR = 0, badPorts = 0, badBlind = 0, badGlyph = 0, menus = 0;
+  let firstBytes = '', firstT = '', firstA = '', firstR = '', firstPorts = '', firstBlind = '', firstGlyph = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
@@ -810,55 +820,83 @@ const mockCtx = (state) => ({
     const io = { r: c.r, in: p => {
       if (j >= log.length || log[j][0] !== p){ portErr = portErr || `read ${j} of port $${p.toString(16)}`; j++; return 0xFF; }
       return log[j++][1];
-    } };
+    }, };
+    /* a read far past the log cannot end: the menu polls until a key, and
+       $FF is no key -- stop it, the port error above is already recorded */
+    const serve = io.in;
+    io.in = p => { if (j > log.length + 64) throw new Error(`read ${j} past the ${log.length} logged`); return serve(p); };
     let res;
     try { res = P.controlPass(m, io); } catch (e){ res = { t: -1, a: -1, r: -1 }; portErr = portErr || e.message; }
     if (j !== log.length) portErr = portErr || `${j} port reads, the machine ${log.length}`;
     if (portErr && !badPorts++) firstPorts = `case ${i}: ${portErr}`;
     let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
+    for (let a = 0; a < 0x10000; a++) if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    const wrote = [], blind = [];
+    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
+    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
+    if (wrote.join() !== blind.join() && !badBlind++)
+      firstBlind = `case ${i}: wrote ${wrote.length} screen bytes, the real code ${blind.length}`;
+    const sig = new Set();
+    for (let j = 0; j < c.sig.length; j += 4) sig.add(parseInt(c.sig.slice(j, j + 4), 16));
+    const last = screens.find(([pc]) => sig.has(pc));
+    if (last){
+      menus++;
+      for (const [text, pos] of last[1]) for (let k = 0, ch; (ch = want[text + k]); k++)
+        for (let r = 0; r < 8; r++)
+          if (m[scr((pos & 0xFF) + r, (pos >> 8) + k)] !== P.font[(ch - 0x20) * 8 + r] && !badGlyph++)
+            firstGlyph = `case ${i}: $${text.toString(16)} char ${k} row ${r}`;
+    }
     if (res.t !== c.t && !badT++) firstT = `case ${i}: T ${res.t} want ${c.t}`;
     if (res.a !== c.exit[iA] && !badA++) firstA = `case ${i}: A ${res.a} want ${c.exit[iA]}`;
     if (res.r !== c.rx && !badR++) firstR = `case ${i}: R ${res.r} want ${c.rx}`;
   }
   check('controlPass reads the same ports in the same order as the real $97CB', [badPorts, firstPorts], [0, '']);
-  check('controlPass writes every byte the real $97CB wrote (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('controlPass writes every byte the real $97CB wrote outside the screen (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('controlPass writes exactly the screen bytes the real $97CB wrote', [badBlind, firstBlind], [0, '']);
+  check('the menu cases end with the lookalike glyphs of the strings of their last screen', [menus, badGlyph, firstGlyph], [13, 0, '']);
+  check('every character controlPass printed has a lookalike glyph (fontMiss unchanged)',
+        [P.fontMiss.count - missed, [...P.fontMiss.codes].map(x => x.toString(16)).join()], [0, '']);
   check('controlPass tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
   check('controlPass returns the A the real $97CB returned (the RET M at $975B)', [badA, firstA], [0, '']);
   check('controlPass counts R to the value the real $97CB left (the AI draws)', [badR, firstR], [0, '']);
   /* Every outcome of every conditional the cases executed, from python
      tools/branches.py --fixture build/callio_97cb.json --js.  Captured with
      --poke (2P: $9C2C=2 $AA46=0; Kempston: $8BD2=$8C42) and derived
-     (callio --derive, 15 cases) where play never went; the starts (1,
-     Kempston fire, 2) run New_Round $909E, whose Print_String of the
-     constant nine spaces at fixed top-third rows leaves eight $C319 and
-     one $C206 outcome unreachable from here.  Not here: the menu exit to
-     $8C54 (a later unit) and seven outcomes dead on
+     (callio --derive, 15 cases; the menu by --script, 13) where play
+     never went; the starts (1, Kempston fire, 2) run New_Round $909E.
+     The fixed strings printed from here (New_Round, the menu) never reach
+     the bottom third ($C20B fall) or a code of $60 up ($C340, $C346 fall),
+     and every one is non-empty, so no PC set shows the RET Z at $92F2
+     taken without its fall.  Not here either: seven outcomes dead on
      hardware -- R bit 7 never set ($A174 $A185 $A3E2 $A56B taken, $A503
      fall), $A094 fall ($AA03/$AA43 are 0 whenever the AI is called),
      $A49F fall ($A614 < 7 on its only way in), $98A2 fall (no bit 5 from
      $8B1F) (ledger/97CB.toml). */
   const pcs = fx.cases.map(c => { const s = new Set();
     for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
-  check('the callio cases reach every branch of $97CB, its controls $8B1F and the AI $A090',
+  check('the callio cases reach every branch of $97CB, its controls $8B1F, the menu $8C54 and the AI $A090',
         [0x8B24, 0x8B2A, 0x8B3D, 0x8B42, 0x8B4C, 0x8B4E, 0x8B56, 0x8B5A, 0x8B62, 0x8B64, 0x8B6C, 0x8B70,
          0x8B78, 0x8B7A, 0x8B82, 0x8B86, 0x8B8E, 0x8B90, 0x8B98, 0x8B9C, 0x8BA4, 0x8BA6, 0x8BBA, 0x8BBF,
-         0x8BCC, 0x8BCD, 0x922F, 0x9235, 0x9239, 0x924A, 0x9254, 0x92F3, 0x97D2, 0x97E3, 0x97EA, 0x97EF,
-         0x9801, 0x9808, 0x981A, 0x9827, 0x982E, 0x9835, 0x983D, 0x9843, 0x9849, 0x984F, 0x9860, 0x9874,
-         0x987A, 0x9880, 0x9891, 0x98A6, 0x98BA, 0x9C64, 0x9C67, 0x9C69, 0x9C6D, 0xA09A, 0xA0AC, 0xA0B3,
-         0xA0B8, 0xA0BE, 0xA0C5, 0xA0CC, 0xA0D9, 0xA0E0, 0xA0E4, 0xA0F3, 0xA0FC, 0xA104, 0xA108, 0xA10C,
-         0xA110, 0xA116, 0xA11C, 0xA123, 0xA127, 0xA12E, 0xA132, 0xA136, 0xA13A, 0xA13E, 0xA145, 0xA14C,
-         0xA152, 0xA155, 0xA15E, 0xA161, 0xA168, 0xA16D, 0xA177, 0xA17C, 0xA181, 0xA188, 0xA18C, 0xA18E,
-         0xA195, 0xA1A1, 0xA1A5, 0xA1B5, 0xA1BB, 0xA1C1, 0xA1C8, 0xA1CC, 0xA1D2, 0xA1F4, 0xA1FB, 0xA207,
-         0xA20D, 0xA21B, 0xA222, 0xA226, 0xA22A, 0xA231, 0xA23A, 0xA23E, 0xA247, 0xA255, 0xA259, 0xA25D,
-         0xA263, 0xA26A, 0xA273, 0xA27F, 0xA292, 0xA2A0, 0xA2A6, 0xA2AF, 0xA2BD, 0xA2C1, 0xA2C5, 0xA2C7,
-         0xA2CE, 0xA2DB, 0xA2E2, 0xA2F1, 0xA2F8, 0xA2FC, 0xA30C, 0xA313, 0xA325, 0xA342, 0xA349, 0xA34E,
-         0xA353, 0xA358, 0xA35F, 0xA366, 0xA36D, 0xA37A, 0xA383, 0xA38C, 0xA390, 0xA397, 0xA398, 0xA3A1,
-         0xA3AF, 0xA3CF, 0xA3D3, 0xA3DA, 0xA3E5, 0xA3E9, 0xA3ED, 0xA3EF, 0xA3F7, 0xA484, 0xA488, 0xA48C,
-         0xA490, 0xA492, 0xA4A8, 0xA4BE, 0xA4C5, 0xA4E8, 0xA4F5, 0xA50C, 0xA545, 0xA54E, 0xA553, 0xA567,
-         0xA56E, 0xA57B, 0xA598, 0xA59E, 0xA5A2, 0xA5B3, 0xA5BA, 0xA5BE, 0xA5C0, 0xA5C3, 0xA5C9, 0xA5CD,
-         0xA5DE, 0xA5E5, 0xA5E9, 0xC21A, 0xC31F, 0xC325, 0xC32B, 0xC331, 0xC337, 0xC33D, 0xC343, 0xC349]
+         0x8BCC, 0x8BCD, 0x8C95, 0x8C9E, 0x8CA6, 0x8CAF, 0x8CB7, 0x8CBF, 0x8CC7, 0x8CCF, 0x8CD7, 0x8CDA,
+         0x8D1A, 0x8D22, 0x8D25, 0x8D2D, 0x8D30, 0x8D38, 0x8D3B, 0x8D43, 0x8D46, 0x8D4E, 0x8D63, 0x8D6C,
+         0x8E27, 0x8E30, 0x8E33, 0x8E36, 0x8E45, 0x8E4B, 0x922F, 0x9235, 0x9239, 0x924A, 0x9254, 0x92F3,
+         0x97D2, 0x97E3, 0x97EA, 0x97EF, 0x9801, 0x9808, 0x981A, 0x9821, 0x9827, 0x982E, 0x9835, 0x983D,
+         0x9843, 0x9849, 0x984F, 0x9860, 0x9874, 0x987A, 0x9880, 0x9891, 0x98A6, 0x98BA, 0x9C64, 0x9C67,
+         0x9C69, 0x9C6D, 0xA09A, 0xA0AC, 0xA0B3, 0xA0B8, 0xA0BE, 0xA0C5, 0xA0CC, 0xA0D9, 0xA0E0, 0xA0E4,
+         0xA0F3, 0xA0FC, 0xA104, 0xA108, 0xA10C, 0xA110, 0xA116, 0xA11C, 0xA123, 0xA127, 0xA12E, 0xA132,
+         0xA136, 0xA13A, 0xA13E, 0xA145, 0xA14C, 0xA152, 0xA155, 0xA15E, 0xA161, 0xA168, 0xA16D, 0xA177,
+         0xA17C, 0xA181, 0xA188, 0xA18C, 0xA18E, 0xA195, 0xA1A1, 0xA1A5, 0xA1B5, 0xA1BB, 0xA1C1, 0xA1C8,
+         0xA1CC, 0xA1D2, 0xA1F4, 0xA1FB, 0xA207, 0xA20D, 0xA21B, 0xA222, 0xA226, 0xA22A, 0xA231, 0xA23A,
+         0xA23E, 0xA247, 0xA255, 0xA259, 0xA25D, 0xA263, 0xA26A, 0xA273, 0xA27F, 0xA292, 0xA2A0, 0xA2A6,
+         0xA2AF, 0xA2BD, 0xA2C1, 0xA2C5, 0xA2C7, 0xA2CE, 0xA2DB, 0xA2E2, 0xA2F1, 0xA2F8, 0xA2FC, 0xA30C,
+         0xA313, 0xA325, 0xA342, 0xA349, 0xA34E, 0xA353, 0xA358, 0xA35F, 0xA366, 0xA36D, 0xA37A, 0xA383,
+         0xA38C, 0xA390, 0xA397, 0xA398, 0xA3A1, 0xA3AF, 0xA3CF, 0xA3D3, 0xA3DA, 0xA3E5, 0xA3E9, 0xA3ED,
+         0xA3EF, 0xA3F7, 0xA484, 0xA488, 0xA48C, 0xA490, 0xA492, 0xA4A8, 0xA4BE, 0xA4C5, 0xA4E8, 0xA4F5,
+         0xA50C, 0xA545, 0xA54E, 0xA553, 0xA567, 0xA56E, 0xA57B, 0xA598, 0xA59E, 0xA5A2, 0xA5B3, 0xA5BA,
+         0xA5BE, 0xA5C0, 0xA5C3, 0xA5C9, 0xA5CD, 0xA5DE, 0xA5E5, 0xA5E9, 0xC209, 0xC214, 0xC21A, 0xC31E,
+         0xC31F, 0xC324, 0xC325, 0xC32A, 0xC32B, 0xC330, 0xC331, 0xC336, 0xC337, 0xC33C, 0xC33D, 0xC343,
+         0xC349]
           .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
   /* each RET cc taken: a case that passed it and not the instruction after */
   check('the callio cases take the early returns of $98A0 and $A090',

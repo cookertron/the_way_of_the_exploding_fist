@@ -65,6 +65,13 @@ how many reads were fetches.
              took, which --capture drops as a repeat PC set.  The derived
              case must read the same ports in the same order, or stop
              early (a key that ends the routine): it keeps the reads made.
+             --script "FRAMES:KEYS,..." answers every port read live from
+             a key script instead (keyprobe's syntax), timed by the twin's
+             uncontended T from the CALL in frames of the target: for a
+             routine that polls the keys for many frames inside one call
+             (a menu).  The reads are new, so the parent's log is not
+             compared; the case logs its own.  Keys are released after
+             the script's last segment.
 
 Usage:
     python tools/callio.py --state NAME --call SITE RET [--frames 1500] [--keys D+W]
@@ -77,6 +84,7 @@ Usage:
     python tools/callio.py --check --state s1 --fixture build/callio_97bb.json
     python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 12 --set 0xAA44=0x12
     python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --r 0x15
+    python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --script "4:0,2:,2:E"
 """
 import json
 import os
@@ -87,7 +95,8 @@ import z80dis.z80 as z
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import Simulator, SP, PC, T, R                         # noqa: E402
-from keyprobe import press                                         # noqa: E402
+from keyprobe import press, parse_script                           # noqa: E402
+from harness import Ports                                          # noqa: E402
 from probeutil import parse_target, boot_target, source_label, TARGET_HELP  # noqa: E402
 from sprdec import runs as hexruns, unruns                         # noqa: E402
 
@@ -161,6 +170,30 @@ class PortLog:
 
     def left(self):
         return len(self.logged) - len(self.log) if self.logged is not None else 0
+
+
+class ScriptPorts:
+    """Ports answered from a key script by the twin's T since the CALL
+    (registers[T] - t0), in frames of `frame` T; nothing held after the end."""
+    def __init__(self, script, frame, t0=0):
+        self.segs, self.frame, self.t0 = [], frame, t0
+        at = 0
+        for frames, keys in script:
+            self.segs.append((at, at + frames * frame, keys)); at += frames * frame
+        self.ports, self.cur = Ports(), None
+
+    def read_port(self, registers, port):
+        dt = registers[T] - self.t0
+        keys = next((k for lo, hi, k in self.segs if lo <= dt < hi), [])
+        if keys is not self.cur:
+            self.ports.release_all()
+            for k in keys:
+                press(self.ports, k)
+            self.cur = keys
+        return self.ports.read_port(registers, port)
+
+    def write_port(self, registers, port, value, offset=0):
+        pass
 
 
 def run_alone(mem, regs, ret, limit=20_000_000, ports=None):
@@ -399,7 +432,7 @@ def check(args):
 
 def derive(args):
     t = parse_target(args)
-    fixture, base, sets, rset, psets = None, None, {}, None, {}
+    fixture, base, sets, rset, psets, script = None, None, {}, None, {}, None
     while args:
         if args[0] == '--fixture':
             fixture = args[1]; del args[:2]
@@ -417,9 +450,13 @@ def derive(args):
                 i, v = kv.split('=')
                 psets[int(i, 0)] = int(v, 0)
             del args[:2]
+        elif args[0] == '--script':
+            script = args[1]; del args[:2]
         else:
             sys.exit(f'callio: unknown argument {args[0]}')
-    if not fixture or base is None or not (sets or psets or rset is not None):
+    if script is not None and psets:
+        sys.exit('callio: --script answers every port read; it cannot be combined with --port')
+    if not fixture or base is None or not (sets or psets or rset is not None or script):
         sys.exit('callio: --derive needs --fixture FILE --case N --set ADDR=VAL[,ADDR=VAL...]')
     h = boot_target(t, 'callio')
     fx = json.load(open(fixture))
@@ -449,7 +486,10 @@ def derive(args):
         sys.exit(f'callio: --port indexes the parent\'s {len(ports)} logged reads')
     for i, v in psets.items():                     # the value the machine answers; the port stays
         ports[i][1] = v
-    pl = PortLog(logged=ports)
+    if script is not None:
+        pl = PortLog(live=ScriptPorts(parse_script(script), h.frame_duration))
+    else:
+        pl = PortLog(logged=ports)
     dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], ports=pl)
     if pl.bad:                                     # stopping early is fine: the case keeps its own log
         sys.exit('callio: the derived case reads the ports differently from its parent; derive another way')
@@ -464,7 +504,8 @@ def derive(args):
                         **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig,
                         'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()},
                                     **({'r': rset} if rset is not None else {}),
-                                    **({'port': {str(i): v for i, v in psets.items()}} if psets else {})}})
+                                    **({'port': {str(i): v for i, v in psets.items()}} if psets else {}),
+                                    **({'script': script} if script is not None else {})}})
     with open(fixture, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
     print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {dt}; PCs no case reached before: '
