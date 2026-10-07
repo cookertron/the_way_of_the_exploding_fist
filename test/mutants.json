@@ -2486,5 +2486,101 @@
   "new": "    M1.m1 += 2; return t + 10;",
   "increment": "9745-r",
   "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: $BF13 SP two high",
+  "old": "renderFighters(m, null, (sp - 4) & 0xFFFF)",
+  "new": "renderFighters(m, null, (sp - 2) & 0xFFFF)",
+  "increment": "9745-pass",
+  "kills": "playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: effect writes not offset by the T before the CALL",
+  "old": "io.out.push([tb + ft, v])",
+  "new": "io.out.push([ft, v])",
+  "increment": "9745-pass",
+  "kills": "playPass makes the effect's $FE writes in number and value, the first at the machine's T"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: effect request not read",
+  "old": "  const a = m[0xB150];\n",
+  "new": "  const a = 0;\n",
+  "increment": "9745-pass",
+  "kills": "playPass makes the effect's $FE writes in number and value, the first at the machine's T"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: one LD A,(nn) at $974E dropped from T",
+  "old": "  t += 13 + 13 + 17; M1.m1 += 3;",
+  "new": "  t += 13 + 17; M1.m1 += 3;",
+  "increment": "9745-pass",
+  "kills": "playPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: CALL $BF13 not charged",
+  "old": "  t += 17 + renderFighters(",
+  "new": "  t += renderFighters(",
+  "increment": "9745-pass",
+  "kills": "playPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: RET M taken charged as not taken",
+  "old": "  if (c.a & 0x80){ M1.m1 += 1; return { t: t + 11,",
+  "new": "  if (c.a & 0x80){ M1.m1 += 1; return { t: t + 5,",
+  "increment": "9745-pass",
+  "kills": "playPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: A at the end is P1's $04",
+  "old": "  return { t, a: 0x44, r: rAt() };",
+  "new": "  return { t, a: 0x04, r: rAt() };",
+  "increment": "9745-pass",
+  "kills": "playPass returns the A the real $9745 returned (the RET M at $AE2D)"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: RET M taken M1 dropped",
+  "old": "  if (c.a & 0x80){ M1.m1 += 1; return",
+  "new": "  if (c.a & 0x80){ M1.m1 += 0; return",
+  "increment": "9745-pass",
+  "kills": "playPass counts R to the value the real $9745 left (the AI draws carried)"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: final RET M1 dropped",
+  "old": "  t += fighterPost(m, 0x40) + 10; M1.m1 += 1;",
+  "new": "  t += fighterPost(m, 0x40) + 10; M1.m1 += 0;",
+  "increment": "9745-pass",
+  "kills": "playPass counts R to the value the real $9745 left (the AI draws carried)"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: R into controlPass without the M1 before $9757",
+  "old": "  const r = (io.r & 0x80) | ((io.r + M1.m1) & 0x7F);",
+  "new": "  const r = io.r;",
+  "increment": "9745-pass",
+  "kills": "playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: $9C29 left 0 for P1's step",
+  "old": "  m[0x9C29] = 0x40;\n  t += fighterStep(m, 0)",
+  "new": "  m[0x9C29] = 0;\n  t += fighterStep(m, 0)",
+  "increment": "9745-pass",
+  "kills": "playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9745 pass: fighters stepped in the wrong order",
+  "old": "  t += fighterStep(m, 0x40) + yinYang2P(m)",
+  "new": "  t += yinYang2P(m) + fighterStep(m, 0x40)",
+  "increment": "9745-pass",
+  "kills": "playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)"
  }
 ]

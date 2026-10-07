@@ -2027,6 +2027,44 @@ function controlPass(m, io){
   function a5c0(){ k(17, 2); return 1; }
 }
 
+/* ---- play_pass $9745: one pass of play, from the CALL at $AE29 --------
+   The callees in the machine's order, each gated alone above; the glue
+   between them is from the listing (python tools/adis.py 0x9745 40).  R:
+   io.r is R at the CALL at $AE29; the M1 count of everything before the
+   CALL at $9757 carries it into controlPass, which returns R there, and the
+   callees after it add theirs.  The effect's $FE writes go to io.out as
+   [T from the CALL at $AE29, value].  sp is SP at that CALL ($BF13 runs at
+   sp - 4).  Returns the uncontended T to $AE2C, A there (bit 7 set: the
+   RET M at $975B; else $44, left by $9B9D for P2) and R there.  Gated
+   whole against python tools/callio.py --capture --call 0xAE29 0xAE2C
+   (ledger/9745.toml). */
+function playPass(m, io, sp){
+  M1.m1 = 1;                                       // CALL $9745
+  let t = 17 + boutTimer(m) + p2HitsP1(m) + p1HitsP2(m);
+  const a = m[0xB150];
+  t += 13 + 13 + 17; M1.m1 += 3;                   // LD A,(nn) twice, CALL $B15A
+  const fx = [], tb = t;
+  t += soundEffect(m, a, fx);
+  for (const [ft, v] of fx) io.out.push([tb + ft, v]);
+  const r = (io.r & 0x80) | ((io.r + M1.m1) & 0x7F);
+  const c = controlPass(m, { r, in: io.in });
+  t += c.t + 4; M1.m1 = 1;                         // AND A
+  if (c.a & 0x80){ M1.m1 += 1; return { t: t + 11, a: c.a, r: rAt() }; }   // RET M taken
+  t += 5 + 7 + 13 + 7; M1.m1 += 4;                 // RET M, LD A,$40: LD ($9C29),A: LD C,0
+  m[0x9C29] = 0x40;
+  t += fighterStep(m, 0) + 7 + 4 + 13; M1.m1 += 3;  // LD C,$40: XOR A: LD ($9C29),A
+  m[0x9C29] = 0;
+  t += fighterStep(m, 0x40) + yinYang2P(m) + fighterMotion(m);
+  t += 17 + renderFighters(m, null, (sp - 4) & 0xFFFF); M1.m1 += 1;
+  t += 7 + 7 + 13; M1.m1 += 3;                     // LD C,0: LD A,$40: LD ($9C29),A
+  m[0x9C29] = 0x40;
+  t += fighterPost(m, 0) + 7 + 4 + 13; M1.m1 += 3;  // LD C,$40: XOR A: LD ($9C29),A
+  m[0x9C29] = 0;
+  t += fighterPost(m, 0x40) + 10; M1.m1 += 1;      // RET
+  return { t, a: 0x44, r: rAt() };
+  function rAt(){ return (c.r & 0x80) | ((c.r + M1.m1) & 0x7F); }
+}
+
 /* ---- the demo "game"------------------------------------------------- */
 const TONE_HZ = 440;
 class Demo {
@@ -2107,5 +2145,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

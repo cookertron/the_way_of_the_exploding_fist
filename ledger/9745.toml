@@ -3,6 +3,8 @@
 
 name     = "play_pass"
 entries  = ["$9745"]
+fixtures = ["pass9745"]
+port     = "playPass"
 manual   = ["Q11", "3.8", "7.2"]
 
 [[fact]]
@@ -35,7 +37,12 @@ kind   = "measured"
 says   = "the whole pass $AE29 to $AE2C, s1 300 frames: 79 calls, 51 distinct PC sets, about 16 KB in/out per case; writes the timer cells $400B-$470F (ROM font: blind) and the $C3F0 display copy"
 by     = "python tools/callio.py --capture --state s1 --call 0xAE29 0xAE2C --frames 300 --per 1 --blind 0x400B-0x400F (and each row to $470B) --out scratch/pass.json"
 
+[[fact]]
+kind   = "measured"
+says   = "playPass, composed from the callees, matches the machine on all 130 driven pass cases and the quit: bytes, timer cells, T, A, R, port order; ROM-effect $FE writes in count, value and first T (D6 moves inner edges)"
+by     = "node test/kit.test.js (play_pass block; build/callio_ae29.json, 24 cases after callio --cover)"
+
 [[open]]
-ask    = "R at the CALL at $9757 (the AI draws) is R at $AE29 plus the M1 of $9C6F $9ED2 $9D29 and $B15A; every callee needs an M1 tally into M1.m1 -- every callee now tallies (gated per callee); left: the composed pass checked against rx"
-tried  = "oracles stamped: callio fixtures rx/r (--stamp-r), rendfx m1 (--stamp-r), sfx m1 (re-captured, identical otherwise)"
-settle = "node test/kit.test.js with an M1 check in every callee gate, then the whole-pass gate checks rx"
+ask    = "two composition mutants survive every driven whole-pass case: $9C29 left 0 for P1's step (the $97BB branches that read the opponent, $9920/$9994) and P2's step after the 2P yin-yang award; no pass case reaches them"
+tried  = "all 130 captured cases before --cover (scratch replay): both survive"
+settle = "callio --derive on a pass case with --set putting P1 in a move whose $97BB path reads the opponent (reuse the sets of the derived 97bb cases), and a 2P case where P2's step changes $AA43/$AA48; then mutants.py --affected kills both"

@@ -77,6 +77,12 @@
       "file": "build/sfx_cases.json",
       "required": true,
       "note": "the D6 substitutes the JS plays and the oracle for sound_effect $B15A: python tools/sfx.py --capture (see its --help)"
+    },
+    {
+      "key": "pass9745",
+      "file": "build/callio_ae29.json",
+      "required": true,
+      "note": "oracle for play_pass $9745, the whole pass: python tools/callio.py --capture --call 0xAE29 0xAE2C (s1, p1, s1 --poke 0x9C2C=2,0xAA46=0; --blind each timer row $400B-$470F), --derive the quit, then --cover"
     }
   ],
   "tape": {

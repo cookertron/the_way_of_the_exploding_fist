@@ -1018,4 +1018,73 @@ const mockCtx = (state) => ({
           .map(s => s.de.toString(16)), []);
 }
 
+/* ---- play_pass $9745, the whole pass, against its frozen oracle --------
+   Bracketed from the CALL at $AE29 to $AE2C (python tools/callio.py
+   --capture, s1, p1 and 2P by --poke; the quit derived by --script H+G;
+   shrunk by --cover to the cases that reach every PC).  Each callee is
+   gated alone above; this checks the composition: the glue, the order, SP
+   into $BF13, R carried through the AI draws, and where the effect's
+   writes land.  The effect cases are ROM effects, whose inner edges move
+   with the D6 substitutes (the sfx gate holds those): their writes must
+   match in count and value, the first at the same T. */
+{
+  const fx = P.assets.pass9745;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  const iA = fx.regs.indexOf(0);
+  let badBytes = 0, badBlind = 0, badT = 0, badA = 0, badR = 0, badPorts = 0, badOuts = 0;
+  let firstBytes = '', firstBlind = '', firstT = '', firstA = '', firstR = '', firstPorts = '', firstOuts = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const log = c.ports || [];
+    let j = 0, portErr = '';
+    const io = { r: c.r, out: [], in: p => {
+      if (j >= log.length || log[j][0] !== p){ portErr = portErr || `read ${j} of port $${p.toString(16)}`; j++; return 0xFF; }
+      return log[j++][1];
+    }, };
+    const res = P.playPass(m, io, c.sp);
+    if (j !== log.length) portErr = portErr || `${j} port reads, the machine ${log.length}`;
+    if (portErr && !badPorts++) firstPorts = `case ${i}: ${portErr}`;
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
+      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
+    }
+    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    const wrote = [], blind = [];
+    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
+    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
+    if (wrote.join() !== blind.join() && !badBlind++)
+      firstBlind = `case ${i}: wrote ${wrote.length} screen bytes, the real code ${blind.length}`;
+    const outs = c.outs || [];
+    if ((io.out.length !== outs.length || io.out.some((e, k) => e[1] !== outs[k][1])
+         || (outs.length && io.out[0][0] !== outs[0][0])) && !badOuts++)
+      firstOuts = `case ${i}: ${io.out.length} writes, first ${JSON.stringify(io.out[0])}; the machine ${outs.length}, ${JSON.stringify(outs[0])}`;
+    if (res.t !== c.t && !badT++) firstT = `case ${i}: T ${res.t} want ${c.t}`;
+    if (res.a !== c.exit[iA] && !badA++) firstA = `case ${i}: A ${res.a} want ${c.exit[iA]}`;
+    if (res.r !== c.rx && !badR++) firstR = `case ${i}: R ${res.r} want ${c.rx}`;
+    /* stop at the first bad case: a pass gone wrong reads bytes the case
+       never held, and over the $A5 poison a sprite walk finds no end */
+    if (badPorts + badBytes + badBlind + badOuts + badT + badA + badR) break;
+  }
+  check('playPass reads the same ports in the same order as the real $9745', [badPorts, firstPorts], [0, '']);
+  check('playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('playPass writes exactly the timer-cell bytes the real $9745 wrote', [badBlind, firstBlind], [0, '']);
+  check('playPass makes the effect\'s $FE writes in number and value, the first at the machine\'s T', [badOuts, firstOuts], [0, '']);
+  check('playPass tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  check('playPass returns the A the real $9745 returned (the RET M at $AE2D)', [badA, firstA], [0, '']);
+  check('playPass counts R to the value the real $9745 left (the AI draws carried)', [badR, firstR], [0, '']);
+  const pcs = fx.cases.map(c => { const s = new Set();
+    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  check('the pass cases cover 1P, 2P, a timer print, an effect and both fighter draws',
+        [0x975C, 0x9776, 0x9C93, 0xB15C, 0x9790, 0x97A6].filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+  check('the pass cases take the RET M at $975B (the quit)',
+        pcs.some(s => s.has(0x975B) && !s.has(0x975C)), true);
+  check('the pass cases wrap R\'s low seven bits between $AE29 and $AE2C (the carry is mod 128)',
+        fx.cases.some(c => (c.rx & 0x7F) < (c.r & 0x7F)), true);
+}
+
 rig.done();

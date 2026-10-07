@@ -79,6 +79,12 @@ how many reads were fetches.
              (a menu).  The reads are new, so the parent's log is not
              compared; the case logs its own.  Keys are released after
              the script's last segment.
+  --cover    shrink a fixture in place to a greedy cover of its PC sets:
+             the fewest cases (most new PCs first) that still reach every
+             PC some case reached, plus every derived case.  For a call
+             whose cases are large (a whole pass, ~16 KB each) where the
+             parts are gated alone and the whole-call gate checks the
+             composition.  Not for a fixture whose gate counts cases.
 
 Usage:
     python tools/callio.py --state NAME --call SITE RET [--frames 1500] [--keys D+W]
@@ -92,6 +98,7 @@ Usage:
     python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 12 --set 0xAA44=0x12
     python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --r 0x15
     python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --script "4:0,2:,2:E"
+    python tools/callio.py --cover --fixture build/callio_ae29.json
 """
 import json
 import os
@@ -536,10 +543,36 @@ def derive(args):
           + (' '.join(f'${a:04X}' for a, _ in runs(pcs - old)) if pcs - old else 'none'))
 
 
+def cover(args):
+    fixture = None
+    while args:
+        if args[0] == '--fixture':
+            fixture = args[1]; del args[:2]
+        else:
+            sys.exit(f'callio: unknown argument {args[0]}')
+    if not fixture:
+        sys.exit('callio: --cover needs --fixture FILE')
+    fx = json.load(open(fixture))
+    sigs = [{int(c['sig'][j:j + 4], 16) for j in range(0, len(c['sig']), 4)} for c in fx['cases']]
+    want, got, keep = set().union(*sigs), set(), set()
+    while got != want:                                   # greedy: most new PCs first, earliest on a tie
+        i = max(range(len(sigs)), key=lambda i: (len(sigs[i] - got), -i))
+        keep.add(i); got |= sigs[i]
+    for i, c in enumerate(fx['cases']):                  # derived cases were asked for: never dropped
+        if c.get('derived'):
+            keep.add(i)
+    old = len(fx['cases'])
+    fx['cases'] = [c for i, c in enumerate(fx['cases']) if i in keep]
+    json.dump(fx, open(fixture, 'w'), separators=(',', ':'))
+    print(f'callio: {fixture}: kept {len(fx["cases"])} of {old} cases, every one of {len(want)} PCs still reached')
+
+
 def main():
     args = sys.argv[1:]
     if not args or '-h' in args or '--help' in args:
         print(__doc__.strip()); sys.exit(0)
+    if args[0] == '--cover':
+        return cover(args[1:])
     if args[0] == '--capture':
         return capture(args[1:])
     if args[0] == '--check':
