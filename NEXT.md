@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     full background mutants run (python tools/mutants.py --background) -- controlPass now complete; then pick the next unported routine from the main loop $9745
-Step:     read build/mutants/summary.txt when it lands; then python tools/status.py --brief to choose the next unit
-Then:     live loop design must drive the menu generator across frames (ledger/8C54.toml open 1)
+Unit:     $9745 play_pass callees -- the sound effect $B15A (blocking beeper, 10.7 frames in one call) is the last unported one; then compose playPass
+Step:     python tools/adis.py 0xB15A 40 and the effect table $B144; read manual on beeper sound (python tools/manual.py --grep beeper) before choosing how the JS plays it
+Then:     live loop design must drive the menu generator across frames (ledger/8C54.toml open 1); $ABD2/$AD22 also call $900E with counts 3+ (ledger/900E.toml)
 Blocked:  none
-Notes:    callio --derive --script FRAMES:KEYS answers ports from a timed key script (for routines that poll inside one call); kit gate throws on a read 64 past the port log so polling mutants fail instead of hanging
+Notes:    callio brackets any PC range, not only a CALL (--call 0x976F 0x978D); --poke Num_Players 0x9C2C=2 gives 2P play from s1

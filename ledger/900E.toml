@@ -1,0 +1,36 @@
+# ledger/900E.toml -- current truth about yin_yang (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "yin_yang"
+entries  = ["$900E", "$AF01", "$9255", "$92CA"]
+oracle   = "tools/callio.py"
+fixtures = ["yy976f"]
+port     = "yinYang2P"
+manual   = ["5.1", "7.2"]
+
+[[fact]]
+kind   = "insn"
+at     = "$976F"
+says   = "2P only (Num_Players $9C2C = 2): $AF01 is A = ($AA03 XOR $AA43) AND $10; zero (neither or both reeling) clears both Points_Awarded $AA08/$AA48 before Yin_Yang_1UP, which then adds them to $AA01/$AA41; both counts are cleared after"
+by     = "python tools/adis.py 0x976F 12 ; python tools/adis.py 0xAF01 5"
+
+[[fact]]
+kind   = "insn"
+at     = "$900E"
+says   = "P1 points nonzero returns after drawing P1: a P2 award in the same pass goes undrawn; count 1 half at $0408, 2 full, 3 full + half at $0108, 4+ full at $0108; P2 at $1A08/$1D08; $9255 copies 4 cells of UDG via $92CA"
+by     = "python tools/adis.py 0x900E 60 ; python tools/adis.py 0x9255 30 ; python tools/adis.py 0x92CA 12"
+
+[[fact]]
+kind   = "measured"
+says   = "fixture build/callio_976f.json, $976F-$978D: 10 play cases (s1 p1 p1b, D+W, 3000 frames, Num_Players poked 2) reach counts 1-2 only; 12 derived (counts to 7, $AA08=2, equal reel bits, 1P); --check 22/22, T 32-9277"
+by     = "python tools/callio.py --capture --state s1 --poke 0x9C2C=2 --call 0x976F 0x978D --frames 3000 --keys D+W --per 2 --out build/callio_976f.json --append ; python tools/callio.py --check --state s1 --fixture build/callio_976f.json"
+
+[[fact]]
+kind   = "data"
+says   = "writers of $AA01/$AA41 are $900E itself, New_Round $909F and the pass clear $9787; so via $9783 the count enters as 0 and only 1-2 occur; $900E is also called at $ABD2 and $AD22 (with $AF01 before each), where counts 3+ can arise"
+by     = "python tools/grepbytes.py \"01 AA\" ; python tools/grepbytes.py \"CD 0E 90\""
+
+[[fact]]
+kind   = "gated"
+says   = "yinYang2P writes every byte and the exact uncontended T of all 22 cases; every branch of $976F, $900E, $9255 and both $9229 exits reached; 15 mutants killed; dropping $9229's H-8 step is equivalent here (it follows the last byte)"
+by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"

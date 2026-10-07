@@ -1686,5 +1686,125 @@
   "new": "  0x7F: [0x66, 0x66, 0x66, 0x3C,",
   "increment": "8C54",
   "kills": "every character controlPass printed has a lookalike glyph (fontMiss unchanged)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: 1P mode runs the award",
+  "old": "if (m[0x9C2C] !== 2) return t + 12;",
+  "new": "if (m[0x9C2C] === 0) return t + 12;",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: reel bit 3 not 4",
+  "old": "if ((m[0xAA03] ^ m[0xAA43]) & 0x10) t += 12;",
+  "new": "if ((m[0xAA03] ^ m[0xAA43]) & 0x08) t += 12;",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: equal reels keep P2 points",
+  "old": "else { m[0xAA08] = 0; m[0xAA48] = 0; t += 7 + 30; }",
+  "new": "else { m[0xAA08] = 0; t += 7 + 30; }",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: counts not cleared after",
+  "old": "m[0xAA01] = 0; m[0xAA41] = 0;\n  return t + 30;",
+  "new": "m[0xAA01] = 0;\n  return t + 30;",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: P1 award falls through to P2",
+  "old": "if (m[0xAA08]) return t + yyAward(m, 0xAA01, m[0xAA08], 0x0408, 0x0108);",
+  "new": "if (m[0xAA08]) t += yyAward(m, 0xAA01, m[0xAA08], 0x0408, 0x0108);",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: count 3 skips the half",
+  "old": "if (a === 3) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + yyCopy(m, YY_HALF, pos2) + 10;",
+  "new": "if (a === 3) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + 10;",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: count 2 draws the half",
+  "old": "if (a === 2) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 10;",
+  "new": "if (a === 2) return t + 7 + 20 + yyCopy(m, YY_HALF, pos1) + 10;",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: count 4+ drawn at the first slot",
+  "old": "return t + 12 + 20 + yyCopy(m, YY_FULL, pos2) + 10;",
+  "new": "return t + 12 + 20 + yyCopy(m, YY_FULL, pos1) + 10;",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: P2 slot column off by one",
+  "old": "return t + 5 + yyAward(m, 0xAA41, m[0xAA48], 0x1A08, 0x1D08);",
+  "new": "return t + 5 + yyAward(m, 0xAA41, m[0xAA48], 0x1B08, 0x1D08);",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: copy lower cells not 8 rows down",
+  "old": "low = pos & 0xFF00 | (pos + 8) & 0xFF;",
+  "new": "low = pos & 0xFF00 | (pos + 7) & 0xFF;",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: copy right cell reuses the first 8 bytes",
+  "old": "+ 10 + 10 + 11 + 4 + 10 + 4 + 11 + 4 + 11 + yyLine(m, right, de + 8)",
+  "new": "+ 10 + 10 + 11 + 4 + 10 + 4 + 11 + 4 + 11 + yyLine(m, right, de)",
+  "increment": "900E",
+  "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: $9229 back-8 step T one short (the step itself is unobservable: it follows the last byte)",
+  "old": "else { h = (h - 8) & 0xFF; t += 69; }\n    }\n    a = h << 8 | l;\n  }\n  return t + 10;\n}\nfunction yyCopy",
+  "new": "else { h = (h - 8) & 0xFF; t += 68; }\n    }\n    a = h << 8 | l;\n  }\n  return t + 10;\n}\nfunction yyCopy",
+  "increment": "900E",
+  "kills": "yinYang2P tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: line loop T one short",
+  "old": "t += 7 + 7 + 6 + 4 + 17 + 4 + (b > 1 ? 13 : 8);\n    /* $9229: down one pixel row */\n    let h = ((a >> 8)",
+  "new": "t += 7 + 7 + 6 + 4 + 17 + 4 + (b > 1 ? 13 : 7);\n    /* $9229: down one pixel row */\n    let h = ((a >> 8)",
+  "increment": "900E",
+  "kills": "yinYang2P tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: AF01 body T wrong",
+  "old": "t += 7 + 17 + 47 + 4;",
+  "new": "t += 7 + 17 + 46 + 4;",
+  "increment": "900E",
+  "kills": "yinYang2P tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "yy: 2UP RET Z charged as not taken",
+  "old": "if (!m[0xAA48]) return t + 11;",
+  "new": "if (!m[0xAA48]) return t + 5;",
+  "increment": "900E",
+  "kills": "yinYang2P tallies the uncontended T of every case exactly"
  }
 ]

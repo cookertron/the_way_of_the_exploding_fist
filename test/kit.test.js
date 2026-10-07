@@ -906,4 +906,38 @@ const mockCtx = (state) => ({
         [0x9835, 0x8B2A, 0x8BBF].filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
 }
 
+/* ---- the 2P yin-yang award $976F-$978D against its frozen oracle -------
+   Bracketed from $976F to $978D with Num_Players poked to 2 (python
+   tools/callio.py --capture --poke 0x9C2C=2 --call 0x976F 0x978D).  Play
+   reaches counts 1 and 2 only -- the pass clears both counts after each
+   draw -- so derived cases (the real code on a set count) reach 3 and 4+,
+   which $ABD2 and $AD22 can bring (ledger/900E.toml). */
+{
+  const fx = P.assets.yy976f;
+  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
+    put(m, c.in);
+    const want = m.slice(); put(want, c.out);
+    const t = P.yinYang2P(m);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
+    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
+    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
+  }
+  check('yinYang2P writes every byte the real $976F-$978D wrote (callio cases)', [badBytes, firstBytes], [0, '']);
+  check('yinYang2P tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const pcs = fx.cases.map(c => { const s = new Set();
+    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  check('the callio cases reach every branch of $976F, $900E and its copy $9255',
+        [0x9776, 0x977C, 0x9783, 0x9015, 0x901E, 0x9028, 0x9036, 0x904D, 0x905C, 0x9065, 0x906F, 0x907D, 0x9094,
+         0x922F, 0x9235, 0x9239]
+          .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+  check('the callio cases take the 1P exit and the RET Z of Yin_Yang_2UP',
+        [[0x9774, 0x9776], [0x905B, 0x905C]]
+          .filter(([a, b]) => !pcs.some(s => s.has(a) && !s.has(b))).map(([a]) => a.toString(16)), []);
+}
+
 rig.done();
