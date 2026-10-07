@@ -1341,6 +1341,51 @@ const mockCtx = (state) => ({
         [0x001F, 0xFBFE, 0xF7FE, 0xFBFD, 0x00FF].map(p => P.specPort(kb, p)), [0x10, 0xFE, 0xFF, 0xFF, 0xFF]);
 }
 
+/* ---- the 1UP game after a bout: $ACA6 to $AC5F or $AC39 ----------------
+   python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39
+   (port.json: played, then the starts constructed by pokes: P1's count,
+   the bouts left $AA3C, the stage $AF34, the rank $B05F, Time).  boutNext
+   for A = 0 / 1; drawStart, winPass on $AA0D and the JP for the draw:
+   every byte outside the stack frames and the score row, T, R and the PC
+   left by. */
+{
+  const fx = P.assets.next_aca6, iA = fx.regs.indexOf(0);
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    P.M1.m1 = 0;
+    const a = c.regs[iA];
+    let t, at, n = 0;
+    try {
+      if (a === 0x81){                              // $ACCF, CALL $ACE8, its loop, JP $AC5F
+        t = P.drawStart(m); let w;
+        do { w = P.winPass(m, 0xAA00, c.sp - 2, null); t += w.t; n++; } while (!w.out && t <= c.t);
+        t += 10; P.M1.m1 += 1; at = 0xAC5F;
+      } else { const b = P.boutNext(m, a, c.r); t = b.t; at = b.at; }
+    } catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
+    let diff = -1;
+    for (let x = 0; x < 0x10000; x++){
+      if (x === c.sp - 128) x = c.sp + 2;
+      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
+    }
+    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, at];
+    const wnt = [c.t, c.rx, -1, c.xpc];
+    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
+      first = `case ${i}: T, R, first bad byte, PC ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
+  }
+  check("boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly",
+        [bad, first], [0, '']);
+  check("...and the cases take every arm: lost, won with bouts left, rank up, rank up with the stage wrapping, the top rank's random, the draw",
+        [fx.cases.map(c => c.regs[iA]), fx.cases.map(c => c.t)],
+        [[0, 1, 0, 1, 1, 1, 0x81, 1], [40, 54, 40, 222, 240, 251, fx.cases[6].t, 222]]);
+  check('...and one derived: the rank from 9 to $10, a BCD carry through DAA',
+        [fx.cases[7].derived, fx.cases[7].out.find(([a]) => a === 0xB05F)], [{ from: 3, set: { b05f: 9 } }, [0xB05F, '10']]);
+}
+
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
    House rule 2: python tools/sample.py --state p1 --at 0xAE29 --script
    (keys BY PASS) --json build/live_p1.json samples the machine at every
@@ -1406,8 +1451,9 @@ function liveGate(L, who, how){
   }
   const what = { won: ', the victory pose and the time bonus', lost: ' and the victory pose', draw: ', the round end and the draw' }[how];
   check(`${who}: roundPass${what} follow the machine sample for sample over keyed 1P play until the bout ends`, first, '');
-  check(`${who}: ...and leave on the sample the machine left, the same way (${how === 'draw' ? 'out at $AC5F drawn' : `${who} wins, out to $ACA6 ${how}`})`,
-        [at, exit, !!(seq[k] && !seq[k].sub), g.win, g.bonus, g.both], [out, how, true, 0, false, null]);
+  check(`${who}: ...and leave on the sample the machine left, the same way (${how === 'draw' ? 'out at $AC5F drawn' : `${who} wins, out to $ACA6 ${how}, on to ${how === 'lost' ? '$AC39' : '$AC5F'}`})`,
+        [at, exit, g.exit && g.exit.at, !!(seq[k] && !seq[k].sub), g.win, g.bonus, g.both],
+        [out, how, how === 'lost' ? 0xAC39 : 0xAC5F, true, 0, false, null]);
   const sub = (L.rows[out] || {}).s || [];
   const end = how === 'draw' ? sub.findIndex(x => x.t > 1e6) : 0;   // the round end's loop: to the delays
   check(`${who}: ...which the script reaches ${how === 'draw' ? 'by the clock, no point played, the round end loop then' : 'through points played on, the way out the last, after'} 66 passes of the pose${how === 'won' ? ' and a pass a second' : ''}`,

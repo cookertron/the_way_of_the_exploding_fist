@@ -2366,6 +2366,41 @@ function timeUp(m){
   return (t += 7, call('p1'));
 }
 
+/* ---- the 1UP game after a bout: $ACA6-$ACE5 and $AF27, from the listing -
+   (python tools/adis.py 0xAC40 80 ; python tools/adis.py 0xAF27 6.)  With
+   A = 0 (lost) $ACD9 returns A = 0 to Main_Game_Loop's $AC39; with A = 1
+   (won) the bouts left at this rank $AA3C count down, and at 0 go back to
+   2 while the stage $AF34 steps 1-3 ($AF27), the new-stage flag $AF35 is
+   set, and the rank rises: Current_Rank $B05F by one in BCD and Also_Rank
+   $AA80 by one, or at rank $10 Also_Rank = 7 + (R & 3) by Random_Number;
+   then JP $AC5F, the next bout.  The draw ($81) is drawStart's.  r is R
+   less the M1 already in M1.m1.  Returns T and the PC reached.  Gated
+   against python tools/callio.py --capture --call 0xACA6 0xAC5F,0xAC39
+   (build/callio_aca6.json, the starts constructed by pokes). */
+function boutNext(m, a, r){
+  M1.m1 += 3;                                      // AND A: JP M: JR Z
+  if (!a) return (M1.m1 += 2, { t: 4 + 10 + 12 + 4 + 10, at: 0xAC39 });   // XOR A: RET
+  let t = 4 + 10 + 7 + 10 + 11; M1.m1 += 3;        // LD HL,$AA3C: DEC (HL): JR NZ
+  if (--m[0xAA3C] & 0xFF) return { t: t + 12, at: 0xAC5F };
+  m[0xAA3C] = 2; t += 7 + 10 + 17; M1.m1 += 2;     // LD (HL),2: CALL $AF27
+  t += 10 + 11 + 7 + 7; M1.m1 += 4;                // LD HL,$AF34: INC (HL): LD A,(HL): CP 4
+  if (++m[0xAF34] !== 4) t += 11, M1.m1 += 1;      // RET NZ
+  else { m[0xAF34] = 1; t += 5 + 7 + 7 + 10; M1.m1 += 4; }
+  m[0xAF35] = 1; t += 7 + 13 + 10 + 7 + 7; M1.m1 += 6;   // LD A,1: LD ($AF35),A: LD HL: LD A,(HL): CP $10: JR Z
+  const v = m[0xB05F];
+  if (v === 0x10){
+    t += 12 + 17; M1.m1 += 1 + 2;                  // CALL Random_Number: LD A,R
+    const x = (r & 0x80) | ((r + M1.m1) & 0x7F);
+    m[0xAA80] = (x & 3) + 7; M1.m1 += 5;           // RET: AND 3: ADD A,7: LD (nn),A: JP
+    return { t: t + 9 + 10 + 7 + 7 + 13 + 10, at: 0xAC5F };
+  }
+  let s = v + 1;                                   // ADD A,1: DAA
+  if ((s & 0x0F) > 9 || (v & 0x0F) === 0x0F) s += 6;
+  if (s > 0x99) s += 0x60;
+  m[0xB05F] = s & 0xFF; m[0xAA80] = (m[0xAA80] + 1) & 0xFF; M1.m1 += 6;
+  return { t: t + 7 + 7 + 4 + 7 + 10 + 11 + 10, at: 0xAC5F };
+}
+
 /* ---- the live game: round_loop on the 7.2 accumulator ------------------
    Starts from the machine at the CALL at $AE29 (build/live_p1.json, from
    python tools/sample.py --json: a mid-bout state, scaffolding until the
@@ -2442,7 +2477,7 @@ class Fist {
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     let res = null;
     if (w.out && this.both === 'draw'){            // JP $AC5F
-      t += 10; this.r = (this.r & 0x80) | ((this.r + 1) & 0x7F); res = { exit: 'draw', r: this.r }; this.both = null;
+      t += 10; this.r = (this.r & 0x80) | ((this.r + 1) & 0x7F); res = { exit: 'draw', at: 0xAC5F, r: this.r }; this.both = null;
     }
     else if (w.out){
       M1.m1 = 0;
@@ -2457,7 +2492,8 @@ class Fist {
   }
   /* one iteration of the victory pose, or one second of P1's time bonus;
      out by the pose's RET, the 1UP bout is lost (P2) or the bonus counts
-     (P1), out to $ACA6 won -- the way on from $ACA6 is not ported (D7) */
+     (P1), out to $ACA6 won; then boutNext to $AC39 (lost) or $AC5F (won),
+     neither ported yet (D7) */
   winPass(){
     const cost = { dec: 0, copy: 0, ldir: 0 };
     M1.m1 = 0;
@@ -2465,21 +2501,28 @@ class Fist {
     if (this.bonus){
       const b = bonusPass(this.m);
       t = b.t;
-      if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }
+      if (b.out){ this.bonus = false; t += this.next(1); }
     } else {
       const w = winPass(this.m, this.win, this.sp, cost);
       t = w.t + rfPlayT(cost.t, cost) - cost.t;
-      if (w.out && this.win === 0xAA40){ t += winEnd(); this.win = 0; this.exit = { exit: 'lost' }; }
+      if (w.out && this.win === 0xAA40){ t += winEnd() + this.next(0); this.win = 0; }
       else if (w.out){                             // $AD62: the clock counted down from here, or out at once
         const b = bonusStart(this.m);
         t += b.t; this.win = 0;
-        if (b.out) this.exit = { exit: 'won' }; else this.bonus = true;
+        if (b.out) t += this.next(1); else this.bonus = true;
       }
     }
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.simT += t; this.passes++;
     if (this.exit) this.exit.r = this.r;
     return t;
+  }
+  /* $ACA6 on from a bout lost (a = 0) or won (1), inside a pass whose M1
+     are counted from this.r: the T, and .exit at the PC reached */
+  next(a){
+    const b = boutNext(this.m, a, this.r);
+    this.exit = { exit: a ? 'won' : 'lost', at: b.at };
+    return b.t;
   }
   /* one video frame: spend its T on whole passes (a pass that overruns is
      paid back by the next frames, as the original's own slow passes are) */
@@ -2575,5 +2618,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, boutNext, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

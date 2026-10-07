@@ -3114,18 +3114,18 @@
  {
   "file": "template.html",
   "label": "AD94 win: Fist: the pose never ends",
-  "old": "if (w.out && this.win === 0xAA40){ t += winEnd(); this.win = 0; this.exit",
-  "new": "if (w.out && this.win === 0xAA40){ t += winEnd(); this.exit",
+  "old": "if (w.out && this.win === 0xAA40){ t += winEnd() + this.next(0); this.win = 0; }",
+  "new": "if (w.out && this.win === 0xAA40){ t += winEnd() + this.next(0); }",
   "increment": "AD94-win",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost)"
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
  },
  {
   "file": "template.html",
   "label": "AD94 win: Fist: the bout lost unnamed",
-  "old": "this.exit = { exit: 'lost' }; }",
-  "new": "this.exit = { exit: 'p2' }; }",
+  "old": "this.exit = { exit: a ? 'won' : 'lost', at: b.at };",
+  "new": "this.exit = { exit: a ? 'won' : 'p2', at: b.at };",
   "increment": "AD94-win",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost)"
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
  },
  {
   "file": "template.html",
@@ -3266,8 +3266,8 @@
  {
   "file": "template.html",
   "label": "AD5F bonus: Fist: no bonus count",
-  "old": "        if (b.out) this.exit = { exit: 'won' }; else this.bonus = true;",
-  "new": "        this.exit = { exit: 'won' };",
+  "old": "        if (b.out) t += this.next(1); else this.bonus = true;",
+  "new": "        t += this.next(1);",
   "increment": "AD5F-bonus",
   "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3282,10 +3282,10 @@
  {
   "file": "template.html",
   "label": "AD5F bonus: Fist: the bonus never stops",
-  "old": "      if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }",
-  "new": "      if (b.out){ this.exit = { exit: 'won' }; }",
+  "old": "      if (b.out){ this.bonus = false; t += this.next(1); }",
+  "new": "      if (b.out){ t += this.next(1); }",
   "increment": "AD5F-bonus",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won)"
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F)"
  },
  {
   "file": "template.html",
@@ -3293,7 +3293,7 @@
   "old": "        t += b.t; this.win = 0;",
   "new": "        t += b.t;",
   "increment": "AD5F-bonus",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won)"
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F)"
  },
  {
   "file": "template.html",
@@ -3414,5 +3414,133 @@
   "new": "res = pointPath(this.m, 0x80, this.r);",
   "increment": "AD44-time",
   "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: lost: RET one T short",
+  "old": "if (!a) return (M1.m1 += 2, { t: 4 + 10 + 12 + 4 + 10, at: 0xAC39 });",
+  "new": "if (!a) return (M1.m1 += 2, { t: 4 + 10 + 12 + 4 + 9, at: 0xAC39 });",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: lost: one M1 short",
+  "old": "if (!a) return (M1.m1 += 2, { t: 4 + 10 + 12 + 4 + 10, at: 0xAC39 });",
+  "new": "if (!a) return (M1.m1 += 1, { t: 4 + 10 + 12 + 4 + 10, at: 0xAC39 });",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: lost: leaves for $AC5F",
+  "old": "if (!a) return (M1.m1 += 2, { t: 4 + 10 + 12 + 4 + 10, at: 0xAC39 });",
+  "new": "if (!a) return (M1.m1 += 2, { t: 4 + 10 + 12 + 4 + 10, at: 0xAC5F });",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: won: bouts left not counted down",
+  "old": "if (--m[0xAA3C] & 0xFF) return",
+  "new": "if ((m[0xAA3C] - 1) & 0xFF) return",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: won: JR NZ taken 7 T",
+  "old": "if (--m[0xAA3C] & 0xFF) return { t: t + 12, at: 0xAC5F };",
+  "new": "if (--m[0xAA3C] & 0xFF) return { t: t + 7, at: 0xAC5F };",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: rank up: bouts left reset to 3",
+  "old": "m[0xAA3C] = 2; t += 7 + 10 + 17;",
+  "new": "m[0xAA3C] = 3; t += 7 + 10 + 17;",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: rank up: stage wraps at 3",
+  "old": "if (++m[0xAF34] !== 4) t += 11, M1.m1 += 1;",
+  "new": "if (++m[0xAF34] !== 3) t += 11, M1.m1 += 1;",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: rank up: stage wrap's RET NZ 11 T",
+  "old": "else { m[0xAF34] = 1; t += 5 + 7 + 7 + 10; M1.m1 += 4; }",
+  "new": "else { m[0xAF34] = 1; t += 11 + 7 + 7 + 10; M1.m1 += 4; }",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: rank up: new-stage flag not set",
+  "old": "m[0xAF35] = 1; t += 7 + 13",
+  "new": "t += 7 + 13",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: rank up: not BCD (no DAA)",
+  "old": "if ((s & 0x0F) > 9 || (v & 0x0F) === 0x0F) s += 6;",
+  "new": "",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: rank up: Also_Rank not raised",
+  "old": "m[0xB05F] = s & 0xFF; m[0xAA80] = (m[0xAA80] + 1) & 0xFF;",
+  "new": "m[0xB05F] = s & 0xFF;",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: top rank: R read one M1 early",
+  "old": "t += 12 + 17; M1.m1 += 1 + 2;",
+  "new": "t += 12 + 17; M1.m1 += 1 + 1;",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: top rank: Also_Rank 8 + (R & 3)",
+  "old": "m[0xAA80] = (x & 3) + 7;",
+  "new": "m[0xAA80] = (x & 3) + 8;",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: top rank: rank raised anyway",
+  "old": "  if (v === 0x10){\n    t += 12 + 17;",
+  "new": "  if (v === 0x11){\n    t += 12 + 17;",
+  "increment": "ACA6-next",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: Fist: lost never goes on",
+  "old": "t += winEnd() + this.next(0);",
+  "new": "t += winEnd(); this.exit = { exit: 'lost', at: 0xAC5F };",
+  "increment": "ACA6-next",
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6 next: Fist: won after the bonus skips boutNext",
+  "old": "if (b.out){ this.bonus = false; t += this.next(1); }",
+  "new": "if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }",
+  "increment": "ACA6-next",
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F)"
  }
 ]

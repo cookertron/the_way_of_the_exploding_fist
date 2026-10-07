@@ -127,6 +127,12 @@
       "note": "oracle for the draw, $AD44 through $ACA6, $ACCF and the pose CALL $ACE8 (both fighters to script $19 in $ACF0's loop) to its return at $ACD6, the start constructed (Time poked to 1, counts level): python tools/callio.py --capture --state p1 --poke 0x9CA5=1 --call 0xAD44 0xACD6 --frames 3000 --blind 0x4000-0x471F"
     },
     {
+      "key": "next_aca6",
+      "file": "build/callio_aca6.json",
+      "required": true,
+      "note": "oracle for the 1UP game after a bout, $ACA6 to $AC5F (won, ranks up, draw) or $AC39 (lost): python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39 --frames 3000, played, then appended with --poke 0xAA01=4 (P1 wins), and with 0xAA3C=1, 0xAF34=3, 0xB05F=0x10 added, and 0x9CA5=1 (the draw); the rank-up run's draw case dropped (draw_ad44 gates that pose)"
+    },
+    {
       "key": "live_time",
       "file": "build/live_time.json",
       "required": true,
