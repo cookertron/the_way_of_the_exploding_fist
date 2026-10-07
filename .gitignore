@@ -22,3 +22,5 @@ scratch/
 claude-resume.txt
 # the mutation runner's local state: last verdicts, cache, summary
 build/mutants/
+# the built page: it inlines tape-derived assets (rule 7)
+web/fist.html
