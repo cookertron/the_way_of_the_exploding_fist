@@ -578,13 +578,15 @@ const mockCtx = (state) => ({
   const fx = P.assets.step97bb;
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
   const iC = fx.regs.indexOf(3);                 // SkoolKit index of C
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.fighterStep(m, c.regs[iC]);
+    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++)
@@ -593,6 +595,8 @@ const mockCtx = (state) => ({
   }
   check('fighterStep writes every byte the real $97BB wrote (callio cases)', [badBytes, firstBytes], [0, '']);
   check('fighterStep tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
+  check('fighterStep counts the M1 cycles of every case as R advanced in the real $97BB', [badM1, firstM1], [0, '']);
   /* every exit of every callee, play or derived (callio.py --derive: the
      real code on a constructed input, e.g. both fighters facing one way) */
   const ran = new Set();
@@ -613,13 +617,15 @@ const mockCtx = (state) => ({
   const fx = P.assets.post9ad7;
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
   const iC = fx.regs.indexOf(3);
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.fighterPost(m, c.regs[iC]);
+    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++)
@@ -628,6 +634,8 @@ const mockCtx = (state) => ({
   }
   check('fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)', [badBytes, firstBytes], [0, '']);
   check('fighterPost tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
+  check('fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D', [badM1, firstM1], [0, '']);
   const ran = new Set();
   for (const c of fx.cases) for (let j = 0; j < c.sig.length; j += 4) ran.add(parseInt(c.sig.slice(j, j + 4), 16));
   check('the callio cases reach every exit and branch of $9AD7',
@@ -961,7 +969,7 @@ const mockCtx = (state) => ({
    wraps BC to 65536 passes. */
 {
   const fx = P.assets.sfx;
-  let badW = 0, badT = 0, badM = 0, firstW = '', firstT = '', firstM = '';
+  let badW = 0, badT = 0, badM = 0, firstW = '', firstT = '', firstM = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);
@@ -970,7 +978,9 @@ const mockCtx = (state) => ({
     m[0xB2FA] = c.flag;
     for (let j = 0; j < 12; j++) m[0xB144 + j] = [0x79, 0xB1, 0x85, 0xB1, 0x91, 0xB1, 0x9D, 0xB1, 0xFB, 0xB1, 0x21, 0xB2][j];
     const out = [];
+    P.M1.m1 = 0;
     const t = P.soundEffect(m, c.a, out);
+    if ((P.M1.m1 & 0x7F) !== c.m1 && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${c.m1} mod 128`;
     const w = JSON.stringify(out), want = JSON.stringify(c.writes);
     if (w !== want && !badW++){
       const k = out.findIndex((e, j) => !c.writes[j] || e[0] !== c.writes[j][0] || e[1] !== c.writes[j][1]);
@@ -983,6 +993,8 @@ const mockCtx = (state) => ({
   check('soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)', [badW, firstW], [0, '']);
   check('soundEffect tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
   check('soundEffect leaves $B150-$B159 (request, delay, LFSR, end, mask) as the real code did', [badM, firstM], [0, '']);
+  /* R: the fixture's m1 is how far R advanced from $B15A to the RET (sfx.py) */
+  check('soundEffect counts the M1 cycles of every case as R advanced in the real $B15A', [badM1, firstM1], [0, '']);
   check('the sfx cases cover the early returns, all six effects and the BC wrap',
         [[0, 1], [2, 0], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1]]
           .filter(([a, f]) => !fx.cases.some(c => c.a === a && c.flag === f)).map(String)

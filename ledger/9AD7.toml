@@ -30,3 +30,8 @@ by     = "python tools/callio.py --capture --state p1 --keys D+W --call 0x979A 0
 kind   = "gated"
 says   = "fighterPost writes every byte and tallies the exact uncontended T of all 38 cases (36 play + 2 derived: move $11 with $AA16 set, per fighter); gate memory poisoned $A5 (T44); 13 mutants killed"
 by     = "python tools/callio.py --derive --state s1 --fixture build/callio_9ad7.json --case 6 --set 0xAA04=0x11 ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "gated"
+says   = "fighterPost counts its M1 cycles into M1.m1 (unprefixed throughout; 24 is four INC HL) and matches rx - r mod 128 on all 38 callio cases"
+by     = "python tools/blockcost.py 0x9AD7 0x9B93 ; python tools/build.py ; node test/kit.test.js"

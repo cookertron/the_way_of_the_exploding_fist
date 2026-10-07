@@ -426,16 +426,16 @@
  {
   "file": "template.html",
   "label": "97BB: $9BA7 distance sign flipped",
-  "old": "      if (!m[fsAt(0xAA17, c)]){ dist = (ee - dd) & 0xFF; t += 7 + 4 + 4 + 12; }",
-  "new": "      if (!m[fsAt(0xAA17, c)]){ dist = (dd - ee) & 0xFF; t += 7 + 4 + 4 + 12; }",
+  "old": "      if (!m[fsAt(0xAA17, c)]){ dist = (ee - dd) & 0xFF; t += 7 + 4 + 4 + 12;",
+  "new": "      if (!m[fsAt(0xAA17, c)]){ dist = (dd - ee) & 0xFF; t += 7 + 4 + 4 + 12;",
   "increment": "97BB-port",
   "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
  },
  {
   "file": "template.html",
   "label": "97BB: $9BA7 near limit $16 -> $17",
-  "old": "      if (dist < 0x16) return",
-  "new": "      if (dist < 0x17) return",
+  "old": "      if (dist < 0x16) {",
+  "new": "      if (dist < 0x17) {",
   "increment": "97BB-port",
   "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
  },
@@ -458,8 +458,8 @@
  {
   "file": "template.html",
   "label": "97BB: $99DD move 1 + frame $11 -> $13",
-  "old": "      if (e === 0x11){ d = 0x12; return t + 7 + 7 + 10; }\n      t += 12 + 7;",
-  "new": "      if (e === 0x11){ d = 0x13; return t + 7 + 7 + 10; }\n      t += 12 + 7;",
+  "old": "      if (e === 0x11){ d = 0x12; M1.m1 += 3; return t + 7 + 7 + 10; }\n      t += 12 + 7;",
+  "new": "      if (e === 0x11){ d = 0x13; M1.m1 += 3; return t + 7 + 7 + 10; }\n      t += 12 + 7;",
   "increment": "97BB-port",
   "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
  },
@@ -498,16 +498,16 @@
  {
   "file": "template.html",
   "label": "97BB: $9B93 T off by one",
-  "old": "  t += 52;                                       // its body, RET included",
-  "new": "  t += 53;                                       // its body, RET included",
+  "old": "  t += 52; M1.m1 += 8;                                       // its body, RET included",
+  "new": "  t += 53; M1.m1 += 8;                                       // its body, RET included",
   "increment": "97BB-port",
   "kills": "fighterStep tallies the uncontended T of every case exactly"
  },
  {
   "file": "template.html",
   "label": "97BB: $9A8D JR taken T as not taken",
-  "old": "    else t += 12;\n    m[fsAt(0xAA09, c)] = 0;\n    return t + 22 + 10 + 10;",
-  "new": "    else t += 7;\n    m[fsAt(0xAA09, c)] = 0;\n    return t + 22 + 10 + 10;",
+  "old": "    else { t += 12; M1.m1 += 1; }\n    m[fsAt(0xAA09, c)] = 0;\n    M1.m1 += 6; return t + 22 + 10 + 10;",
+  "new": "    else { t += 7; M1.m1 += 1; }\n    m[fsAt(0xAA09, c)] = 0;\n    M1.m1 += 6; return t + 22 + 10 + 10;",
   "increment": "97BB-port",
   "kills": "fighterStep tallies the uncontended T of every case exactly"
  },
@@ -570,16 +570,16 @@
  {
   "file": "template.html",
   "label": "9AD7: $9B8A sets $AA09 to 0",
-  "old": "m[fsAt(0xAA09, c)] = 1; return t + 12 + 22 + 10 + 10;",
-  "new": "m[fsAt(0xAA09, c)] = 0; return t + 12 + 22 + 10 + 10;",
+  "old": "m[fsAt(0xAA09, c)] = 1; M1.m1 += 7; return t + 12 + 22 + 10 + 10;",
+  "new": "m[fsAt(0xAA09, c)] = 0; M1.m1 += 7; return t + 12 + 22 + 10 + 10;",
   "increment": "9AD7-port",
   "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
  },
  {
   "file": "template.html",
   "label": "9AD7: $9B71 second clear at +3 not +4",
-  "old": "m[hl] = 0; m[(hl + 4) & 0xFFFF] = 0;\n      return",
-  "new": "m[hl] = 0; m[(hl + 3) & 0xFFFF] = 0;\n      return",
+  "old": "m[hl] = 0; m[(hl + 4) & 0xFFFF] = 0;\n      M1.m1 += 19; return",
+  "new": "m[hl] = 0; m[(hl + 3) & 0xFFFF] = 0;\n      M1.m1 += 19; return",
   "increment": "9AD7-port",
   "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
  },
@@ -602,8 +602,8 @@
  {
   "file": "template.html",
   "label": "9AD7: $9B38 leaves $AA16 set",
-  "old": "    m[fsAt(0xAA16, c)] = 0;\n    return t + 22",
-  "new": "    return t + 22",
+  "old": "    m[fsAt(0xAA16, c)] = 0;\n    M1.m1 += 20; return t + 22",
+  "new": "    M1.m1 += 20; return t + 22",
   "increment": "9AD7-port",
   "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
  },
@@ -1810,8 +1810,8 @@
  {
   "file": "template.html",
   "label": "sfx: A=0 RET Z charged as not taken",
-  "old": "  let t = 4;                                       // AND A\n  if (!a) return t + 11;",
-  "new": "  let t = 4;                                       // AND A\n  if (!a) return t + 5;",
+  "old": "  let t = 4; M1.m1 += 2;                           // AND A\n  if (!a) return t + 11;",
+  "new": "  let t = 4; M1.m1 += 2;                           // AND A\n  if (!a) return t + 5;",
   "increment": "B15A",
   "kills": "soundEffect tallies the uncontended T of every case exactly"
  },
@@ -1914,24 +1914,24 @@
  {
   "file": "template.html",
   "label": "sfx: LD B,0 not applied",
-  "old": "if (!keepB){ bc &= 0xFF; t += 7; }         // LD B,0",
-  "new": "if (!keepB){ t += 7; }         // LD B,0",
+  "old": "if (!keepB){ bc &= 0xFF; t += 7; M1.m1 += 1; }   // LD B,0",
+  "new": "if (!keepB){ t += 7; M1.m1 += 1; }   // LD B,0",
   "increment": "B15A",
   "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
  },
  {
   "file": "template.html",
   "label": "sfx: BC wrap to 65536 lost",
-  "old": "const delay = (n, per) => { t += (n || 0x10000) * per - 5; };",
-  "new": "const delay = (n, per) => { t += (n || 1) * per - 5; };",
+  "old": "t += (n || 0x10000) * per - 5;",
+  "new": "t += (n || 1) * per - 5;",
   "increment": "B15A",
   "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
  },
  {
   "file": "template.html",
   "label": "sfx: noise section 3 per-pass T",
-  "old": "noise(2, 38, true);",
-  "new": "noise(2, 34, true);",
+  "old": "noise(2, 38, 7, true);",
+  "new": "noise(2, 34, 7, true);",
   "increment": "B15A",
   "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
  },
@@ -1946,8 +1946,8 @@
  {
   "file": "template.html",
   "label": "sfx: fx5 delay length",
-  "old": "delay(0x2000, 26); t += 10;",
-  "new": "delay(0x1000, 26); t += 10;",
+  "old": "delay(0x2000, 26, 4); t += 10;",
+  "new": "delay(0x1000, 26, 4); t += 10;",
   "increment": "B15A",
   "kills": "soundEffect makes every $FE write of the real $B15A at the same T (sfx cases)"
  },
@@ -1962,8 +1962,8 @@
  {
   "file": "template.html",
   "label": "sfx: request not cleared",
-  "old": "  m[0xB150] = 0;\n  return t + 4 + 13 + 10;",
-  "new": "  return t + 4 + 13 + 10;",
+  "old": "  m[0xB150] = 0; M1.m1 += 3;\n",
+  "new": "  M1.m1 += 3;\n",
   "increment": "B15A",
   "kills": "soundEffect leaves $B150-$B159 (request, delay, LFSR, end, mask) as the real code did"
  },
@@ -2062,5 +2062,117 @@
   "new": "M1.m1 += 1 + 3;                                  // the CALL and the copy",
   "increment": "9745",
   "kills": "p1HitsP2 counts the M1 cycles of every case as R advanced in the real $9D29"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 B15A: dispatch",
+  "old": "M1.m1 += 12;   // to JP (HL)",
+  "new": "M1.m1 += 11;   // to JP (HL)",
+  "increment": "9745-sfx",
+  "kills": "soundEffect counts the M1 cycles of every case as R advanced in the real $B15A"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 B15A: pulse half INC A",
+  "old": "M1.m1 += v ? 8 : 9;",
+  "new": "M1.m1 += 8;",
+  "increment": "9745-sfx",
+  "kills": "soundEffect counts the M1 cycles of every case as R advanced in the real $B15A"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 B15A: DJNZ passes",
+  "old": "M1.m1 += (v || 1) * (nops + 1);",
+  "new": "M1.m1 += (v || 1) * nops;",
+  "increment": "9745-sfx",
+  "kills": "soundEffect counts the M1 cycles of every case as R advanced in the real $B15A"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 B15A: LFSR body",
+  "old": "M1.m1 += 4 + 19 + 8;",
+  "new": "M1.m1 += 4 + 17 + 8;",
+  "increment": "9745-sfx",
+  "kills": "soundEffect counts the M1 cycles of every case as R advanced in the real $B15A"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 B15A: delay with three NOPs",
+  "old": "noise(2, 38, 7, true);",
+  "new": "noise(2, 38, 6, true);",
+  "increment": "9745-sfx",
+  "kills": "soundEffect counts the M1 cycles of every case as R advanced in the real $B15A"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 B15A: LD B,0",
+  "old": "if (!keepB){ bc &= 0xFF; t += 7; M1.m1 += 1; }\n",
+  "new": "if (!keepB){ bc &= 0xFF; t += 7; }\n",
+  "increment": "9745-sfx",
+  "kills": "soundEffect counts the M1 cycles of every case as R advanced in the real $B15A"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 97BB: entry CALLs",
+  "old": "let t = 17 + 17 + 17 + 17 + 17 + 17 + 10; M1.m1 += 7;",
+  "new": "let t = 17 + 17 + 17 + 17 + 17 + 17 + 10; M1.m1 += 6;",
+  "increment": "9745-m1",
+  "kills": "fighterStep counts the M1 cycles of every case as R advanced in the real $97BB"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 97BB: $9BA7 entry",
+  "old": "let t = 22 + 7 + 31 + 7 + 10 + 13 + 7, dist; M1.m1 += 13;",
+  "new": "let t = 22 + 7 + 31 + 7 + 10 + 13 + 7, dist; M1.m1 += 12;",
+  "increment": "9745-m1",
+  "kills": "fighterStep counts the M1 cycles of every case as R advanced in the real $97BB"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 97BB: $9994 reel ternary",
+  "old": "M1.m1 += e === 0x1A ? 1 : e === 0x1B ? 3 : 5;",
+  "new": "M1.m1 += e === 0x1A ? 1 : e === 0x1B ? 3 : 4;",
+  "increment": "9745-m1",
+  "kills": "fighterStep counts the M1 cycles of every case as R advanced in the real $97BB"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 97BB: $9A4D four stores",
+  "old": "M1.m1 += 2 + 4 * 5 + 1;",
+  "new": "M1.m1 += 2 + 4 * 4 + 1;",
+  "increment": "9745-m1",
+  "kills": "fighterStep counts the M1 cycles of every case as R advanced in the real $97BB"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 97BB: $9AA1 new move",
+  "old": "M1.m1 += 11; return t + 7 + 6 + 7 + 6 + 10 + 22 + 10 + 10;",
+  "new": "M1.m1 += 10; return t + 7 + 6 + 7 + 6 + 10 + 22 + 10 + 10;",
+  "increment": "9745-m1",
+  "kills": "fighterStep counts the M1 cycles of every case as R advanced in the real $97BB"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9AD7: $9AE3 compares",
+  "old": "? 12 : 7); M1.m1 += 12;",
+  "new": "? 12 : 7); M1.m1 += 11;",
+  "increment": "9745-m1",
+  "kills": "fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9AD7: $9B23 tail",
+  "old": "M1.m1 += 20; return t + 22 + 10 + 6",
+  "new": "M1.m1 += 19; return t + 22 + 10 + 6",
+  "increment": "9745-m1",
+  "kills": "fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9AD7: $9B71 INC HL x4",
+  "old": "M1.m1 += 19; return t + 7 + 7 + 4",
+  "new": "M1.m1 += 18; return t + 7 + 7 + 4",
+  "increment": "9745-m1",
+  "kills": "fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D"
  }
 ]

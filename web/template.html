@@ -462,11 +462,11 @@ function renderFighters(m, paths, sp = 0x5BF5, cost){
 const fsAt = (base, k) => (base & 0xFF00) | ((base + k) & 0xFF);
 function fighterStep(m, c){
   const o = m[0x9C29];
-  let t = 17 + 17 + 17 + 17 + 17 + 17 + 10;      // the site's CALL, five CALLs, RET
+  let t = 17 + 17 + 17 + 17 + 17 + 17 + 10; M1.m1 += 7;      // the site's CALL, five CALLs, RET
   /* $9B93: D,E = move, frame */
   let hl = fsAt(0xAA05, c);
   let e = m[hl], d = m[(hl - 1) & 0xFFFF];
-  t += 52;                                       // its body, RET included
+  t += 52; M1.m1 += 8;                                       // its body, RET included
   /* $9920 */
   t += fs9920();
   /* $9994 */
@@ -476,188 +476,188 @@ function fighterStep(m, c){
   /* $9B9D: store D,E back */
   hl = fsAt(0xAA04, c);
   m[hl] = d; hl = (hl + 1) & 0xFFFF; m[hl] = e;
-  t += 22 + 7 + 6 + 7 + 10;
+  t += 22 + 7 + 6 + 7 + 10; M1.m1 += 8;
   return t;
 
   function fs9920(){
-    let t = 4 + 7;
+    let t = 4 + 7; M1.m1 += 2;
     if (e !== 3){
-      t += 12 + 4 + 7;                               // $9986
-      if (e !== 7) return t + 11;
-      t += 5 + 4 + 7;
-      if (d === 4) return t + 11;
-      t += 5 + 7;
-      if (d === 7) return t + 11;
+      t += 12 + 4 + 7; M1.m1 += 3;                               // $9986
+      if (e !== 7) { M1.m1 += 1; return t + 11; }
+      t += 5 + 4 + 7; M1.m1 += 3;
+      if (d === 4) { M1.m1 += 1; return t + 11; }
+      t += 5 + 7; M1.m1 += 2;
+      if (d === 7) { M1.m1 += 1; return t + 11; }
       e = 0x18;
-      return t + 5 + 7 + 10;
+      M1.m1 += 3; return t + 5 + 7 + 10;
     }
-    t += 7 + 4 + 7;
-    if (d === 0x13){ e = d; return t + 12 + 4 + 10; }
-    t += 7 + 7;
-    if (d === 0x14){ e = d; return t + 7 + 4 + 10; }
-    t += 12;                                          // $9930
-    t += 31 + 7 + 4;
-    if (m[fsAt(0xAA16, o)]) return t + 11;
-    t += 5 + 31 + 7 + 4;
-    if (m[fsAt(0xAA09, o)]) return t + 11;
-    t += 5 + 31 + 7;
+    t += 7 + 4 + 7; M1.m1 += 3;
+    if (d === 0x13){ e = d; M1.m1 += 3; return t + 12 + 4 + 10; }
+    t += 7 + 7; M1.m1 += 2;
+    if (d === 0x14){ e = d; M1.m1 += 3; return t + 7 + 4 + 10; }
+    t += 12; M1.m1 += 1;                                          // $9930
+    t += 31 + 7 + 4; M1.m1 += 6;
+    if (m[fsAt(0xAA16, o)]) { M1.m1 += 1; return t + 11; }
+    t += 5 + 31 + 7 + 4; M1.m1 += 7;
+    if (m[fsAt(0xAA09, o)]) { M1.m1 += 1; return t + 11; }
+    t += 5 + 31 + 7; M1.m1 += 6;
     const om = m[fsAt(0xAA04, o)];
-    t += 7;
-    if (om === 0x10) return t + 11;
-    t += 5 + 7;
-    if (om === 0x0A) return t + 11;
-    t += 5 + 10 + 4 + 4 + 7 + 4;
-    if (!m[fsAt(0xA90D, om)]) return t + 11;
-    t += 5 + 11 + 17 + 10;                            // PUSH DE, CALL $9BA7, POP DE
+    t += 7; M1.m1 += 1;
+    if (om === 0x10) { M1.m1 += 1; return t + 11; }
+    t += 5 + 7; M1.m1 += 2;
+    if (om === 0x0A) { M1.m1 += 1; return t + 11; }
+    t += 5 + 10 + 4 + 4 + 7 + 4; M1.m1 += 6;
+    if (!m[fsAt(0xA90D, om)]) { M1.m1 += 1; return t + 11; }
+    t += 5 + 11 + 17 + 10; M1.m1 += 4;                            // PUSH DE, CALL $9BA7, POP DE
     const r = fs9BA7();
-    t += r[1] + 4;
-    if (!r[0]) return t + 11;
-    t += 5 + 31 + 7 + 10 + 4 + 4 + 7;
+    t += r[1] + 4; M1.m1 += 1;
+    if (!r[0]) { M1.m1 += 1; return t + 11; }
+    t += 5 + 31 + 7 + 10 + 4 + 4 + 7; M1.m1 += 10;
     e = m[fsAt(0xA926, m[fsAt(0xAA04, o)])];
     m[fsAt(0xAA09, c)] = 0;
     m[fsAt(0xAA16, o)] = 0;
-    return t + 22 + 10 + 31 + 10 + 10;
+    M1.m1 += 11; return t + 22 + 10 + 31 + 10 + 10;
   }
 
   /* $9BA7: may this fighter's move land?  [A, T after the CALL] */
   function fs9BA7(){
     const dd = m[fsAt(0xAA19, c)], ee = m[fsAt(0xAA19, o)];
-    let t = 22 + 7 + 31 + 7 + 10 + 13 + 7, dist;
+    let t = 22 + 7 + 31 + 7 + 10 + 13 + 7, dist; M1.m1 += 13;
     const same = m[0xAA57] === m[0xAA17];
     if (!same){
-      t += 7 + 22 + 7 + 4;
-      if (!m[fsAt(0xAA17, c)]){ dist = (ee - dd) & 0xFF; t += 7 + 4 + 4 + 12; }
-      else { dist = (dd - ee) & 0xFF; t += 12 + 4 + 4; }
+      t += 7 + 22 + 7 + 4; M1.m1 += 7;
+      if (!m[fsAt(0xAA17, c)]){ dist = (ee - dd) & 0xFF; t += 7 + 4 + 4 + 12; M1.m1 += 4; }
+      else { dist = (dd - ee) & 0xFF; t += 12 + 4 + 4; M1.m1 += 3; }
       m[0x9C2D] = dist;
-      t += 13 + 31 + 7 + 10 + 4 + 4 + 7 + 4;
-      if (m[fsAt(0xB47E, m[fsAt(0xAA04, o)])]) return [0, t + 12 + 4 + 10];
-      t += 7 + 13 + 7;
-      if (dist >= 0xEF) return [1, t + 12 + 7 + 10];
-      t += 7 + 7;
-      if (dist < 0x16) return [1, t + 12 + 7 + 10];
-      return [0, t + 7 + 4 + 10];
+      t += 13 + 31 + 7 + 10 + 4 + 4 + 7 + 4; M1.m1 += 11;
+      if (m[fsAt(0xB47E, m[fsAt(0xAA04, o)])]) { M1.m1 += 3; return [0, t + 12 + 4 + 10]; }
+      t += 7 + 13 + 7; M1.m1 += 3;
+      if (dist >= 0xEF) { M1.m1 += 3; return [1, t + 12 + 7 + 10]; }
+      t += 7 + 7; M1.m1 += 2;
+      if (dist < 0x16) { M1.m1 += 3; return [1, t + 12 + 7 + 10]; }
+      M1.m1 += 3; return [0, t + 7 + 4 + 10];
     }
-    t += 12 + 22 + 7 + 4;                             // $9BF5
-    if (m[fsAt(0xAA17, c)]){ dist = (dd - ee) & 0xFF; t += 7 + 4 + 4 + 12; }
-    else { dist = (ee - dd) & 0xFF; t += 12 + 4 + 4; }
+    t += 12 + 22 + 7 + 4; M1.m1 += 7;                             // $9BF5
+    if (m[fsAt(0xAA17, c)]){ dist = (dd - ee) & 0xFF; t += 7 + 4 + 4 + 12; M1.m1 += 4; }
+    else { dist = (ee - dd) & 0xFF; t += 12 + 4 + 4; M1.m1 += 3; }
     m[0x9C2D] = dist;
-    t += 13 + 31 + 7 + 10 + 4 + 4 + 7 + 4;
-    if (!m[fsAt(0xB47E, m[fsAt(0xAA04, o)])]) return [0, t + 12 + 4 + 10];
-    t += 7 + 13 + 7;
-    if (dist < 3) return [0, t + 12 + 4 + 10];
-    t += 7 + 7;
-    if (dist >= 0x10) return [0, t + 12 + 4 + 10];
-    return [1, t + 7 + 7 + 10];
+    t += 13 + 31 + 7 + 10 + 4 + 4 + 7 + 4; M1.m1 += 11;
+    if (!m[fsAt(0xB47E, m[fsAt(0xAA04, o)])]) { M1.m1 += 3; return [0, t + 12 + 4 + 10]; }
+    t += 7 + 13 + 7; M1.m1 += 3;
+    if (dist < 3) { M1.m1 += 3; return [0, t + 12 + 4 + 10]; }
+    t += 7 + 7; M1.m1 += 2;
+    if (dist >= 0x10) { M1.m1 += 3; return [0, t + 12 + 4 + 10]; }
+    M1.m1 += 3; return [1, t + 7 + 7 + 10];
   }
 
   function fs9994(){
-    let t = 4 + 7;
+    let t = 4 + 7; M1.m1 += 2;
     if (e === 0x1A || e === 0x1B || e === 0x16){
-      t += e === 0x1A ? 12 : e === 0x1B ? 7 + 7 + 12 : 7 + 7 + 7 + 7 + 7;
+      t += e === 0x1A ? 12 : e === 0x1B ? 7 + 7 + 12 : 7 + 7 + 7 + 7 + 7; M1.m1 += e === 0x1A ? 1 : e === 0x1B ? 3 : 5;
       d = e;                                          // $99A1
       let hl = fsAt(0xAA18, c);
       m[hl] = 0x7A; hl = (hl - 2) & 0xFFFF; m[hl] = 0;
       m[fsAt(0xAA09, c)] = 0;
-      t += 4 + 22 + 10 + 6 + 6 + 10 + 22 + 10 + 22 + 7 + 4;
-      if (!m[fsAt(0xAA13, c)]) return t + 11;
-      t += 5 + 22 + 7 + 7;
+      t += 4 + 22 + 10 + 6 + 6 + 10 + 22 + 10 + 22 + 7 + 4; M1.m1 += 20;
+      if (!m[fsAt(0xAA13, c)]) { M1.m1 += 1; return t + 11; }
+      t += 5 + 22 + 7 + 7; M1.m1 += 7;
       const k = m[fsAt(0xAA12, c)];
-      if (k === 0x2C) t += 12;
-      else { t += 7 + 7; if (k !== 0x28) return t + 11; t += 5; }
-      t += 13 + 4;                                    // $99CD
-      if (m[0x9CA7]) return t + 11;
+      if (k === 0x2C) { t += 12; M1.m1 += 1; }
+      else { t += 7 + 7; M1.m1 += 2; if (k !== 0x28) { M1.m1 += 1; return t + 11; } t += 5; M1.m1 += 1; }
+      t += 13 + 4; M1.m1 += 2;                                    // $99CD
+      if (m[0x9CA7]) { M1.m1 += 1; return t + 11; }
       m[0x9CA7] = 1; m[0xB150] = 5;
-      return t + 5 + 7 + 13 + 7 + 13 + 10;
+      M1.m1 += 6; return t + 5 + 7 + 13 + 7 + 13 + 10;
     }
-    t += 7 + 7 + 7 + 7 + 12;                          // $99DD
-    t += 4 + 4;
-    if (d === e) return t + 11;
-    t += 5 + 7;
+    t += 7 + 7 + 7 + 7 + 12; M1.m1 += 5;                          // $99DD
+    t += 4 + 4; M1.m1 += 2;
+    if (d === e) { M1.m1 += 1; return t + 11; }
+    t += 5 + 7; M1.m1 += 2;
     if (d === 1){
-      t += 7 + 4 + 7;
-      if (e === 0x11){ d = 0x12; return t + 7 + 7 + 10; }
-      t += 12 + 7;
-      if (e === 7){ d = 4; return t + 12 + 7 + 10; }
-      t += 7 + 7;
-      if (e === 0x10){ d = 4; return t + 12 + 7 + 10; }
-      t += 7 + 7;
-      if (e === 0x0A){ d = 4; return t + 7 + 7 + 10; }
+      t += 7 + 4 + 7; M1.m1 += 3;
+      if (e === 0x11){ d = 0x12; M1.m1 += 3; return t + 7 + 7 + 10; }
+      t += 12 + 7; M1.m1 += 2;
+      if (e === 7){ d = 4; M1.m1 += 3; return t + 12 + 7 + 10; }
+      t += 7 + 7; M1.m1 += 2;
+      if (e === 0x10){ d = 4; M1.m1 += 3; return t + 12 + 7 + 10; }
+      t += 7 + 7; M1.m1 += 2;
+      if (e === 0x0A){ d = 4; M1.m1 += 3; return t + 7 + 7 + 10; }
       d = e;
-      return t + 12 + 4 + 10;
+      M1.m1 += 3; return t + 12 + 4 + 10;
     }
-    t += 12 + 4 + 7;                                  // $99FD
+    t += 12 + 4 + 7; M1.m1 += 3;                                  // $99FD
     let hit = e === 7;
-    if (hit) t += 12;
+    if (hit) { t += 12; M1.m1 += 1; }
     else {
-      t += 7 + 7;
-      if (e === 0x10){ hit = true; t += 12; }
-      else { t += 7 + 7; if (e === 0x0A){ hit = true; t += 7; } else t += 12; }
+      t += 7 + 7; M1.m1 += 2;
+      if (e === 0x10){ hit = true; t += 12; M1.m1 += 1; }
+      else { t += 7 + 7; M1.m1 += 2; if (e === 0x0A){ hit = true; t += 7; M1.m1 += 1; } else { t += 12; M1.m1 += 1; } }
     }
     if (hit){                                         // $9A0A
-      t += 4 + 7;
+      t += 4 + 7; M1.m1 += 2;
       if (d === 4){
-        t += 7 + 22 + 7 + 7;
-        if (m[fsAt(0xAA09, c)] !== 1) return t + 11;
+        t += 7 + 22 + 7 + 7; M1.m1 += 7;
+        if (m[fsAt(0xAA09, c)] !== 1) { M1.m1 += 1; return t + 11; }
         d = e;
-        return t + 5 + 4 + 10;
+        M1.m1 += 3; return t + 5 + 4 + 10;
       }
-      t += 12 + 7;                                    // $9A1B
-      if (d !== 0x12) return t + 11;
+      t += 12 + 7; M1.m1 += 2;                                    // $9A1B
+      if (d !== 0x12) { M1.m1 += 1; return t + 11; }
       m[fsAt(0xAA16, c)] = 1;
-      return t + 5 + 22 + 10 + 10;
+      M1.m1 += 7; return t + 5 + 22 + 10 + 10;
     }
-    t += 4 + 7;                                       // $9A27
+    t += 4 + 7; M1.m1 += 2;                                       // $9A27
     if (d === 0x12){
-      t += 7 + 4 + 7;
+      t += 7 + 4 + 7; M1.m1 += 3;
       if (e === 0x11){
-        t += 7 + 22 + 7 + 7;
-        if (m[fsAt(0xAA09, c)] !== 1) return t + 11;
+        t += 7 + 22 + 7 + 7; M1.m1 += 7;
+        if (m[fsAt(0xAA09, c)] !== 1) { M1.m1 += 1; return t + 11; }
         d = e;
-        return t + 5 + 4 + 10;
+        M1.m1 += 3; return t + 5 + 4 + 10;
       }
-      t += 12;
-    } else t += 12;
-    t += 4 + 7;                                       // $9A3D
+      t += 12; M1.m1 += 1;
+    } else { t += 12; M1.m1 += 1; }
+    t += 4 + 7; M1.m1 += 2;                                       // $9A3D
     if (d === 0x11){
-      t += 7 + 22 + 7 + 7;
+      t += 7 + 22 + 7 + 7; M1.m1 += 7;
       if (m[fsAt(0xAA09, c)] === 1){
         d = 0x15;
         m[fsAt(0xAA16, c)] = 1; m[fsAt(0xAA07, c)] = 0;
         m[fsAt(0xAA0B, c)] = 0; m[fsAt(0xAA09, c)] = 0;
-        return t + 7 + 7 + 4 * (22 + 10) + 10;
+        M1.m1 += 2 + 4 * 5 + 1; return t + 7 + 7 + 4 * (22 + 10) + 10;
       }
-      t += 12;
-    } else t += 12;
-    t += 4 + 10 + 4 + 4 + 7 + 7;                      // $9A70
+      t += 12; M1.m1 += 1;
+    } else { t += 12; M1.m1 += 1; }
+    t += 4 + 10 + 4 + 4 + 7 + 7; M1.m1 += 6;                      // $9A70
     const k = m[fsAt(0xB462, d)];
     if (k === 0x80){
-      t += 7 + 22 + 10 + 4 + 7;
+      t += 7 + 22 + 10 + 4 + 7; M1.m1 += 8;
       m[fsAt(0xAA09, c)] = 0;
-      if (e === 0x11){ d = 0x12; return t + 7 + 7 + 10; }
+      if (e === 0x11){ d = 0x12; M1.m1 += 3; return t + 7 + 7 + 10; }
       d = e;
-      return t + 12 + 4 + 10;
+      M1.m1 += 3; return t + 12 + 4 + 10;
     }
-    t += 12 + 4;                                      // $9A8D
-    if (!k){ t += 7 + 22 + 10; m[fsAt(0xAA16, c)] = 1; }
-    else t += 12;
+    t += 12 + 4; M1.m1 += 2;                                      // $9A8D
+    if (!k){ t += 7 + 22 + 10; M1.m1 += 6; m[fsAt(0xAA16, c)] = 1; }
+    else { t += 12; M1.m1 += 1; }
     m[fsAt(0xAA09, c)] = 0;
-    return t + 22 + 10 + 10;
+    M1.m1 += 6; return t + 22 + 10 + 10;
   }
 
   function fs9AA1(){
     let hl = fsAt(0xAA0B, c);
-    let t = 22 + 7 + 4;
+    let t = 22 + 7 + 4; M1.m1 += 6;
     if (m[hl] !== d){
       m[(hl + 1) & 0xFFFF] = d; m[hl] = 0;
       m[fsAt(0xAA09, c)] = 0;
-      return t + 7 + 6 + 7 + 6 + 10 + 22 + 10 + 10;
+      M1.m1 += 11; return t + 7 + 6 + 7 + 6 + 10 + 22 + 10 + 10;
     }
-    t += 12 + 22 + 7 + 7;                             // $9AB9
+    t += 12 + 22 + 7 + 7; M1.m1 += 7;                             // $9AB9
     if (m[fsAt(0xAA09, c)] === 1){
       m[fsAt(0xAA0C, c)] = 0;
-      return t + 7 + 22 + 10 + 10;
+      M1.m1 += 7; return t + 7 + 22 + 10 + 10;
     }
-    t += 12 + 22 + 7 + 6 + 7 + 10;                    // $9ACD
+    t += 12 + 22 + 7 + 6 + 7 + 10; M1.m1 += 9;                    // $9ACD
     hl = fsAt(0xAA0B, c);
     m[(hl + 1) & 0xFFFF] = m[hl];
     return t;
@@ -671,55 +671,56 @@ function fighterStep(m, c){
    tools/callio.py --capture --call 0x979A 0x97A0 --call 0x97A6 0x97AC;
    ledger/9AD7.toml). */
 function fighterPost(m, c){
-  let t = 17 + 17;                               // the site's CALL, CALL $9B93
+  let t = 17 + 17; M1.m1 += 2;                               // the site's CALL, CALL $9B93
   let hl = fsAt(0xAA05, c);
   let d = m[(hl - 1) & 0xFFFF], e = m[hl];      // $9B93: D,E = move, frame
-  t += 52;
+  t += 52; M1.m1 += 8;
   t += post();
   /* $9B9D: store D,E back */
   hl = fsAt(0xAA04, c);
   m[hl] = d; m[(hl + 1) & 0xFFFF] = e;
-  return t + 17 + 22 + 7 + 6 + 7 + 10;
+  M1.m1 += 9; return t + 17 + 22 + 7 + 6 + 7 + 10;
 
   function post(){
-    let t = 4 + 7;
-    if (d === 3) t += 12;
+    let t = 4 + 7; M1.m1 += 2;
+    if (d === 3) { t += 12; M1.m1 += 1; }
     else {
-      t += 7 + 7;
-      t += d === 2 ? 7 : 12;
+      t += 7 + 7; M1.m1 += 2;
+      t += d === 2 ? 7 : 12; M1.m1 += 1;
     }
-    if (d === 2 || d === 3)                      // $9AE3: compares, result unused
-      t += 22 + 7 + 22 + 7 + 4 + (m[fsAt(0xAA36, c)] === m[fsAt(0xAA19, c)] ? 12 : 7);
+    if (d === 2 || d === 3){                     // $9AE3: compares, result unused
+      t += 22 + 7 + 22 + 7 + 4 + (m[fsAt(0xAA36, c)] === m[fsAt(0xAA19, c)] ? 12 : 7); M1.m1 += 12;
+    }
     hl = fsAt(0xAA0D, c);                        // $9AF4
-    t += 22 + 7 + 4;
-    if (!m[hl]) return t + 11;
+    t += 22 + 7 + 4; M1.m1 += 6;
+    if (!m[hl]) { M1.m1 += 1; return t + 11; }
     m[hl] = 0;
-    t += 5 + 10 + 22 + 7 + 4;                    // $9AFF
+    t += 5 + 10 + 22 + 7 + 4; M1.m1 += 8;                    // $9AFF
     const a = m[fsAt(0xAA03, c)];
-    if (a){ e = a; m[0x9C28] = a; return t + 7 + 4 + 13 + 10; }
+    if (a){ e = a; m[0x9C28] = a; M1.m1 += 4; return t + 7 + 4 + 13 + 10; }
     hl = fsAt(0xAA16, c);                        // $9B0E
-    t += 12 + 22 + 7 + 4 + 10;
+    t += 12 + 22 + 7 + 4 + 10; M1.m1 += 8;
     if (!m[hl]){                                 // $9B67
-      t += 4 + 10 + 4 + 4 + 7 + 4;
-      if (!m[fsAt(0xB462, d)]){ m[fsAt(0xAA09, c)] = 1; return t + 12 + 22 + 10 + 10; }
+      t += 4 + 10 + 4 + 4 + 7 + 4; M1.m1 += 6;
+      if (!m[fsAt(0xB462, d)]){ m[fsAt(0xAA09, c)] = 1; M1.m1 += 7; return t + 12 + 22 + 10 + 10; }
       d = 1;
       m[fsAt(0xAA00, c)] = d;
       hl = fsAt(0xAA07, c);
       m[hl] = 0; m[(hl + 4) & 0xFFFF] = 0;
-      return t + 7 + 7 + 4 + 22 + 7 + 22 + 10 + 24 + 10 + 10;
+      M1.m1 += 19; return t + 7 + 7 + 4 + 22 + 7 + 22 + 10 + 24 + 10 + 10;
     }
-    t += 4 + 7;
+    t += 4 + 7; M1.m1 += 2;
     if (d === 0x11){
       const h = (hl + 1) & 0xFFFF;
       m[h] ^= 1;
-      t += 7 + 6 + 7 + 7 + 7;
-    } else t += 12;
+      t += 7 + 6 + 7 + 7 + 7; M1.m1 += 5;
+    } else { t += 12; M1.m1 += 1; }
     hl = fsAt(0xAA07, c);                        // $9B23
     m[hl] = 0; m[(hl + 2) & 0xFFFF] = 0; m[(hl + 4) & 0xFFFF] = 0;
     m[(hl + 5) & 0xFFFF] = 1;
     d = 1;
     m[fsAt(0xAA16, c)] = 0;
-    return t + 22 + 10 + 6 + 6 + 10 + 6 + 6 + 10 + 7 + 6 + 10 + 22 + 10 + 10;
+    M1.m1 += 20; return t + 22 + 10 + 6 + 6 + 10 + 6 + 6 + 10 + 7 + 6 + 10 + 22 + 10 + 10;
   }
 }
 
@@ -982,38 +983,42 @@ const SFX_ROM = (() => {
   return rom;
 })();
 function soundEffect(m, a, out){
-  let t = 4;                                       // AND A
+  /* M1 (for R): one per instruction, two for the CB and ED ones; each
+     RET's own is counted with the test before it */
+  let t = 4; M1.m1 += 2;                           // AND A
   if (!a) return t + 11;
-  t += 5 + 4 + 13 + 4 + 4;                         // LD C,A: LD A,(Flag_Sound): AND A: LD A,C
+  t += 5 + 4 + 13 + 4 + 4; M1.m1 += 5;             // LD C,A: LD A,(Flag_Sound): AND A: LD A,C
   if (!m[0xB2FA]) return t + 11;
-  t += 5 + 4 + 4 + 4 + 7 + 10 + 11 + 7 + 6 + 7 + 4 + 17 + 4;   // to JP (HL)
+  t += 5 + 4 + 4 + 4 + 7 + 10 + 11 + 7 + 6 + 7 + 4 + 17 + 4; M1.m1 += 12;   // to JP (HL)
   const at = 0xB144 + 2 * ((a - 1) & 0x7F);
   const rom = SFX_ROM[a] || new Uint8Array(0x4000);
   const edge = v => out.push([t, v]);
-  const delay = (n, per) => { t += (n || 0x10000) * per - 5; };   // DEC BC .. JR NZ with BC = n
+  const delay = (n, per, k) => { t += (n || 0x10000) * per - 5; M1.m1 += (n || 0x10000) * k; };   // DEC BC .. JR NZ with BC = n, k instructions a pass
 
   function pulses(mask, de, hl, nops){             // $B25B (4 NOPs) / $B297 (6 NOPs)
     m[0xB156] = hl & 0xFF; m[0xB157] = hl >> 8; m[0xB158] = mask;
-    t += 16 + 13;
+    t += 16 + 13; M1.m1 += 2;
     for (;;){
-      t += 13 + 4;                                 // LD A,(B158): LD H,A
+      t += 13 + 4; M1.m1 += 2;                     // LD A,(B158): LD H,A
       for (const low of [0x1F, 0x07]){
         const v = (de < 0x4000 ? rom[de] : m[de]) & m[0xB158];
         de = (de + 1) & 0xFFFF;
-        t += 7 + 6 + 4 + (v ? 12 : 11) + 4 + 13 + 7;
+        t += 7 + 6 + 4 + (v ? 12 : 11) + 4 + 13 + 7; M1.m1 += v ? 8 : 9;
         edge(m[0xB159] & low); t += 11;
         t += (v || 1) * (4 * nops + 13) - 5;       // the NOPs and DJNZ
+        M1.m1 += (v || 1) * (nops + 1);
       }
       const left = (m[0xB156] | m[0xB157] << 8) - de;
-      t += 16 + 4 + 15;
+      t += 16 + 4 + 15; M1.m1 += 5;                // with the RET Z
       if (!left) return t += 11;
-      t += 5;
-      if (left < 0) return t += 7 + 10;
+      t += 5; M1.m1 += 1;
+      if (left < 0){ M1.m1 += 1; return t += 7 + 10; }   // unreached: every effect's HL - DE is even
       t += 12;
     }
   }
   function lfsr(low){                              // $B22D (low $1F) / $B244 (low 7): returns BC
     t += 13 + 7; edge(m[0xB159] & low); t += 11 + 17;
+    M1.m1 += 4 + 19 + 8;                           // to the CALL, $B2D7, the tail
     const x = m[0xB155] ^ (m[0xB154] << 1 & 0xFF);
     const c3 = m[0xB153] & 1, c4 = m[0xB154] & 1;
     m[0xB153] = (x << 1 & 0x80) | m[0xB153] >> 1;
@@ -1023,42 +1028,42 @@ function soundEffect(m, a, out){
     const c = m[0xB153] | m[0xB154];
     return (c & 1) << 8 | c;
   }
-  function noise(d0, per, keepB){                  // one PUSH DE .. JR NZ block of $B19D
-    t += 10;                                       // LD DE
+  function noise(d0, per, k, keepB){               // one PUSH DE .. JR NZ block of $B19D
+    t += 10; M1.m1 += 1;                           // LD DE
     for (let d = d0; d; d--){
-      t += 11;                                     // PUSH DE
+      t += 11; M1.m1 += 1;                         // PUSH DE
       for (let e = 8; e; e--){
-        t += 17; let bc = lfsr(0x1F);
-        if (!keepB){ bc &= 0xFF; t += 7; }         // LD B,0
-        delay(bc, per);
-        t += 17; bc = lfsr(0x07);
-        if (!keepB){ bc &= 0xFF; t += 7; }
-        delay(bc, per);
-        t += 4 + (e > 1 ? 12 : 7);                 // DEC E: JR NZ
+        t += 17; M1.m1 += 1; let bc = lfsr(0x1F);
+        if (!keepB){ bc &= 0xFF; t += 7; M1.m1 += 1; }   // LD B,0
+        delay(bc, per, k);
+        t += 17; M1.m1 += 1; bc = lfsr(0x07);
+        if (!keepB){ bc &= 0xFF; t += 7; M1.m1 += 1; }
+        delay(bc, per, k);
+        t += 4 + (e > 1 ? 12 : 7); M1.m1 += 2;     // DEC E: JR NZ
       }
-      t += 10 + 4 + (d > 1 ? 12 : 7);              // POP DE: DEC D: JR NZ
+      t += 10 + 4 + (d > 1 ? 12 : 7); M1.m1 += 3;  // POP DE: DEC D: JR NZ
     }
   }
 
   switch (m[at] | m[at + 1] << 8){
-    case 0xB179: t += 7 + 10 + 10 + 17; pulses(0x7F, 0x000A, 0x0400, 4); t += 10; break;
-    case 0xB185: t += 7 + 10 + 10 + 17; pulses(0x3F, 0x000A, 0x0300, 6); t += 10; break;
-    case 0xB191: t += 7 + 10 + 10 + 17; pulses(0x3F, 0x00C0, 0x0100, 6); t += 10; break;
-    case 0xB221: t += 7 + 10 + 10 + 17; pulses(0x3F, 0x0080, 0x0100, 6); t += 10; break;
+    case 0xB179: t += 7 + 10 + 10 + 17; M1.m1 += 4; pulses(0x7F, 0x000A, 0x0400, 4); t += 10; M1.m1 += 1; break;
+    case 0xB185: t += 7 + 10 + 10 + 17; M1.m1 += 4; pulses(0x3F, 0x000A, 0x0300, 6); t += 10; M1.m1 += 1; break;
+    case 0xB191: t += 7 + 10 + 10 + 17; M1.m1 += 4; pulses(0x3F, 0x00C0, 0x0100, 6); t += 10; M1.m1 += 1; break;
+    case 0xB221: t += 7 + 10 + 10 + 17; M1.m1 += 4; pulses(0x3F, 0x0080, 0x0100, 6); t += 10; M1.m1 += 1; break;
     case 0xB19D:
-      noise(3, 26, false);                         // DEC BC: LD A,B: OR C: JR NZ
-      noise(2, 30, true);                          // .. with a NOP
-      noise(2, 38, true);                          // .. with three
-      t += 10; break;
+      noise(3, 26, 4, false);                      // DEC BC: LD A,B: OR C: JR NZ
+      noise(2, 30, 5, true);                       // .. with a NOP
+      noise(2, 38, 7, true);                       // .. with three
+      t += 10; M1.m1 += 1; break;
     case 0xB1FB:
-      t += 7 + 10 + 10 + 17; pulses(0xFF, 0x00E0, 0x0120, 6);
-      m[0xB151] = 0x00; m[0xB152] = 0x20; t += 10 + 16 + 17 + 20;   // $B2F0 with BC = $2000
-      delay(0x2000, 26); t += 10;
-      m[0xB151] = 0xFF; m[0xB152] = 0xFF; t += 10 + 16;
-      t += 7 + 10 + 10 + 17; pulses(0xFF, 0x03C0, 0x0400, 6); t += 10; break;
+      t += 7 + 10 + 10 + 17; M1.m1 += 4; pulses(0xFF, 0x00E0, 0x0120, 6);
+      m[0xB151] = 0x00; m[0xB152] = 0x20; t += 10 + 16 + 17 + 20; M1.m1 += 3 + 2;   // $B2F0 with BC = $2000
+      delay(0x2000, 26, 4); t += 10; M1.m1 += 1;
+      m[0xB151] = 0xFF; m[0xB152] = 0xFF; t += 10 + 16; M1.m1 += 2;
+      t += 7 + 10 + 10 + 17; M1.m1 += 4; pulses(0xFF, 0x03C0, 0x0400, 6); t += 10; M1.m1 += 1; break;
     default: throw new Error(`soundEffect: effect ${a} jumps to an unported address`);
   }
-  m[0xB150] = 0;
+  m[0xB150] = 0; M1.m1 += 3;
   return t + 4 + 13 + 10;                          // XOR A: LD ($B150),A: RET
 }
 

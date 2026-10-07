@@ -41,3 +41,8 @@ n      = 0
 kind   = "ported"
 says   = "soundEffect(m, a, out) in web/template.html: every $FE write at the same T, exact uncontended T and $B150-$B159 on 17 cases (fx 0-6, Flag_Sound 0, 8 chained LFSR states, 2 derived BC wraps); 24 mutants killed"
 by     = "python tools/sfx.py --capture ; python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "soundEffect counts its M1 cycles into M1.m1 and matches the sfx fixture's m1 (R advanced $B15A to RET, mod 128) on all 17 cases; the pulse RET NC exit is unreached (every effect's HL - DE is even)"
+by     = "python tools/build.py ; node test/kit.test.js"

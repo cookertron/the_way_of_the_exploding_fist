@@ -36,6 +36,6 @@ says   = "the whole pass $AE29 to $AE2C, s1 300 frames: 79 calls, 51 distinct PC
 by     = "python tools/callio.py --capture --state s1 --call 0xAE29 0xAE2C --frames 300 --per 1 --blind 0x400B-0x400F (and each row to $470B) --out scratch/pass.json"
 
 [[open]]
-ask    = "R at the CALL at $9757 (the AI draws) is R at $AE29 plus the M1 of $9C6F $9ED2 $9D29 and $B15A; every callee needs an M1 tally into M1.m1 -- done $9C6F $9ED2 $9D29; to do $B15A $97BB $9AD7 $95D4 $976F $BF13"
+ask    = "R at the CALL at $9757 (the AI draws) is R at $AE29 plus the M1 of $9C6F $9ED2 $9D29 and $B15A; every callee needs an M1 tally into M1.m1 -- done $9C6F $9ED2 $9D29 $B15A $97BB $9AD7; to do $95D4 $976F $BF13"
 tried  = "oracles stamped: callio fixtures rx/r (--stamp-r), rendfx m1 (--stamp-r), sfx m1 (re-captured, identical otherwise)"
 settle = "node test/kit.test.js with an M1 check in every callee gate, then the whole-pass gate checks rx"
