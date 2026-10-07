@@ -674,8 +674,8 @@
  {
   "file": "template.html",
   "label": "9336: leading zeros kept",
-  "old": "    m[p++] = 0x20;",
-  "new": "    p++;",
+  "old": "    m[p++] = 0x20;\n    t += 7 + 7 + 6 + 10;",
+  "new": "    p++;\n    t += 7 + 7 + 6 + 10;",
   "increment": "9C6F-port",
   "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
  },
@@ -1162,8 +1162,8 @@
  {
   "file": "template.html",
   "label": "control: demo flag P2 not set",
-  "old": "m[0xAA46] = 1; m[0xAA06] = 1;",
-  "new": "m[0xAA06] = 1;",
+  "old": "  m[0xAA46] = 1; m[0xAA06] = 1;\n  let [cy, a]",
+  "new": "  m[0xAA06] = 1;\n  let [cy, a]",
   "increment": "97CB-mut",
   "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
  },
@@ -2890,24 +2890,24 @@
  {
   "file": "template.html",
   "label": "AD1B point: point: reel bits compared on bit 3",
-  "old": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);",
-  "new": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x08){\n    t += yinYang(m) + award(m);",
+  "old": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 7 + 7;",
+  "new": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x08){\n    t += yinYang(m) + award(m);\n    t += 13 + 7 + 7;",
   "increment": "AD1B-point",
   "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
  },
  {
   "file": "template.html",
   "label": "AD1B point: point: P1 wins at 3",
-  "old": "    if (m[0xAA01] >= 4) return (t += 5, out('p1'));",
-  "new": "    if (m[0xAA01] >= 3) return (t += 5, out('p1'));",
+  "old": "    if (m[0xAA01] >= 4) return (t += 5, out('p1'));\n    t += 13 + 7 + 10;",
+  "new": "    if (m[0xAA01] >= 3) return (t += 5, out('p1'));\n    t += 13 + 7 + 10;",
   "increment": "AD1B-point",
   "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
  },
  {
   "file": "template.html",
   "label": "AD1B point: point: P2 win exit not taken",
-  "old": "    if (m[0xAA41] >= 4) return out('p2');",
-  "new": "    if (m[0xAA41] >= 5) return out('p2');",
+  "old": "    if (m[0xAA41] >= 4) return out('p2');\n  } else t += 5;                                   // the JR Z taken\n  m[0xAA08] = 0; m[0xAA48] = 0;\n  t += 4 + 13 + 13 + 13 + 4 + 7; M1.m1 += 6;       // XOR A .. AND A: JR Z\n  if (m[0x9C2B]) return out('time');",
+  "new": "    if (m[0xAA41] >= 5) return out('p2');\n  } else t += 5;                                   // the JR Z taken\n  m[0xAA08] = 0; m[0xAA48] = 0;\n  t += 4 + 13 + 13 + 13 + 4 + 7; M1.m1 += 6;       // XOR A .. AND A: JR Z\n  if (m[0x9C2B]) return out('time');",
   "increment": "AD1B-point",
   "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
  },
@@ -2962,7 +2962,7 @@
  {
   "file": "template.html",
   "label": "AD1B point: round: a point stops the engine again",
-  "old": "  if (b.exit !== 'ret' || demo) return b;",
+  "old": "  if (b.exit !== 'ret') return b;",
   "new": "  if (b.exit !== 'ret' || 1) return b;",
   "increment": "AD1B-point",
   "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
@@ -4008,22 +4008,6 @@
  },
  {
   "file": "template.html",
-  "label": "AC09: roundPass: the demo's point played by pointPath",
-  "old": "  if (b.exit !== 'ret' || demo) return b;",
-  "new": "  if (b.exit !== 'ret') return b;",
-  "increment": "AC09",
-  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
- },
- {
-  "file": "template.html",
-  "label": "AC09: Fist.pass: the demo's return named $AD1B",
-  "old": "res.exit === 'end' ? 0xAE67 : 0xABCB;",
-  "new": "res.exit === 'end' ? 0xAE67 : 0xAD1B;",
-  "increment": "AC09",
-  "kills": "P2: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row 418"
- },
- {
-  "file": "template.html",
   "label": "AC09: Fist.demoPass: round_loop not the demo's",
   "old": "this.demoAt = false; this.demo = true; this.stage = true;",
   "new": "this.demoAt = false; this.demo = false; this.stage = true;",
@@ -4045,5 +4029,103 @@
   "new": "u = demoIn(this.m, this.r, null);",
   "increment": "AC09",
   "kills": "P2: ...and the pass from $AC3C into the demo's $AE29 is charged within 0.2% of the contended machine"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: RET M not taken",
+  "old": "  if (a & 0x80) return (t += 6, out('quit'));\n  t += 17 + 47 + 7; M1.m1 += 1 + 5 + 1;            // CALL $AF01 and its body, JR Z\n  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 4 + 7;",
+  "new": "  if (a & 0x40) return (t += 6, out('quit'));\n  t += 17 + 47 + 7; M1.m1 += 1 + 5 + 1;            // CALL $AF01 and its body, JR Z\n  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 4 + 7;",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: reel bits on bit 3",
+  "old": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 4 + 7;",
+  "new": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x08){\n    t += yinYang(m) + award(m);\n    t += 13 + 4 + 7;",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: points not scored",
+  "old": "    t += yinYang(m) + award(m);\n    t += 13 + 4 + 7;",
+  "new": "    t += yinYang(m);\n    t += 13 + 4 + 7;",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: $AA03 test inverted",
+  "old": "    if (m[0xAA03]){\n      t += 13 + 7 + 7;",
+  "new": "    if (!m[0xAA03]){\n      t += 13 + 7 + 7;",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: both counts looked at (P1 by $AA03 set too)",
+  "old": "      if (m[0xAA41] >= 4) return out('p2');",
+  "new": "      if (m[0xAA41] >= 4) return out('p2');\n      if (m[0xAA01] >= 4) return (t += 5, out('p1'));",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: P2 wins at 3",
+  "old": "      if (m[0xAA41] >= 4) return out('p2');",
+  "new": "      if (m[0xAA41] >= 3) return out('p2');",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: P1 wins at 5",
+  "old": "      if (m[0xAA01] >= 4) return (t += 5, out('p1'));",
+  "new": "      if (m[0xAA01] >= 5) return (t += 5, out('p1'));",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: P1's JR NC taken T as not taken",
+  "old": "      if (m[0xAA01] >= 4) return (t += 5, out('p1'));",
+  "new": "      if (m[0xAA01] >= 4) return (t += 0, out('p1'));",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: P2's JR C taken T dropped",
+  "old": "      t += 5;                                      // the JR C taken, to $ABF1",
+  "new": "      t += 0;",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: $AA03 JR Z taken T dropped",
+  "old": "      t += 5 + 13 + 7 + 7; M1.m1 += 3;             // the JR Z taken",
+  "new": "      t += 13 + 7 + 7; M1.m1 += 3;             // the JR Z taken",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: points left set",
+  "old": "  m[0xAA08] = 0; m[0xAA48] = 0;\n  t += 4 + 13 + 13 + 13 + 4 + 7; M1.m1 += 6;       // XOR A .. AND A: JR Z\n  if (m[0x9C2B]) return (t += 4 + 10",
+  "new": "  m[0xAA08] = 0;\n  t += 4 + 13 + 13 + 13 + 4 + 7; M1.m1 += 6;       // XOR A .. AND A: JR Z\n  if (m[0x9C2B]) return (t += 4 + 10",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: time up ignored",
+  "old": "  if (m[0x9C2B]) return (t += 4 + 10, M1.m1 += 2, out('time'));",
+  "new": "  if (0) return (t += 4 + 10, M1.m1 += 2, out('time'));",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: time up: RET's M1 dropped",
+  "old": "return (t += 4 + 10, M1.m1 += 2, out('time'));",
+  "new": "return (t += 4 + 10, M1.m1 += 1, out('time'));",
+  "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: JR Z to $ABC8 not charged",
+  "old": "  t += 5 + roundIn(m, r);                          // JR Z taken, to $ABC8",
+  "new": "  t += roundIn(m, r);",
+  "increment": "ABCB"
  }
 ]

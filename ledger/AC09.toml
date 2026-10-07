@@ -23,7 +23,7 @@ kind   = "gated"
 says   = "live (P2 lost) runs past $AC3C: demoIn a pass (within 0.2% of the machine's 768438 T), then round_loop as the demo's, row for row to row 418, the machine's return to $ABCB: the engine stops there"
 by     = "node test/kit.test.js (live block, P2 leave row) ; python tools/sample.py (port.json live note)"
 
-[[open]]
-ask    = "the demo's ways out of $AE26 -- $ABCB (a point, the pose, rank up by $AF27, the next stage), the RET M quit to the $AC27 dispatch, round end $AE67 -- still stop the engine"
-tried  = "live_p1 rows 419-499 follow the machine's demo past its first point; not yet ported"
-settle = "port $ABCB-$AC04 as pointPath's twin, gated on callio --call 0xABCB 0xAE29,0xAC27 and live rows 418 on"
+[[fact]]
+kind   = "gated"
+says   = "the demo's points are played on by demoPoint ($ABCB, ledger ABCB); its other ways out (poses, time, quit, round end) are ABCB open 1"
+by     = "node test/kit.test.js (demoPoint block ; live block, P2 leave row)"

@@ -1,0 +1,30 @@
+# ledger/ABCB.toml -- current truth about demo_point (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "demo_point"
+entries  = ["$ABCB"]
+oracle   = "tools/callio.py"
+fixtures = ["demo_abcb", "live"]
+port     = "demoPoint"
+manual   = ["7.2", "Q11"]
+
+[[fact]]
+kind   = "insn"
+at     = "$ABCB"
+says   = "pointPath's twin for the demo's CALL at $ABC8: $AF01, $900E, $AF36; then $AA03 set looks at P2's count only (4: CALL $AE9D at $ABE5), clear at P1's only (4: CALL $AE7A at $AC00); $9C2B -> XOR A, RET to $ABB9; else JR $ABC8"
+by     = "python tools/adis.py 0xABC8 30"
+
+[[fact]]
+kind   = "measured"
+says   = "demoPoint matches the machine from $ABCB to $AE29 or its way out on 17 cases (9 played in the demo after the lost bout, 8 derived, 3 of them with --up 0xABB9): bytes (score row blind, D5), exit, uncontended T 15-17734, R"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_abcb.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "live (P2 lost) follows the demo through its point at row 418 to the fixture's last row (499), no way out; the demo's p1/p2/time/quit/end exits stop the engine at DEMO_OUT"
+by     = "node test/kit.test.js (live block, P2 leave row)"
+
+[[open]]
+ask    = "the demo's ways on from demoPoint -- the poses at $AC00/$ABE5 then XOR A RET, time up, the round end $AE67 -- to $ABB9: $AF27 stage up, rank up, $AB97 the next demo stage or RET to $AC27"
+tried  = "live_p1 ends at row 499 with no further mark; none of these is reached by the fixture"
+settle = "port $ABB9-$ABC7 with the poses (winStart/winPass) and gate on a longer live sample (--passes past the demo's first pose) or callio --call 0xABB9 0xAE29,0xAC27"

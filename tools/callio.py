@@ -82,6 +82,10 @@ how many reads were fetches.
              (a menu).  The reads are new, so the parent's log is not
              compared; the case logs its own.  Keys are released after
              the script's last segment.
+             --up WORD puts WORD at SP as the caller's return, recorded
+             as the case's "up": for a bracket entered mid-routine (not
+             at a CALL) whose derived path returns through its caller --
+             the replay's stack is the target's, not play's.
   --cover    shrink a fixture in place to a greedy cover of its PC sets:
              the fewest cases (most new PCs first) that still reach every
              PC some case reached, plus every derived case.  For a call
@@ -497,7 +501,7 @@ def check(args):
 
 def derive(args):
     t = parse_target(args)
-    fixture, base, sets, rset, psets, script, rsets = None, None, {}, None, {}, None, {}
+    fixture, base, sets, rset, psets, script, rsets, up = None, None, {}, None, {}, None, {}, None
     while args:
         if args[0] == '--fixture':
             fixture = args[1]; del args[:2]
@@ -522,6 +526,8 @@ def derive(args):
             del args[:2]
         elif args[0] == '--script':
             script = args[1]; del args[:2]
+        elif args[0] == '--up':
+            up = int(args[1], 0); del args[:2]
         else:
             sys.exit(f'callio: unknown argument {args[0]}')
     if script is not None and psets:
@@ -536,6 +542,10 @@ def derive(args):
     if missing:
         sys.exit('callio: --set may only change bytes the case read: not '
                  + ' '.join(f'${a:04X}' for a in missing))
+    if up is not None:                             # the caller's return at SP: a way out through it
+        if 'up' in c:
+            sys.exit('callio: --up: the case already returns through its caller')
+        c = {**c, 'up': bytes([up & 0xFF, up >> 8]).hex()}
     mem = bytearray(h.memobj.m)                    # the target, for code the case never fetched
     for a, v in {**ins, **sets}.items():
         mem[a] = v
@@ -584,7 +594,8 @@ def derive(args):
                                     **({'r': rset} if rset is not None else {}),
                                     **({'reg': {str(i): v for i, v in rsets.items()}} if rsets else {}),
                                     **({'port': {str(i): v for i, v in psets.items()}} if psets else {}),
-                                    **({'script': script} if script is not None else {})}})
+                                    **({'script': script} if script is not None else {}),
+                                    **({'up': up} if up is not None else {})}})
     with open(fixture, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
     print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {dt}; PCs no case reached before: '

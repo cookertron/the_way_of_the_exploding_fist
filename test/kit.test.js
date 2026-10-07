@@ -1151,6 +1151,47 @@ const mockCtx = (state) => ({
          fx.cases.some(c => set(c).b019 === 8 && set(c).b030 === 9)], [true, true, true]);
 }
 
+/* ---- the demo's point path $ABCB back to $AE29, against its oracle -----
+   python tools/callio.py --capture --call 0xABCB 0xAE29,0xABB9,0xAC00,0xABE5
+   (p1, the demo after the lost bout: 7 points back in, 2 won by P1; the
+   other arms derived, the RETs to $ABB9 with --up, port.json).  Exact as
+   pointPath's: every byte outside the score row, the way out, T and R. */
+{
+  const fx = P.assets.demo_abcb;
+  const iA = fx.regs.indexOf(0);
+  const EXIT = { 0xAE29: null, 0xAC00: 'p1', 0xABE5: 'p2' };
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    const res = P.demoPoint(m, c.regs[iA], c.r);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
+      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
+    }
+    const wrote = [], blind = [];
+    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
+    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
+    const out = c.xpc === 0xABB9 ? (c.exit[iA] & 0x80 ? 'quit' : 'time') : EXIT[c.xpc];   // the RET: A says which
+    const got = [res.exit, res.t, res.r, diff, wrote.join() === blind.join()];
+    const w = [out, c.t, c.rx, -1, true];
+    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
+      first = `case ${i}: exit, T, R, first bad byte, score row ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
+  }
+  check("demoPoint matches the real $ABCB to $AE29 (or its way out) on every case: bytes, exit, T and R exactly", [bad, first], [0, '']);
+  const set = c => (c.derived || {}).set || {};
+  check('...and the cases take every way out: back in, P1 wins, P2 wins, time up with and without a point, the RET M',
+        [[0xAE29, 0xAC00, 0xABE5].map(x => fx.cases.some(c => c.xpc === x)),
+         fx.cases.filter(c => c.xpc === 0xABB9).map(c => [c.exit[iA], set(c).aa03 === 0])],
+        [[true, true, true], [[0, false], [0, true], [0x80, false]]]);
+  check('...and P1 at 4 with $AA03 set is not looked at: back in, faithful',
+        fx.cases.filter(c => set(c).aa03 === 1).map(c => c.xpc), [0xAE29]);
+}
+
 /* ---- P2 wins the 1UP bout: $AD94, the victory pose $AE9D, to $ACA6 -----
    python tools/callio.py --capture --state p1 --call 0xAD94 0xACA6 (the
    call the live script makes, 66 passes of the pose).  winStart, winPass
@@ -1604,13 +1645,13 @@ function liveGate(L, who, how){
   check(`${who}: roundPass${what} follow the machine sample for sample over keyed 1P play until the bout ends`, first, '');
   /* lost: the high score checked, sampled at $AC3C; Main_Game_Loop's rows
      and Demo_Mode (demoIn, a pass of its own) into the demo's $AE29, the
-     row of the bout's end; the demo played on to the machine's first
-     return from $AE26 to $ABCB, where the engine stops (not ported yet) */
-  const demoRet = L.rows.findIndex((r, i) => i > out && r.m.includes(0xABCB));
+     row of the bout's end; the demo played on, its points by demoPoint
+     (the machine's returns from $AE26 to $ABCB), to the fixture's last row */
+  const demoRet = L.rows.map((r, i) => i > out && r.m.includes(0xABCB) ? i : -1).filter(i => i >= 0);
   if (how === 'lost'){
-    check(`${who}: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo to the machine's return to $ABCB on row ${demoRet}`,
-          [demoP, at, exit, g.exit && g.exit.at, g.demo, g.demoAt, g.win, g.bonus, g.both, g.setup, L.rows[out].m.includes(0xAC09)],
-          [out, demoRet, 'ret', 0xABCB, true, false, 0, false, null, null, true]);
+    check(`${who}: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo through its points (returns to $ABCB on rows ${demoRet.join(', ')}) to the fixture's last row with no way out`,
+          [demoP, at, exit, k, demoRet.length > 0, g.demo, g.demoAt, g.win, g.bonus, g.both, g.setup, L.rows[out].m.includes(0xAC09)],
+          [out, -1, null, seq.length, true, true, false, 0, false, null, null, true]);
     /* the demo's pass is mostly the scenery: 640994 T uncontended
        (build/callio_ac3c.json), 768438 on the machine */
     check(`${who}: ...and the pass from $AC3C into the demo's $AE29 is charged within 0.2% of the contended machine`, Math.abs(demoT - 1) < 0.002, true);
