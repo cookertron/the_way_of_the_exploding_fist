@@ -1477,15 +1477,28 @@ function liveGate(L, who, how){
   const out = bout ?? marked[marked.length - 1] ?? -1;
   const outKind = out < 0 ? null : L.rows[out].m.includes(0xACA6) ? how
     : L.rows[out].m.includes(0xAE67) ? 'end' : 'point';
-  const pcNow = () => g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
-  let at = -1, k = 0, round = 0, subs = 0;
+  const pcNow = () => g.exit ? g.exit.at : g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
+  /* won and drawn bouts go on through the setup's tune (charged in the
+     pass that reaches $AC5F) and its rest (a pass of its own) to the CALL
+     $AD18, sampled there; with a new stage the text rows are in the font
+     (D5), so the display is checked by the hash below them, $4800- */
+  const disp = L.hash.findIndex(([lo, hi]) => lo === 0x4000);
+  let at = -1, k = 0, round = 0, subs = 0, setupT = 0, setupM = 0, edges = -1, logN = 0, tail = -1;
   for (; k < seq.length; k++){
-    if (!g.win && !g.bonus && !g.both){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
-    const cost = g.pass(kb);
-    if (g.exit){ exit = g.exit.exit; at = seq[k].p; break; }
-    if (g.win || g.bonus || g.both) subs++;
-    ratio.push(cost / seq[k].t);
+    if (!g.win && !g.bonus && !g.both && !g.setup){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
+    logN = g.sound.log.length;
+    let cost = g.pass(kb);
+    if (g.setup){
+      const t1 = g.simT, e = g.sound.log.slice(logN).filter(([f]) => f * P.T_FRAME <= t1);
+      edges = e.length; if (edges) tail = t1 - e[edges - 1][0] * P.T_FRAME;
+      cost += g.pass(kb); setupT = cost; setupM = seq[k].t;
+    }
+    if (g.exit && g.exit.at !== 0xAD18){ exit = g.exit.exit; at = seq[k].p; break; }
+    if (!g.exit && (g.win || g.bonus || g.both)) subs++;
+    if (!g.exit) ratio.push(cost / seq[k].t);
     const got = [pcNow(), ...row(g.m, g.r)], w = [seq[k].pc, ...want(seq[k])];
+    if (g.exit && g.exit.stage) got[1 + L.vars.length + 1 + disp] = w[1 + L.vars.length + 1 + disp];
+    if (g.exit && !first && JSON.stringify(got) === JSON.stringify(w)){ exit = g.exit.exit; at = seq[k].p; break; }
     if (JSON.stringify(got) !== JSON.stringify(w)){
       const names = ['PC', ...L.vars.map(v => v[0]), 'R', ...L.hash.map(([lo, hi]) => `hash $${lo.toString(16)}-$${hi.toString(16)}`)];
       const j = got.findIndex((x, i) => x !== w[i]);
@@ -1494,14 +1507,21 @@ function liveGate(L, who, how){
   }
   const what = { won: ', the victory pose and the time bonus', lost: ' and the victory pose', draw: ', the round end and the draw' }[how];
   check(`${who}: roundPass${what} follow the machine sample for sample over keyed 1P play until the bout ends`, first, '');
-  check(`${who}: ...and leave on the sample the machine left, the same way (${how === 'draw' ? 'out at $AC5F drawn' : `${who} wins, out to $ACA6 ${how}, on to ${how === 'lost' ? '$AC39' : '$AC5F'}`})`,
-        [at, exit, g.exit && g.exit.at, !!(seq[k] && !seq[k].sub), g.win, g.bonus, g.both],
-        [out, how, how === 'lost' ? 0xAC39 : 0xAC5F, true, 0, false, null]);
-  const sub = (L.rows[out] || {}).s || [];
+  check(`${who}: ...and leave on the sample the machine left, the same way (${how === 'draw' ? 'out at $AC5F drawn' : `${who} wins, out to $ACA6 ${how}, on to ${how === 'lost' ? '$AC39' : '$AC5F'}`}${how === 'lost' ? '' : ', the setup run to the CALL $AD18'})`,
+        [at, exit, g.exit && g.exit.at, seq[k] && (seq[k].sub ? seq[k].pc : 'row'), g.win, g.bonus, g.both, g.setup],
+        [out, how, how === 'lost' ? 0xAC39 : 0xAD18, how === 'lost' ? 'row' : 0xAD18, 0, false, null, null]);
+  const sub = ((L.rows[out] || {}).s || []).filter(x => x.pc !== 0xAD18);
   const end = how === 'draw' ? sub.findIndex(x => x.t > 1e6) : 0;   // the round end's loop: to the delays
   check(`${who}: ...which the script reaches ${how === 'draw' ? 'by the clock, no point played, the round end loop then' : 'through points played on, the way out the last, after'} 66 passes of the pose${how === 'won' ? ' and a pass a second' : ''}`,
         [marked.filter(i => i <= out).length, outKind, subs, sub.filter(x => x.pc !== 0xAD6E).length - end, sub.filter(x => x.pc === 0xAD6E).length > 1, end],
         { won: [1, 'won', sub.length, 66, true, 0], lost: [2, 'lost', sub.length, 66, false, 0], draw: [1, 'draw', sub.length, 66, false, 3] }[how]);
+  if (how !== 'lost')
+    /* the draw's segment is mostly the pose's last pass, at the D4 means:
+       0.16% off; the won one is mostly the tune and the scenery: 0.007%.
+       The tune ends on a rest after its last write: 76022 T uncontended
+       (build/callio_ac5f.json case 0: T 12260038 at the RET, 12184016) */
+    check(`${who}: ...and the pass to $AC5F with ${how === 'won' ? 'the tune (a new stage: the scenery after)' : 'no tune (no new stage)'} and the setup's rest are charged within ${how === 'won' ? '0.05' : '0.2'}% of the contended machine, the tune's edges inside the first, its last at the end of the pass`,
+          [Math.abs(setupT / setupM - 1) < (how === 'won' ? 0.0005 : 0.002), edges, how === 'won' ? tail > 70000 && tail < 80000 : tail], [true, how === 'won' ? 3422 : 0, how === 'won' ? true : -1]);
   const sum = ratio.reduce((a, b) => a + b, 0) / ratio.length, worst = Math.max(...ratio.map(x => Math.abs(x - 1)));
   checkTrue(`${who}: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round${{ won: ', the pose and the bonus', lost: ' and the pose', draw: ', the round end and the draw' }[how]}`,
             Math.abs(sum - 1) < 0.005, `mean ${sum.toFixed(5)}, worst pass ${(worst * 100).toFixed(2)}% off`);

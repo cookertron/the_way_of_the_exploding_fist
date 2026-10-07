@@ -142,13 +142,13 @@
       "key": "live_time",
       "file": "build/live_time.json",
       "required": true,
-      "note": "live rows for time up and the draw, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0x9CA5=1 --passes 200 --also 0xAD0B --also 0xAE8E --also 0xAEB2 --also 0xAD6E --json build/live_time.json with live_p1w's script, vars, marks, hashes and skips"
+      "note": "live rows for time up and the draw, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0x9CA5=1 --passes 200 --also 0xAD0B --also 0xAE8E --also 0xAEB2 --also 0xAD6E --also 0xAD18 --json build/live_time.json with live_p1w's script, vars, marks, hashes (with 0x4800-0x5AFF) and skips; the setup sampled at $AD18"
     },
     {
       "key": "live_p1w",
       "file": "build/live_p1w.json",
       "required": true,
-      "note": "live rows for P1 winning, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0xAA01=4 --passes 200 --also 0xAE8E --also 0xAD6E --json build/live_p1w.json with live's script, vars (and sc=0xB02D:3), marks and hashes, the P1 score cells $4001-$4008 skipped with the timer's (D5)"
+      "note": "live rows for P1 winning, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0xAA01=4,0xAA3C=1 --passes 200 --also 0xAE8E --also 0xAD6E --also 0xAD18 --json build/live_p1w.json with live's script, vars (and sc=0xB02D:3), marks and hashes (and --hash 0x4800-0x5AFF: below the text rows, D5), the P1 score cells $4001-$4008 skipped with the timer's (D5); $AA3C=1: the win ranks up to stage 3, so the tune and the scenery run before $AD18"
     },
     {
       "key": "live",

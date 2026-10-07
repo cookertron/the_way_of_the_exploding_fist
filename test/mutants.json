@@ -3114,16 +3114,16 @@
  {
   "file": "template.html",
   "label": "AD94 win: Fist: the pose never ends",
-  "old": "if (w.out && this.win === 0xAA40){ t += winEnd() + this.next(0); this.win = 0; }",
-  "new": "if (w.out && this.win === 0xAA40){ t += winEnd() + this.next(0); }",
+  "old": "if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); this.win = 0; }",
+  "new": "if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); }",
   "increment": "AD94-win",
   "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
  },
  {
   "file": "template.html",
   "label": "AD94 win: Fist: the bout lost unnamed",
-  "old": "this.exit = { exit: a ? 'won' : 'lost', at: b.at };",
-  "new": "this.exit = { exit: a ? 'won' : 'p2', at: b.at };",
+  "old": "if (b.at === 0xAC39){ this.exit = { exit: 'lost', at: b.at }; return b.t; }",
+  "new": "if (b.at === 0xAC39){ this.exit = { exit: 'p2', at: b.at }; return b.t; }",
   "increment": "AD94-win",
   "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
  },
@@ -3266,8 +3266,8 @@
  {
   "file": "template.html",
   "label": "AD5F bonus: Fist: no bonus count",
-  "old": "        if (b.out) t += this.next(1); else this.bonus = true;",
-  "new": "        t += this.next(1);",
+  "old": "        if (b.out) t += this.next(1, t); else this.bonus = true;",
+  "new": "        t += this.next(1, t);",
   "increment": "AD5F-bonus",
   "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3282,10 +3282,10 @@
  {
   "file": "template.html",
   "label": "AD5F bonus: Fist: the bonus never stops",
-  "old": "      if (b.out){ this.bonus = false; t += this.next(1); }",
-  "new": "      if (b.out){ t += this.next(1); }",
+  "old": "      if (b.out){ this.bonus = false; t += this.next(1, t); }",
+  "new": "      if (b.out){ t += this.next(1, t); }",
   "increment": "AD5F-bonus",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F)"
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F, the setup run to the CALL $AD18)"
  },
  {
   "file": "template.html",
@@ -3530,7 +3530,7 @@
  {
   "file": "template.html",
   "label": "ACA6 next: Fist: lost never goes on",
-  "old": "t += winEnd() + this.next(0);",
+  "old": "t += winEnd(); t += this.next(0, t);",
   "new": "t += winEnd(); this.exit = { exit: 'lost', at: 0xAC5F };",
   "increment": "ACA6-next",
   "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
@@ -3538,10 +3538,10 @@
  {
   "file": "template.html",
   "label": "ACA6 next: Fist: won after the bonus skips boutNext",
-  "old": "if (b.out){ this.bonus = false; t += this.next(1); }",
+  "old": "if (b.out){ this.bonus = false; t += this.next(1, t); }",
   "new": "if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }",
   "increment": "ACA6-next",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F)"
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F, the setup run to the CALL $AD18)"
  },
  {
   "file": "template.html",
@@ -3702,5 +3702,101 @@
   "new": "for (const pos of [0x0108, 0x0110, 0x1A08]){",
   "increment": "AC5F-setup",
   "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: SETUP_K: the tune charged uncontended",
+  "old": "const SETUP_K = { tune: 36842904 / 36780114,",
+  "new": "const SETUP_K = { tune: 1,",
+  "increment": "AC5F-live",
+  "kills": "P1: ...and the pass to $AC5F with the tune (a new stage: the scenery after) and the setup's rest are charged within 0.05% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: SETUP_K: the scenery charged at the rest's factor",
+  "old": "scen: 2038943 / 1670337,",
+  "new": "scen: 275349 / 260490,",
+  "increment": "AC5F-live",
+  "kills": "P1: ...and the pass to $AC5F with the tune (a new stage: the scenery after) and the setup's rest are charged within 0.05% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: SETUP_K: the rest charged uncontended",
+  "old": "rest: 275349 / 260490 };",
+  "new": "rest: 1 };",
+  "increment": "AC5F-live",
+  "kills": "time: ...and the pass to $AC5F with no tune (no new stage) and the setup's rest are charged within 0.2% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: setupRest: the scenery's T not reported",
+  "old": "    if (cost) cost.scen = sc;\n",
+  "new": "",
+  "increment": "AC5F-live",
+  "kills": "P1: ...and the pass to $AC5F with the tune (a new stage: the scenery after) and the setup's rest are charged within 0.05% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.music: the tune's level changes not logged",
+  "old": "if (lv !== this.lvl){ this.lvl = lv; this.sound.log.push([(this.simT + t + u) / T_FRAME, lv]); }",
+  "new": "if (lv !== this.lvl){ this.lvl = lv; }",
+  "increment": "AC5F-live",
+  "kills": "P1: ...and the pass to $AC5F with the tune (a new stage: the scenery after) and the setup's rest are charged within 0.05% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.music: the edges timed from the pass's start, not from $AC5F",
+  "old": "this.sound.log.push([(this.simT + t + u) / T_FRAME, lv]);",
+  "new": "this.sound.log.push([(this.simT + u) / T_FRAME, lv]);",
+  "increment": "AC5F-live",
+  "kills": "P1: ...and the pass to $AC5F with the tune (a new stage: the scenery after) and the setup's rest are charged within 0.05% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.music: the tune not charged",
+  "old": "    return s.t * SETUP_K.tune;",
+  "new": "    return 0;",
+  "increment": "AC5F-live",
+  "kills": "P1: ...and the pass to $AC5F with the tune (a new stage: the scenery after) and the setup's rest are charged within 0.05% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.setupPass: R not advanced by the rest's M1",
+  "old": "    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
+  "new": "    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;",
+  "increment": "AC5F-live",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.endPass: the draw's JP $AC5F not counted in R",
+  "old": "      M1.m1 = 1; t += this.music('draw', t);",
+  "new": "      M1.m1 = 0; t += this.music('draw', t);",
+  "increment": "AC5F-live",
+  "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.next: won stops at $AC5F, no setup",
+  "old": "    return b.t + this.music('won', t + b.t);",
+  "new": "    this.exit = { exit: 'won', at: b.at }; return b.t;",
+  "increment": "AC5F-live",
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F, the setup run to the CALL $AD18)"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.setupPass: the setup run with no new stage",
+  "old": "const cost = { scen: 0 }, u = setupRest(this.m, this.setup.stage, cost);",
+  "new": "const cost = { scen: 0 }, u = setupRest(this.m, false, cost);",
+  "increment": "AC5F-live",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F live: Fist.pass: the setup pass skipped, the bout's pass runs",
+  "old": "    if (this.setup) return this.setupPass();\n",
+  "new": "",
+  "increment": "AC5F-live",
+  "kills": "time: ...and leave on the sample the machine left, the same way (out at $AC5F drawn, the setup run to the CALL $AD18)"
  }
 ]

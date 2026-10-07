@@ -2424,8 +2424,16 @@ function boutNext(m, a, r){
    Always: New_Round, Init_Time, CALL $AD18.  setupMusic is $AC5F through
    the music's RET (or the JR Z with no new stage), its $FE writes pushed to
    outs as [T from $AC5F, value]; setupRest is the rest, to $AD18 with the
-   CALL.  T uncontended, M1 into M1.m1.  Gated against python
-   tools/callio.py --capture --call 0xAC5F 0xAD18 (build/callio_ac5f.json). */
+   CALL; cost.scen (if given) gets the T of the scenery, LD A,($AF34) to
+   the CALL $9200's RET.  T uncontended, M1 into M1.m1.  Gated against
+   python tools/callio.py --capture --call 0xAC5F 0xAD18 (build/callio_ac5f.json).
+   Live, contention is charged as measured means (D4): sample.py --also
+   0xAC5F --also 0xAC6C --also 0xAC72 --also 0xAD18 over live_p1w's play
+   (--poke 0xAA3C=1, and 0xAF34=1, 3), and live_time's: the tune 3 runs,
+   36842904 T contended over 36780114 (the OUTs); the scenery stages 2, 1,
+   3: 2038943 over 1670337 (its code at $5F22 and its writes in contended
+   RAM); the rest 4 runs, the draw's among them, 275349 over 260490. */
+const SETUP_K = { tune: 36842904 / 36780114, scen: 2038943 / 1670337, rest: 275349 / 260490 };
 function introMusic(m, outs, t0){                  // Intro_Music $90D1 with its CALL, t0 the T at the CALL
   let t = 17 + 4 + 13 + 4; M1.m1 += 4;             // CALL: DI: LD A,(Flag_Sound): AND A
   if (!m[0xB2FA]){ M1.m1 += 1; return t + 11; }
@@ -2573,10 +2581,12 @@ function setupMusic(m, outs){                      // $AC5F to the music's RET, 
   t += 7 + 4 + 13; M1.m1 += 2;                     // DEC A: LD ($AF35),A
   return { t: t + introMusic(m, outs, t), stage: true };
 }
-function setupRest(m, stage){                      // on to $AD18, with the CALL
+function setupRest(m, stage, cost){                // on to $AD18, with the CALL
   let t = 0;
   if (stage){
-    t += 13 + scenery(m, m[0xAF34]) + 7 + 17; M1.m1 += 3;   // LD A,($AF34): CALL $9200: LD B,0: CALL $AF52
+    const sc = 13 + scenery(m, m[0xAF34]);         // LD A,($AF34): CALL $9200
+    if (cost) cost.scen = sc;
+    t += sc + 7 + 17; M1.m1 += 3;                  // LD B,0: CALL $AF52
     t += awardTail(m, 0, SIDE1);
     t += 17 + 10 + 7 + populate(m, 0x9C2C, 1) + 17; M1.m1 += 4;   // CALL $98BF: LD HL,Num_Players: LD B,1: ..CALL Zero_To_Space
     t += zeroToSpace(m, 0xB026) + 20 + printString(m, 0x0019, 0xB024, M1) + 20 + printString(m, 0x0319, 0xB03E, M1) + 10; M1.m1 += 5;
@@ -2613,6 +2623,7 @@ class Fist {
     this.win = 0;                                  // the winner's base while the victory pose loops, else 0
     this.bonus = false;                            // P1's time bonus counting ($AD6E), after the pose
     this.both = null;                              // both fighters posing in $ACF0's loop $AD0B: 'end' (time up) or 'draw'
+    this.setup = null;                             // the next bout's setup after the tune: { how, stage } to setupRest
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();
@@ -2621,6 +2632,7 @@ class Fist {
   get simFrame(){ return this.simT / T_FRAME; }
   /* one pass with these keys; returns its charged T */
   pass(kb){
+    if (this.setup) return this.setupPass();
     if (this.win || this.bonus) return this.winPass();
     if (this.both) return this.endPass();
     const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
@@ -2658,7 +2670,7 @@ class Fist {
   }
   /* one iteration of $ACF0's loop $AD0B; out by its RET: at the round end
      the delays, pointPath (time up: 'time') and onward; after the draw the
-     JP $AC5F to the next bout, not ported (D7) */
+     JP $AC5F to the next bout's setup */
   endPass(){
     const cost = { dec: 0, copy: 0, ldir: 0 };
     M1.m1 = 0;
@@ -2667,7 +2679,9 @@ class Fist {
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     let res = null;
     if (w.out && this.both === 'draw'){            // JP $AC5F
-      t += 10; this.r = (this.r & 0x80) | ((this.r + 1) & 0x7F); res = { exit: 'draw', at: 0xAC5F, r: this.r }; this.both = null;
+      t += 10; this.both = null;
+      M1.m1 = 1; t += this.music('draw', t);
+      this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     }
     else if (w.out){
       M1.m1 = 0;
@@ -2682,8 +2696,8 @@ class Fist {
   }
   /* one iteration of the victory pose, or one second of P1's time bonus;
      out by the pose's RET, the 1UP bout is lost (P2) or the bonus counts
-     (P1), out to $ACA6 won; then boutNext to $AC39 (lost) or $AC5F (won),
-     neither ported yet (D7) */
+     (P1), out to $ACA6 won; then boutNext to $AC39 (lost, not ported yet:
+     D7) or $AC5F (won), the next bout's setup */
   winPass(){
     const cost = { dec: 0, copy: 0, ldir: 0 };
     M1.m1 = 0;
@@ -2691,15 +2705,15 @@ class Fist {
     if (this.bonus){
       const b = bonusPass(this.m);
       t = b.t;
-      if (b.out){ this.bonus = false; t += this.next(1); }
+      if (b.out){ this.bonus = false; t += this.next(1, t); }
     } else {
       const w = winPass(this.m, this.win, this.sp, cost);
       t = w.t + rfPlayT(cost.t, cost) - cost.t;
-      if (w.out && this.win === 0xAA40){ t += winEnd() + this.next(0); this.win = 0; }
+      if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); this.win = 0; }
       else if (w.out){                             // $AD62: the clock counted down from here, or out at once
         const b = bonusStart(this.m);
         t += b.t; this.win = 0;
-        if (b.out) t += this.next(1); else this.bonus = true;
+        if (b.out) t += this.next(1, t); else this.bonus = true;
       }
     }
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
@@ -2707,12 +2721,41 @@ class Fist {
     if (this.exit) this.exit.r = this.r;
     return t;
   }
-  /* $ACA6 on from a bout lost (a = 0) or won (1), inside a pass whose M1
-     are counted from this.r: the T, and .exit at the PC reached */
-  next(a){
+  /* $ACA6 on from a bout lost (a = 0) or won (1), t into a pass whose M1
+     are counted from this.r: the T; lost sets .exit at $AC39, won goes on
+     into the setup's tune */
+  next(a, t){
     const b = boutNext(this.m, a, this.r);
-    this.exit = { exit: a ? 'won' : 'lost', at: b.at };
-    return b.t;
+    if (b.at === 0xAC39){ this.exit = { exit: 'lost', at: b.at }; return b.t; }
+    return b.t + this.music('won', t + b.t);
+  }
+  /* $AC5F, t into the pass: setupMusic charged inside this pass whole (DI
+     throughout, the screen untouched while it plays), its $FE writes to the
+     border and the sound log at their T; setupRest is the next pass.  Both
+     at the measured means of SETUP_K */
+  music(how, t){
+    const outs = [], s = setupMusic(this.m, outs);
+    for (let [u, v] of outs){
+      u *= SETUP_K.tune;
+      this.border = v & 7;
+      const lv = (v >> 4) & 1;
+      if (lv !== this.lvl){ this.lvl = lv; this.sound.log.push([(this.simT + t + u) / T_FRAME, lv]); }
+    }
+    this.setup = { how, stage: s.stage };
+    return s.t * SETUP_K.tune;                     // with no tune its 29 T: the factor below measurement
+  }
+  /* the setup after the tune: the scenery and text rows (a new stage), New_
+     Round, Init_Time, out at the CALL $AD18 -- round_loop's way in is not
+     ported yet (D7), so .exit is set there */
+  setupPass(){
+    M1.m1 = 0;
+    const cost = { scen: 0 }, u = setupRest(this.m, this.setup.stage, cost);
+    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;
+    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
+    this.exit = { exit: this.setup.how, at: 0xAD18, stage: this.setup.stage, r: this.r };
+    this.setup = null;
+    this.simT += t; this.passes++;
+    return t;
   }
   /* one video frame: spend its T on whole passes (a pass that overruns is
      paid back by the next frames, as the original's own slow passes are) */
@@ -2808,5 +2851,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, boutNext, setupMusic, setupRest, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, boutNext, setupMusic, setupRest, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

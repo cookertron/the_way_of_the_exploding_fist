@@ -29,3 +29,13 @@ by     = "python tools/boot.py --state p1 --steps 0 --out F ; python tools/adis.
 kind   = "measured"
 says   = "setupMusic+setupRest match the machine $AC5F to CALL $AD18 on 7 cases: stages 2, 3, wrap to 1, ST ND RD TH (12.89M T, 3422 $FE writes), derived no stage, sound off, novice; bytes, text cells, T, R, $FE writes"
 by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac5f.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "setup contention (D4 means, SETUP_K): tune x1.00171 over 3 runs (the OUTs); scenery x1.2207 over stages 1-3 (code at $5F22, screen writes); rest x1.0570 over 4 runs, the draw's among them"
+by     = "python tools/sample.py --state p1 --at 0xAE29 --poke 0xAA01=4,0xAA3C=1 --also 0xAC5F --also 0xAC6C --also 0xAC72 --also 0xAD18 (and 0xAF34=1, 3; live_time's play), over the engine's uncontended T: P.scenery and P.setupRest on build/callio_ac5f.json cases 0-3"
+
+[[fact]]
+kind   = "gated"
+says   = "live: won (stage 3) and drawn bouts play the tune inside the pass reaching $AC5F (3422 edges logged), setupRest the next pass, out at CALL $AD18 matching the machine's sample; charge 0.007% / 0.16% off"
+by     = "node test/kit.test.js (liveGate P1, time) ; python tools/mutants.py --affected"
