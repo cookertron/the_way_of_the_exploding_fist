@@ -27,12 +27,18 @@ out of every hash.  Rows go to the file whether or not --changes is given.
 --mark PC (repeatable) adds to each JSON row the marks executed since the
 previous visit, in order ("m": [PC, ...]) -- a way out of the loop and back
 in (a RET to the caller, a reset) shows there, not as a mystery row.
+--also PC (repeatable) samples at more PCs without counting them as passes:
+a loop the main loop calls that runs many times between two visits to --at
+(a victory pose).  Each such visit is a sub-row of the next row ("s": [{pc,
+v, r, t, h}, ...], in order); t is then always since the previous sample of
+either kind, so the engine can charge each sub-loop pass its own T.
 
 Usage:
     python tools/sample.py --state NAME --at PC --var NAME=ADDR [--var ...]
                            [--passes 1000] [--changes] [--keys D+W]
                            [--script "40:,60:D"] [--json FILE]
                            [--hash LO-HI ...] [--skip LO-HI ...] [--mark PC ...]
+                           [--also PC ...]
     python tools/sample.py --state s1 --at 0x9745 --var time=0x9CA5 --var cnt=0x9CA6 --changes
 """
 import json
@@ -75,7 +81,7 @@ def main():
         print(__doc__.strip()); sys.exit(0)
     target = parse_target(args)
     at, passes, changes, keys, vars_ = None, 1000, False, None, []
-    script, out, hashes, skip, marks = None, None, [], [], []
+    script, out, hashes, skip, marks, also = None, None, [], [], [], []
     i = 0
     while i < len(args):
         a = args[i]
@@ -97,6 +103,8 @@ def main():
             hashes.append(parse_range(args[i + 1])); i += 2
         elif a == '--mark':
             marks.append(int(args[i + 1], 0)); i += 2
+        elif a == '--also':
+            also.append(int(args[i + 1], 0)); i += 2
         elif a == '--skip':
             skip.append(parse_range(args[i + 1])); i += 2
         else:
@@ -115,13 +123,21 @@ def main():
           + (f', keys {keys}' if keys else '') + (f', script {script}' if script else ''))
     m = h.memobj.m
     prev, rows, start, t0 = None, [], None, None
-    hit = []                                # marks since the previous visit
+    hit, sub = [], []                       # marks and --also rows since the previous visit
     for p in range(passes):
         while True:
-            reason, _ = h.run_until({at, *marks}, limit=50_000_000)
+            reason, _ = h.run_until({at, *marks, *also}, limit=50_000_000)
             if reason != 'target' or h.pc() == at:
                 break
-            hit.append(h.pc()); h.step(1)
+            if h.pc() in marks:
+                hit.append(h.pc())
+            if h.pc() in also and out:
+                sub.append({'pc': h.pc(), 'v': [bytes(m[a:a + n]).hex().upper() if n > 1 else f'{m[a]:02X}'
+                                                for _, a, n in vars_], 'r': h.regs[R],
+                            't': None if t0 is None else h.tstates() - t0,
+                            'h': [fnv(m, lo, hi, skip) for lo, hi in hashes]})
+                t0 = h.tstates()
+            h.step(1)
         if reason != 'target':
             print(f'# stopped at pass {p}: {reason}'); break
         row = tuple(bytes(m[a:a + n]).hex().upper() if n > 1 else f'{m[a]:02X}'
@@ -134,10 +150,13 @@ def main():
                 start = {'ram': bytes(m[0x4000:0x10000]).hex(), 'r': h.regs[R], 'sp': h.regs[SP]}
             rows.append({'p': p, 'v': list(row), 'r': h.regs[R],
                          't': None if t0 is None else h.tstates() - t0,
-                         'h': [fnv(m, lo, hi, skip) for lo, hi in hashes], 'm': hit})
+                         'h': [fnv(m, lo, hi, skip) for lo, hi in hashes], 'm': hit,
+                         **({'s': sub} if sub else {})})
             if hit:
                 print(f'# pass {p}: marks ' + ' '.join(f'${x:04X}' for x in hit))
-            hit = []
+            if sub:
+                print(f'# pass {p}: {len(sub)} --also rows')
+            hit, sub = [], []
             t0 = h.tstates()
         if script:                          # the keys for the pass about to run
             h.ports.release_all()
@@ -148,7 +167,8 @@ def main():
         with open(out, 'w') as f:
             json.dump({'at': at, 'source': source_label(target), 'script': script,
                        'vars': [[nm, a, n] for nm, a, n in vars_],
-                       'hash': hashes, 'skip': skip, 'marks': marks, 'start': start, 'rows': rows}, f)
+                       'hash': hashes, 'skip': skip, 'marks': marks,
+                       **({'also': also} if also else {}), 'start': start, 'rows': rows}, f)
         print(f'# wrote {out}: {len(rows)} rows')
 
 

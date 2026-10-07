@@ -91,7 +91,10 @@ function spriteDecode(m, hl, de, paths){
   m[0x8B1C] = w; m[0x8B1B] = w; t += 7 + 13 + 13 + 4 + 13 + 4 + 10; M1.m1 += 7;
   if (m[0x8B0A]){ m[0x8B1C] = (w + 1) & 0xFF; t += 13 + 4 + 13; M1.m1 += 3; }
   hl = (hl + 1) & 0xFFFF; t += 6; M1.m1 += 1;
-  for (;;){
+  /* a sprite ends at a 0 header within a few hundred rows; one that does
+     not is not sprite data (the machine would run away too): say so */
+  for (let rows = 0; ; rows++){
+    if (rows > 0xFFFF) throw new Error(`FIST_RUNAWAY spriteDecode: no end row in 65536 from $${hl.toString(16)}`);
     /* $8833 row top */
     m[0x8AF3] ^= 1; t += 13 + 7 + 13;
     m[0x8AFF] = 0; m[0x8AFE] = 0; t += 4 + 13 + 13;
@@ -2232,6 +2235,36 @@ function pointPath(m, a, r){
   return out(null);
 }
 
+/* ---- the victory pose: $AE7A (P1) / $AE9D (P2), from the listing -------
+   (python tools/adis.py 0xAE78 40.)  The winner A ($AA00 / $AA40) is set
+   to script $19 (A+$0C) at height $7A (A+$18), A+$0B and the facing A+$16
+   cleared, $C427 to 0 / 1 (P2's INC A); then the loop at $AE8E / $AEB2
+   steps the motion ($95D4) and draws ($BF13) until the script's done flag
+   A+$0D is set.  P2's is reached from pointPath's 'p2' by $AD94, which
+   returns A = 0 to $ACA6 ($AD97): the 1UP bout lost.  winStart: the CALL
+   and the body to the loop top.  winPass: the loop top back to it, or out
+   by its RET (out); sp is SP in the loop (at the CALL at $AE29 in play),
+   so $BF13 runs at sp - 2; cost as playPass's io.cost, with .t $BF13's T.
+   winEnd: $AD97-$AD98 for P2, to $ACA6.  M1 adds to M1.m1 for R.  Gated
+   whole against python tools/callio.py --capture --call 0xAD94 0xACA6
+   (build/callio_ad94.json) and live, iteration by iteration. */
+function winStart(m, A){
+  const p2 = A === 0xAA40;
+  m[A + 0x0C] = 0x19; m[A + 0x18] = 0x7A; m[A + 0x0B] = 0; m[A + 0x16] = 0; m[0xC427] = p2 ? 1 : 0;
+  M1.m1 += p2 ? 10 : 9;                            // CALL, then LD A,n: LD (nn),A x2, XOR A, LD (nn),A x3 (and INC A)
+  return 17 + (p2 ? 87 : 83);
+}
+function winPass(m, A, sp, cost){
+  let t = fighterMotion(m);                        // CALL $95D4, counted there
+  const tr = renderFighters(m, null, (sp - 2) & 0xFFFF, cost);
+  if (cost) cost.t = tr;
+  t += 17 + tr + 13 + 4; M1.m1 += 3;               // CALL $BF13: LD A,(A+$0D): AND A
+  if (!m[A + 0x0D]) return (M1.m1 += 1, { t: t + 12, out: false });   // JR Z taken
+  M1.m1 += 2;
+  return { t: t + 7 + 10, out: true };             // JR Z, RET
+}
+function winEnd(){ M1.m1 += 2; return 4 + 10; }   // $AD97 XOR A: RET, to $ACA6 with A = 0
+
 /* ---- the live game: round_loop on the 7.2 accumulator ------------------
    Starts from the machine at the CALL at $AE29 (build/live_p1.json, from
    python tools/sample.py --json: a mid-bout state, scaffolding until the
@@ -2251,6 +2284,7 @@ class Fist {
     this.m = new Uint8Array(0x10000); this.m.set(fromHex(st.ram), 0x4000);
     this.r = st.r; this.sp = st.sp;
     this.passes = 0; this.simT = 0; this.acc = 0; this.exit = null;
+    this.win = 0;                                  // the winner's base while the victory pose loops, else 0
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();
@@ -2259,9 +2293,14 @@ class Fist {
   get simFrame(){ return this.simT / T_FRAME; }
   /* one pass with these keys; returns its charged T */
   pass(kb){
+    if (this.win) return this.winPass();
     const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
     const res = roundPass(this.m, io, this.sp);
-    const cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
+    let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
+    if (res.exit === 'p2'){                        // $AD94: on into the victory pose, to its loop top
+      M1.m1 = 0; cost += winStart(this.m, 0xAA40);
+      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null; this.win = 0xAA40;
+    }
     for (const [t, v] of io.out){
       this.border = v & 7;
       const lv = (v >> 4) & 1;
@@ -2270,6 +2309,19 @@ class Fist {
     this.simT += cost; this.r = res.r; this.passes++;
     if (res.exit) this.exit = res;
     return cost;
+  }
+  /* one iteration of the victory pose; out by its RET, the 1UP bout is lost
+     at $ACA6 -- the way back to the menu is not ported (D7) */
+  winPass(){
+    const cost = { dec: 0, copy: 0, ldir: 0 };
+    M1.m1 = 0;
+    const w = winPass(this.m, this.win, this.sp, cost);
+    let t = w.t + rfPlayT(cost.t, cost) - cost.t;
+    if (w.out){ t += winEnd(); this.win = 0; this.exit = { exit: 'lost' }; }
+    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
+    this.simT += t; this.passes++;
+    if (this.exit) this.exit.r = this.r;
+    return t;
   }
   /* one video frame: spend its T on whole passes (a pass that overruns is
      paid back by the next frames, as the original's own slow passes are) */
@@ -2365,5 +2417,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

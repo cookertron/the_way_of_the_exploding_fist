@@ -2722,10 +2722,10 @@
  {
   "file": "template.html",
   "label": "AE26 loop: no contention charged on $BF13",
-  "old": "    const cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;",
-  "new": "    const cost = res.t;",
+  "old": "    let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;",
+  "new": "    let cost = res.t;",
   "increment": "AE26-loop",
-  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round"
+  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
  },
  {
   "file": "template.html",
@@ -2733,7 +2733,7 @@
   "old": "    this.simT += cost; this.r = res.r; this.passes++;",
   "new": "    this.simT += cost; this.passes++;",
   "increment": "AE26-loop",
-  "kills": "roundPass follows the machine row for row over keyed 1P play until it leaves the loop"
+  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
  },
  {
   "file": "template.html",
@@ -2749,7 +2749,7 @@
   "old": "  const tr = renderFighters(m, null, (sp - 4) & 0xFFFF, io.cost);",
   "new": "  const tr = renderFighters(m, null, (sp - 4) & 0xFFFF);",
   "increment": "AE26-loop",
-  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round"
+  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
  },
  {
   "file": "template.html",
@@ -2965,6 +2965,166 @@
   "old": "  if (b.exit !== 'ret') return b;",
   "new": "  if (b.exit !== 'ret' || 1) return b;",
   "increment": "AD1B-point",
-  "kills": "roundPass follows the machine row for row over keyed 1P play until it leaves the loop"
+  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winStart: script $18",
+  "old": "  m[A + 0x0C] = 0x19; m[A + 0x18] = 0x7A;",
+  "new": "  m[A + 0x0C] = 0x18; m[A + 0x18] = 0x7A;",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winStart: height left",
+  "old": "m[A + 0x18] = 0x7A; m[A + 0x0B] = 0;",
+  "new": "m[A + 0x0B] = 0;",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winStart: facing kept",
+  "old": "m[A + 0x0B] = 0; m[A + 0x16] = 0; m[0xC427]",
+  "new": "m[A + 0x0B] = 0; m[0xC427]",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winStart: $C427 not INC'd for P2",
+  "old": "m[0xC427] = p2 ? 1 : 0;",
+  "new": "m[0xC427] = 0;",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winStart: M1 without INC A",
+  "old": "  M1.m1 += p2 ? 10 : 9;",
+  "new": "  M1.m1 += 9;",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winStart: T without INC A",
+  "old": "  return 17 + (p2 ? 87 : 83);",
+  "new": "  return 17 + 83;",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winPass: $BF13 at the loop's SP",
+  "old": "renderFighters(m, null, (sp - 2) & 0xFFFF, cost);",
+  "new": "renderFighters(m, null, sp & 0xFFFF, cost);",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winPass: done flag A+$0C",
+  "old": "  if (!m[A + 0x0D]) return (M1.m1 += 1, { t: t + 12, out: false });",
+  "new": "  if (!m[A + 0x0C]) return (M1.m1 += 1, { t: t + 12, out: false });",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winPass: JR Z taken 7",
+  "old": "  if (!m[A + 0x0D]) return (M1.m1 += 1, { t: t + 12, out: false });",
+  "new": "  if (!m[A + 0x0D]) return (M1.m1 += 1, { t: t + 7, out: false });",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winPass: JR Z no M1",
+  "old": "  if (!m[A + 0x0D]) return (M1.m1 += 1, { t: t + 12, out: false });",
+  "new": "  if (!m[A + 0x0D]) return (M1.m1 += 0, { t: t + 12, out: false });",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winPass: LD/AND T",
+  "old": "  t += 17 + tr + 13 + 4; M1.m1 += 3;",
+  "new": "  t += 17 + tr + 13; M1.m1 += 3;",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winEnd: no XOR A",
+  "old": "function winEnd(){ M1.m1 += 2; return 4 + 10; }",
+  "new": "function winEnd(){ M1.m1 += 2; return 10; }",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: winEnd: M1 one",
+  "old": "function winEnd(){ M1.m1 += 2; return 4 + 10; }",
+  "new": "function winEnd(){ M1.m1 += 1; return 4 + 10; }",
+  "increment": "AD94-win",
+  "kills": "winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: Fist: P2 win stops the engine",
+  "old": "    if (res.exit === 'p2'){",
+  "new": "    if (res.exit === 'p2x'){",
+  "increment": "AD94-win",
+  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: Fist: the pose for P1",
+  "old": "res.exit = null; this.win = 0xAA40;",
+  "new": "res.exit = null; this.win = 0xAA00;",
+  "increment": "AD94-win",
+  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: Fist: winStart's R lost",
+  "old": "      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null;",
+  "new": "      res.exit = null;",
+  "increment": "AD94-win",
+  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: Fist: pose R not kept",
+  "old": "    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);\n    this.simT += t; this.passes++;",
+  "new": "    this.simT += t; this.passes++;",
+  "increment": "AD94-win",
+  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: Fist: pose $BF13 uncontended",
+  "old": "    let t = w.t + rfPlayT(cost.t, cost) - cost.t;",
+  "new": "    let t = w.t;",
+  "increment": "AD94-win",
+  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: Fist: the pose never ends",
+  "old": "    if (w.out){ t += winEnd(); this.win = 0; this.exit = { exit: 'lost' }; }",
+  "new": "    if (w.out){ t += winEnd(); this.exit = { exit: 'lost' }; }",
+  "increment": "AD94-win",
+  "kills": "...and leave on the sample the machine left, the same way (P2 wins at $AD94, the pose, out to $ACA6)"
+ },
+ {
+  "file": "template.html",
+  "label": "AD94 win: Fist: the bout lost unnamed",
+  "old": "this.exit = { exit: 'lost' }; }",
+  "new": "this.exit = { exit: 'p2' }; }",
+  "increment": "AD94-win",
+  "kills": "...and leave on the sample the machine left, the same way (P2 wins at $AD94, the pose, out to $ACA6)"
  }
 ]

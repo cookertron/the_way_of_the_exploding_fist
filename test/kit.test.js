@@ -1151,6 +1151,41 @@ const mockCtx = (state) => ({
          fx.cases.some(c => set(c).b019 === 8 && set(c).b030 === 9)], [true, true, true]);
 }
 
+/* ---- P2 wins the 1UP bout: $AD94, the victory pose $AE9D, to $ACA6 -----
+   python tools/callio.py --capture --state p1 --call 0xAD94 0xACA6 (the
+   call the live script makes, 66 passes of the pose).  winStart, winPass
+   until its RET, winEnd, composed as the engine runs them: every byte
+   outside the stack frames, T and R exactly. */
+{
+  const fx = P.assets.win_ad94;
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    P.M1.m1 = 0;
+    let t = P.winStart(m, 0xAA40), n = 0, w;       // the CALL at $AD94 and $AE9D's body
+    try {                                          // a pose longer than the machine's, or one that draws garbage, fails
+      do { w = P.winPass(m, 0xAA40, c.sp - 2, null); t += w.t; n++; } while (!w.out && t <= c.t);
+    } catch (e){ if (!bad++) first = `case ${i}: pass ${n}: ${e.message}`; continue; }
+    t += P.winEnd();
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === c.sp - 128) a = c.sp + 2;
+      if (m[a] !== want[a]){ diff = a; break; }
+    }
+    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, n];
+    const wnt = [c.t, c.rx, -1, 66];
+    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
+      first = `case ${i}: T, R, first bad byte, passes ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
+  }
+  check('winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly',
+        [bad, first], [0, '']);
+  check('...and the machine left for $ACA6 with A = 0 (the 1UP bout lost: winEnd)',
+        fx.cases.map(c => c.exit[fx.regs.indexOf(0)]), [0]);
+}
+
 {
   /* the page's IN: what tools/harness.py Ports.read_port answers */
   const kb = new S.Keyboard(); kb.press('Q'); kb.kempston = 0x10;
@@ -1185,34 +1220,40 @@ const mockCtx = (state) => ({
   const g = new P.Fist(L.start), kb = new S.Keyboard();
   let first = '', exit = null, ratio = [];
   check('the engine starts from the first row the machine sampled', row(g.m, g.r), want(L.rows[0]));
+  /* the machine's samples in order: each row's --also rows (sample.py: the
+     victory pose's loop top $AEB2) before it */
+  const seq = [];
+  L.rows.slice(1).forEach((r, i) => { for (const x of r.s || []) seq.push({ ...x, p: i + 1, sub: true }); seq.push({ ...r, pc: L.at, p: i + 1 }); });
   /* the machine's way out: the first row whose marks (sample.py --mark)
      show a return from $AE26 to one of its three callers, or $AE67 */
   const RETS = [0xABCB, 0xAD1B, 0xAE17];
   const marked = L.rows.map((r, i) => r.m.some(x => RETS.includes(x) || x === 0xAE67) ? i : -1).filter(i => i >= 0);
   /* a point ($AD1B) is played through by pointPath; this script's second
-     point wins the bout for P2 ($AD94: point_ad1b case 1 is that call) */
+     point wins the bout for P2 ($AD94: point_ad1b case 1 is that call),
+     the pose runs, and $ACA6 is reached with A = 0: the 1UP bout lost */
   const out = marked[marked.length - 1] ?? -1;
-  const outKind = out < 0 ? null : L.rows[out].m.includes(0xAE67) ? 'end' : 'p2';
-  let at = -1;
-  for (let p = 0; p + 1 < L.rows.length; p++){
-    kb.releaseAll(); for (const k of plan[p] || []) kb.press(k);
+  const outKind = out < 0 ? null : L.rows[out].m.includes(0xAE67) ? 'end' : L.rows[out].m.includes(0xACA6) ? 'lost' : 'p2';
+  let at = -1, k = 0, round = 0, poses = 0;
+  for (; k < seq.length; k++){
+    if (!g.win){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
     const cost = g.pass(kb);
-    if (g.exit){ exit = g.exit.exit; at = p + 1; break; }
-    ratio.push(cost / L.rows[p + 1].t);
-    const got = row(g.m, g.r), w = want(L.rows[p + 1]);
+    if (g.exit){ exit = g.exit.exit; at = seq[k].p; break; }
+    if (g.win) poses++;
+    ratio.push(cost / seq[k].t);
+    const got = [g.win ? 0xAEB2 : L.at, ...row(g.m, g.r)], w = [seq[k].pc, ...want(seq[k])];
     if (JSON.stringify(got) !== JSON.stringify(w)){
-      const names = [...L.vars.map(v => v[0]), 'R', ...L.hash.map(([lo, hi]) => `hash $${lo.toString(16)}-$${hi.toString(16)}`)];
-      const k = got.findIndex((x, i) => x !== w[i]);
-      first = `pass ${p}: ${names[k]} ${got[k]} want ${w[k]}`; break;
+      const names = ['PC', ...L.vars.map(v => v[0]), 'R', ...L.hash.map(([lo, hi]) => `hash $${lo.toString(16)}-$${hi.toString(16)}`)];
+      const j = got.findIndex((x, i) => x !== w[i]);
+      first = `${seq[k].sub ? 'pose before row' : 'row'} ${seq[k].p}: ${names[j]} ${got[j]} want ${w[j]}`; break;
     }
   }
-  check('roundPass follows the machine row for row over keyed 1P play until it leaves the loop', first, '');
-  check('...and leaves on the pass the machine left, the same way (the bout won by P2 at $AD94)',
-        [at, exit], [out, outKind]);
-  check('...which the script reaches through a point played on: two points, the way out the second',
-        [marked.length, outKind], [2, 'p2']);
+  check('roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost', first, '');
+  check('...and leave on the sample the machine left, the same way (P2 wins at $AD94, the pose, out to $ACA6)',
+        [at, exit, !!(seq[k] && !seq[k].sub), g.win], [out, outKind, true, 0]);
+  check('...which the script reaches through a point played on: two points, the way out the second, after 66 passes of the pose',
+        [marked.length, outKind, poses], [2, 'lost', (L.rows[out] || {}).s?.length]);
   const sum = ratio.reduce((a, b) => a + b, 0) / ratio.length, worst = Math.max(...ratio.map(x => Math.abs(x - 1)));
-  checkTrue('the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round',
+  checkTrue('the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose',
             Math.abs(sum - 1) < 0.005, `mean ${sum.toFixed(5)}, worst pass ${(worst * 100).toFixed(2)}% off`);
 }
 

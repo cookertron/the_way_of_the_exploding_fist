@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     $AD1B point_path -- the point played on into the next $AE29, 16 cases exact, live gate row for row to pass 336 where P2 wins the bout by $AD94
-Step:     the bout's end: $AD94 (P2 wins) as the live script reaches it, then $AD5F and $AD44 (time) -- bracket each from its first instruction to the next $AE29 or the menu
-Then:     the menu generator (8C54 open 1), which retires D7
+Unit:     $AD94 p2_wins_pose -- P2 wins the 1UP bout, the victory pose $AE9D gated exact (14.36M T, 66 passes) and live sample for sample to $ACA6
+Step:     P1 wins: $AD5F calls $AE7A (P1's pose, twin of winPass with $AA0D) then the time-bonus count $AD62-$AD8E; bracket $AD5F to $ACA6 (derive from point_ad1b's p1 case), then $AD44 time-up and $AD99 the draw ($81)
+Then:     the 1UP game loop $AC5F-$ACDA around $AD18 (rank up, $ACE8), then the menu generator (8C54 open 1), which retires D7
 Blocked:  none
-Notes:    callio --call RET may now be a comma list (xpc per case) and --derive takes --reg; AD1B open 1 (RET M at $AD1C ungated); full --background mutant run started after this commit
+Notes:    sample.py --also PC gives inner-loop sub-rows; spriteDecode throws FIST_RUNAWAY on data with no end row (mutants.py diagnostic FIST_); $9C28 writers are $9B0A and $9CD5 (AD1B open 1); full --background mutant run started after this commit

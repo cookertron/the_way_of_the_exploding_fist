@@ -97,10 +97,16 @@
       "note": "oracle for the point path $AD1B back to $AE29 (or out at $AD5F, $AD94, $AD44): python tools/callio.py --capture --state p1 --call 0xAD1B 0xAE29,0xAD5F,0xAD94,0xAD44 --blind each score row $4000-$471F, then --derive case 0 with --set 0xAA03=0 / 0xAA08=2,0xAA48=0 / 0xAA08=1,0xAA48=0 / 0xAA48=1 / 0x9C2C=2 / 0x9C2C=0,0xAA08=2,0xAA48=0 / 0x9C2C=2,0xB019=0 / 0xB030=0x95,0xB031=0x99 / 0x9C2B=1 / 0xAA08=2,0xAA48=0,0xAA01=2 / 0x9C2B=1,0xAA03=0"
     },
     {
+      "key": "win_ad94",
+      "file": "build/callio_ad94.json",
+      "required": true,
+      "note": "oracle for P2 winning the 1UP bout, $AD94 through the victory pose $AE9D to $ACA6: python tools/callio.py --capture --state p1 --call 0xAD94 0xACA6 --frames 3000"
+    },
+    {
       "key": "live",
       "file": "build/live_p1.json",
       "required": true,
-      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --json build/live_p1.json (the script, vars, marks and ranges are stored in the file)"
+      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --json build/live_p1.json (the script, vars, marks and ranges are stored in the file)"
     }
   ],
   "tape": {
@@ -140,6 +146,7 @@
   },
   "mutants": {
     "cases": "test/mutants.json",
-    "suite": "test/kit.test.js"
+    "suite": "test/kit.test.js",
+    "diagnostic": "FIST_"
   }
 }
