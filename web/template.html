@@ -81,22 +81,24 @@ const sprGet16 = (m, a) => m[a] | m[a + 1] << 8;
 function spriteDecode(m, hl, de, paths){
   const tally = paths ? k => { paths[k] = (paths[k] || 0) + 1; } : () => {};
   const F = m[0xC40E];
-  let t = 13 + 7 + 10;
-  if (F & 0xFE){ m[0x8B0A] = 1; t += 7 + 13 + 10; }
-  else { m[0x8B0A] = 0; t += 4 + 13; }
-  m[0x8AF3] = 0; t += 7 + 13;
+  /* M1 (for R) beside each T: one per instruction, two for BIT, SLA, RRD,
+     LD DE,(nn) and each LDIR repeat (python tools/blockcost.py 0x8803 0x8AE9) */
+  let t = 13 + 7 + 10; M1.m1 += 3;
+  if (F & 0xFE){ m[0x8B0A] = 1; t += 7 + 13 + 10; M1.m1 += 3; }
+  else { m[0x8B0A] = 0; t += 4 + 13; M1.m1 += 2; }
+  m[0x8AF3] = 0; t += 7 + 13; M1.m1 += 2;
   let w = m[hl];
-  m[0x8B1C] = w; m[0x8B1B] = w; t += 7 + 13 + 13 + 4 + 13 + 4 + 10;
-  if (m[0x8B0A]){ m[0x8B1C] = (w + 1) & 0xFF; t += 13 + 4 + 13; }
-  hl = (hl + 1) & 0xFFFF; t += 6;
+  m[0x8B1C] = w; m[0x8B1B] = w; t += 7 + 13 + 13 + 4 + 13 + 4 + 10; M1.m1 += 7;
+  if (m[0x8B0A]){ m[0x8B1C] = (w + 1) & 0xFF; t += 13 + 4 + 13; M1.m1 += 3; }
+  hl = (hl + 1) & 0xFFFF; t += 6; M1.m1 += 1;
   for (;;){
     /* $8833 row top */
     m[0x8AF3] ^= 1; t += 13 + 7 + 13;
     m[0x8AFF] = 0; m[0x8AFE] = 0; t += 4 + 13 + 13;
-    t += 7 + 4 + 10;
-    if (m[hl] === 0) return t + 10;
-    sprPut16(m, 0x8B16, de + m[0xC408]); t += 72;
-    let hd = m[hl]; t += 7 + 4 + 10;
+    t += 7 + 4 + 10; M1.m1 += 9;
+    if (m[hl] === 0){ M1.m1 += 1; return t + 10; }
+    sprPut16(m, 0x8B16, de + m[0xC408]); t += 72; M1.m1 += 7;
+    let hd = m[hl]; t += 7 + 4 + 10; M1.m1 += 3;
     if (!(hd & 0x80)){                              /* $8858 raw row: w bytes */
       tally('raw');
       w = m[0x8B1B];
@@ -104,14 +106,14 @@ function spriteDecode(m, hl, de, paths){
       m[0x8AE9] = w | 0x80;
       sprLdir(m, hl, 0x8AEA, w);
       hl = 0x8AE9;
-      t += 13 + 4 + 7 + 11 + 11 + 16 + 10 + 11 + 10 + 7 + 7 + 6 + sprLdirT(w) + 30;
+      t += 13 + 4 + 7 + 11 + 11 + 16 + 10 + 11 + 10 + 7 + 7 + 6 + sprLdirT(w) + 30; M1.m1 += 15 + 2 * (w || 0x10000);
     } else {                                        /* $8875 packed row */
       tally('packed');
       sprPut16(m, 0x8B14, hl + (hd & 7) + 1);
-      t += 4 + 7 + 4 + 4 + 7 + 11 + 11 + 16 + 10;
+      t += 4 + 7 + 4 + 4 + 7 + 11 + 11 + 16 + 10; M1.m1 += 9;
     }
     /* $8882 recolour by row parity, tables $B8/$B9 via $8AD1 */
-    t += 13 + 4 + 10;
+    t += 13 + 4 + 10; M1.m1 += 3;
     if (m[0xC407]){
       tally('recolour');
       const a = m[hl], n = a & 7, tab = m[0x8AF3] ? 0xB800 : 0xB900;
@@ -119,31 +121,32 @@ function spriteDecode(m, hl, de, paths){
       for (let i = 0; i < n; i++) m[0x8AF5 + i] = m[tab + m[(hl + 1 + i) & 0xFFFF]];
       t += 11 + 7 + 10 + 7 + 6 + 6 + 7 + 4 + 4 + 10 + 20;
       if (n) t += sprDjnzT(n, 7 + 17 + 97 + 7 + 6 + 6);
+      M1.m1 += 12 + 17 * n;                         // $8AD1 is 11 either way
       hl = 0x8AF4;
     }
     /* $88A5 mirror: skip re-measured from the right, bytes reversed by $B7 */
-    t += 13 + 8 + 10;
+    t += 13 + 8 + 10; M1.m1 += 4;
     if (F & 1){
       tally('mirror');
       hd = m[hl];
       const n = hd & 7, s = (hd >> 3) & 7;
       let a = (((m[0x8B1B] - s - n) & 0xFF) << 3) & 0xFF;
-      t += 128;
-      if (a){ a |= 0x40; t += 7; }
+      t += 128; M1.m1 += 22;
+      if (a){ a |= 0x40; t += 7; M1.m1 += 1; }
       m[0x8B0B] = a | 0x80 | n;
       for (let i = 0; i < n; i++) m[0x8B0B + n - i] = m[0xB700 + m[(hl + 1 + i) & 0xFFFF]];
-      t += 42 + 78 + (n ? sprDjnzT(n, 65) : 0) + 20;
+      t += 42 + 78 + (n ? sprDjnzT(n, 65) : 0) + 20; M1.m1 += 7 + 13 + 10 * n + 2;
       hl = 0x8B0B;
     }
     /* $88F7 shift: bit 1 two pixels, bit 2 four (RRD), bit 3 six (left 2) */
-    t += 13 + 8 + 10;
+    t += 13 + 8 + 10; M1.m1 += 4;
     let sh = 0;
     if (F & 2) sh = 2;
     else {
-      t += 13 + 8 + 10;
+      t += 13 + 8 + 10; M1.m1 += 4;
       if (F & 4) sh = 4;
       else {
-        t += 13 + 8 + 10;
+        t += 13 + 8 + 10; M1.m1 += 4;
         if (F & 8) sh = 6;
       }
     }
@@ -151,80 +154,80 @@ function spriteDecode(m, hl, de, paths){
       tally('shift' + sh);
       hd = m[hl]; m[0x8B01] = hd;
       const n = hd & 7, src = (hl + 1) & 0xFFFF;
-      t += 7 + 11 + 10 + 7 + 10 + 6 + 7 + 10;
+      t += 7 + 11 + 10 + 7 + 10 + 6 + 7 + 10; M1.m1 += 8;
       if (n){
         m[0x8B00] = n;
         const first = m[src], k = n + 1;
         if (sh === 6){
           m[0x8B02] = 0;
-          t += 13 + 11 + 10 + 4 + 7 + 11 + 4 + 7 + 6 + 7 + 7 + 10;
-          if (first < 0x40){ m[0x8AFE] = 1; t += 20; }
+          t += 13 + 11 + 10 + 4 + 7 + 11 + 4 + 7 + 6 + 7 + 7 + 10; M1.m1 += 12;
+          if (first < 0x40){ m[0x8AFE] = 1; t += 20; M1.m1 += 2; }
           sprLdir(m, src, 0x8B03, n);
-          t += 4 + 4 + 10 + sprLdirT(n) + 10 + 10 + 13 + 4 + 4 + 4 + 4 + 4 + 10;
-          t += 11 + 13 + 4 + 7 + 11 + 10 + 11 + 11 + 4;
+          t += 4 + 4 + 10 + sprLdirT(n) + 10 + 10 + 13 + 4 + 4 + 4 + 4 + 4 + 10; M1.m1 += 12 + 2 * n;
+          t += 11 + 13 + 4 + 7 + 11 + 10 + 11 + 11 + 4; M1.m1 += 9;
           for (let r = 0; r < 2; r++){
             let c = 0;
             for (let a = 0x8B02 + n; a > 0x8B01; a--){ const v = m[a]; m[a] = (v << 1 | c) & 0xFF; c = v >> 7; }
           }
-          t += 2 * sprDjnzT(k, 24) + 10 + 4 + 4 + 10 + 7 + 4 + 10;
+          t += 2 * sprDjnzT(k, 24) + 10 + 4 + 4 + 10 + 7 + 4 + 10; M1.m1 += 10 * k + 7;
         } else {
-          t += 13 + 11 + 10 + 4 + 7 + 7 + 7 + 10;
-          if (first < (sh === 2 ? 4 : 0x10)){ m[0x8AFE] = 1; t += 20; }
+          t += 13 + 11 + 10 + 4 + 7 + 7 + 7 + 10; M1.m1 += 8;
+          if (first < (sh === 2 ? 4 : 0x10)){ m[0x8AFE] = 1; t += 20; M1.m1 += 2; }
           sprLdir(m, src, 0x8B02, n);
           m[0x8B02 + n] = 0;
-          t += 11 + 4 + 4 + 10 + sprLdirT(n) + 10 + 4 + 7 + 10;
+          t += 11 + 4 + 4 + 10 + sprLdirT(n) + 10 + 4 + 7 + 10; M1.m1 += 8 + 2 * n;
           if (sh === 2){
             for (let r = 0; r < 2; r++){
               let c = 0;
               for (let a = 0x8B02; a < 0x8B02 + k; a++){ const v = m[a]; m[a] = v >> 1 | c << 7; c = v & 1; }
             }
-            t += 47 + 11 + 2 * sprDjnzT(k, 24) + 10 + 4 + 4;
+            t += 47 + 11 + 2 * sprDjnzT(k, 24) + 10 + 4 + 4; M1.m1 += 12 + 10 * k;
           } else {
             let acc = 0;
             for (let a = 0x8B02; a < 0x8B02 + k; a++){ const v = m[a]; m[a] = (acc & 0xF) << 4 | v >> 4; acc = v & 0xF; }
-            t += 13 + 4 + 4 + 4 + sprDjnzT(k, 24);
+            t += 13 + 4 + 4 + 4 + sprDjnzT(k, 24); M1.m1 += 4 + 4 * k;
           }
-          t += 6 + 7 + 4 + 10;
+          t += 6 + 7 + 4 + 10; M1.m1 += 4;
         }
-        if (m[0x8B02 + n] === 0){ m[0x8AFF] = 1; t += 20; }
+        if (m[0x8B02 + n] === 0){ m[0x8AFF] = 1; t += 20; M1.m1 += 2; }
       }
-      t += 20;
+      t += 20; M1.m1 += 2;
       hl = 0x8B01;
     }
     /* $8A30 plot: skip, then first byte masked by $B5, middle copied, last
        masked by $B6; a single byte takes both masks ($8AA5) */
-    hd = m[hl]; t += 13 + 4 + 7 + 4 + 4 + 10;
-    if (hd & 0x40){ de = (de + ((hd >> 3) & 7)) & 0xFFFF; t += 89; }
-    const n = hd & 7; t += 25;
+    hd = m[hl]; t += 13 + 4 + 7 + 4 + 4 + 10; M1.m1 += 6;
+    if (hd & 0x40){ de = (de + ((hd >> 3) & 7)) & 0xFFFF; t += 89; M1.m1 += 15; }
+    const n = hd & 7; t += 25; M1.m1 += 4;
     if (n === 0){
       tally('empty');
-      hl = sprGet16(m, 0x8B14); de = sprGet16(m, 0x8B16); t += 46;
+      hl = sprGet16(m, 0x8B14); de = sprGet16(m, 0x8B16); t += 46; M1.m1 += 4;
       continue;
     }
-    let b = n; t += 31;
-    if (m[0x8B0A]){ b++; t += 4; }
-    hl = (hl + 1) & 0xFFFF; b--; t += 37;
-    if (m[0x8AFF]){ b--; t += 4; }
-    t += 27;
-    if (m[0x8AFE]){ de = (de + 1) & 0xFFFF; hl = (hl + 1) & 0xFFFF; b--; t += 16; }
-    b &= 0xFF; t += 18;
+    let b = n; t += 31; M1.m1 += 4;
+    if (m[0x8B0A]){ b++; t += 4; M1.m1 += 1; }
+    hl = (hl + 1) & 0xFFFF; b--; t += 37; M1.m1 += 5;
+    if (m[0x8AFF]){ b--; t += 4; M1.m1 += 1; }
+    t += 27; M1.m1 += 3;
+    if (m[0x8AFE]){ de = (de + 1) & 0xFFFF; hl = (hl + 1) & 0xFFFF; b--; t += 16; M1.m1 += 3; }
+    b &= 0xFF; t += 18; M1.m1 += 3;
     if (b === 0){
       tally('single');
       const v = m[hl];
       m[de] = m[de] & (m[0xB500 + v] | m[0xB600 + v]) | v;
-      t += 121;
+      t += 121; M1.m1 += 21;
     } else {
       tally('edges');
       let v = m[hl];
       m[de] = m[de] & m[0xB500 + v] | v;
       hl = (hl + 1) & 0xFFFF; de = (de + 1) & 0xFFFF;
-      b--; t += 96;
-      if (b){ [hl, de] = sprLdir(m, hl, de, b); t += 11 + sprLdirT(b); }
+      b--; t += 96; M1.m1 += 17;
+      if (b){ [hl, de] = sprLdir(m, hl, de, b); t += 11 + sprLdirT(b); M1.m1 += 2 + 2 * b; }
       v = m[hl];
       m[de] = m[de] & m[0xB600 + v] | v;
-      t += 70;
+      t += 70; M1.m1 += 13;
     }
-    hl = sprGet16(m, 0x8B14); de = sprGet16(m, 0x8B16); t += 46;
+    hl = sprGet16(m, 0x8B14); de = sprGet16(m, 0x8B16); t += 46; M1.m1 += 4;
   }
 }
 
@@ -242,51 +245,56 @@ function spriteDecode(m, hl, de, paths){
    in play is not charged here: cost, if given, receives the split that
    rfPlayT charges (D4). */
 let rfCost = { dec: 0, copy: 0, ldir: 0 };  // $8803's T, bytes and T of the $C3F0 LDIR
-const rfMul = (m, d, e) => [d * e, 222 - [0, 1, 2, 3, 4, 5, 6, 7].reduce((n, i) => n + (e >> i & 1), 0)];  // $C319: HL = D*E
-function rfMinMax(d, e){                          // $C1F6 with its CALL: [min, max, T]
-  return d < e ? [d, e, 66] : [e, d, 78];
+const rfPop = e => [0, 1, 2, 3, 4, 5, 6, 7].reduce((n, i) => n + (e >> i & 1), 0);
+const rfMul = (m, d, e) => [d * e, 222 - rfPop(e), 38 + rfPop(e)];  // $C319: HL = D*E [HL, T, M1], without its CALL
+/* M1 (for R) in the render helpers: one per instruction, two for the CB,
+   ED and index-register ones and each LDIR repeat (python tools/blockcost.py
+   0xBF13 0xC407); each helper adds its own into M1.m1, rfMinMax and
+   rfScreenAddr return theirs for the caller */
+function rfMinMax(d, e){                          // $C1F6 with its CALL: [min, max, T, M1]
+  return d < e ? [d, e, 66, 7] : [e, d, 78, 10];
 }
 const rfLdir = (m, s, d, n) => { for (let i = n || 0x10000; i > 0; i--){ m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; } return [s, d]; };
 function rfScreenAddr(y){                         // Screen_Calc $C203 with its CALL: [HL, T]
   const hi = y & 0xC0;
   const base = hi === 0 ? 0x4000 : hi === 0x40 ? 0x4800 : 0x5000;
-  return [base + ((y & 7) << 8) + ((y & 0x38) << 2), 17 + (hi === 0 ? 31 : 58) + 108];
+  return [base + ((y & 7) << 8) + ((y & 0x38) << 2), 17 + (hi === 0 ? 31 : 58) + 108, hi === 0 ? 24 : 27];
 }
 /* $C234: fill the back buffer from the shadow; h = width bytes, l = rows,
    b = x & $FC, c = (ymin - $48) & 255.  Returns T with its CALL. */
 function rfShadow(m, h, l, b, c, sp){
-  let [p, tm] = rfMul(m, 0x20, c);
+  let [p, tm, rm] = rfMul(m, 0x20, c);
   let de = (p + (b >> 2)) & 0xFFFF;
-  let t = 17 + 17 + 109 + tm + 49;
+  let t = 17 + 17 + 109 + tm + 49; M1.m1 += 25 + rm;
   m[0xC2B4] = 0;
   if (((c + l - 1) & 0xFF) >= 0x40){
     const nl = (0x40 - c) & 0xFF;
     m[0xC2B2] = (l - nl) & 0xFF; m[0xC2B3] = h; m[0xC2B4] = 1;
-    l = nl; t += 77;
+    l = nl; t += 77; M1.m1 += 11;
   }
   let src = (0x8000 + de) & 0xFFFF, dst = 0xF730;
-  t += 39;
+  t += 39; M1.m1 += 5;
   for (let k = l || 256; k > 0; k--){
     [, dst] = rfLdir(m, src, dst, h);
     src = (src + 0x20) & 0xFFFF;
-    t += 70 + 21 * (h || 0x10000) - 5 + (k > 1 ? 13 : 8);
+    t += 70 + 21 * (h || 0x10000) - 5 + (k > 1 ? 13 : 8); M1.m1 += 8 + 2 * (h || 0x10000);
   }
-  t += 17;
-  if (!m[0xC2B4]) return t + 11;
-  t += 5 + 11 + 34 + 17;
-  [p, tm] = rfMul(m, m[0xC2B2], m[0xC2B3]);
+  t += 17; M1.m1 += 2;
+  if (!m[0xC2B4]){ M1.m1 += 1; return t + 11; }
+  t += 5 + 11 + 34 + 17; M1.m1 += 7;
+  [p, tm, rm] = rfMul(m, m[0xC2B2], m[0xC2B3]);
   let n = p, hl = dst;
-  t += tm + 10 + 4 + 4 + 10 + 4 + 7;
+  t += tm + 10 + 4 + 4 + 10 + 4 + 7; M1.m1 += rm + 6;
   const r = n & 7;
   if (r){
-    t += 7 + 8;
+    t += 7 + 8; M1.m1 += 3 + 4 * r;
     for (let k = r; k > 0; k--){ m[hl] = 0; hl = (hl + 1) & 0xFFFF; n = (n - 1) & 0xFFFF; t += k > 1 ? 32 : 27; }
-  } else t += 12;
+  } else { t += 12; M1.m1 += 1; }
   hl = (hl + n) & 0xFFFF;
   const blocks = ((n >> 3) & 0xFF) || 256;
   const s = (sp - 2) & 0xFFFF;               // the CALL to $C234 is on the stack
   m[0xC2B0] = s & 0xFF; m[0xC2B1] = s >> 8;
-  t += 11 + 4 + 4 + 36 + 20 + 6 + 10;
+  t += 11 + 4 + 4 + 36 + 20 + 6 + 10; M1.m1 += 16 + 5 * blocks + 3;   // with LD SP,(nn) and the RET
   for (let k = blocks; k > 0; k--){
     for (let i = 0; i < 8; i++){ hl = (hl - 1) & 0xFFFF; m[hl] = 0; }
     t += 44 + (k > 1 ? 13 : 8);
@@ -296,11 +304,11 @@ function rfShadow(m, h, l, b, c, sp){
 /* $C2B5: one part at box-relative (x, y), sprite at hl, buffer at de.
    Returns T with its CALL. */
 function rfPart(m, x, y, hl, de){
-  const [p, tm] = rfMul(m, m[0xC40D], y);
+  const [p, tm, rm] = rfMul(m, m[0xC40D], y);
   const dst = (p + (x >> 2) + de) & 0xFFFF;
   let t = 17 + 141 + tm;
   const s = x & 3;
-  t += [28, 55, 72, 72][s];
+  t += [28, 55, 72, 72][s]; M1.m1 += 20 + rm + [4, 7, 9, 9][s] + 8 + 1;
   m[0xC40E] = m[0xC40C] | [0, 2, 4, 8][s];
   m[0xC407] = m[0xC40B]; m[0xC408] = m[0xC40D];
   const td = spriteDecode(m, hl, dst);
@@ -313,7 +321,7 @@ function rfParts(m, b, c, hl, tally){
   let n = m[hl]; hl = (hl + 1) & 0xFFFF;
   m[0xC416] = m[hl]; hl = (hl + 1) & 0xFFFF;
   m[0xC417] = m[hl]; hl = (hl + 1) & 0xFFFF;
-  let t = 17 + 103;
+  let t = 17 + 103; M1.m1 += 14 + 1;               // with the RET
   for (let k = n || 256; k > 0; k--){
     m[0xC414] = m[hl]; m[0xC415] = m[hl + 1 & 0xFFFF];
     const stride = m[hl + 2 & 0xFFFF] | m[hl + 3 & 0xFFFF] << 8;
@@ -321,12 +329,12 @@ function rfParts(m, b, c, hl, tally){
     hl = (hl + 4) & 0xFFFF;
     m[0xC40D] = m[0xC40F]; m[0xC40C] = m[0xC410]; m[0xC40B] = m[0xC411];
     let y = (m[0xC413] + m[0xC415]) & 0xFF;
-    t += 11 + 11 + 17 + 109 + 78 + 68;
-    if (m[0xC415] === 0xFF){ tally('floor-part'); y = (0xBE - m[0xC41A] - 12) & 0xFF; t += 60; }
+    t += 11 + 11 + 17 + 109 + 78 + 68; M1.m1 += 30 + 3 + 8;   // with the 27 and the tail
+    if (m[0xC415] === 0xFF){ tally('floor-part'); y = (0xBE - m[0xC41A] - 12) & 0xFF; t += 60; M1.m1 += 8; }
     let x;
     t += 27;
-    if (!m[0xC410]){ tally('unflipped'); x = (m[0xC412] + m[0xC414]) & 0xFF; t += 48; }
-    else { tally('flip'); x = (m[0xC412] + m[0xC416] - m[0xC414] - (m[hl] << 2)) & 0xFF; t += 111; }
+    if (!m[0xC410]){ tally('unflipped'); x = (m[0xC412] + m[0xC414]) & 0xFF; t += 48; M1.m1 += 6; }
+    else { tally('flip'); x = (m[0xC412] + m[0xC416] - m[0xC414] - (m[hl] << 2)) & 0xFF; t += 111; M1.m1 += 17; }
     t += rfPart(m, x, y, hl, 0xF730);
     hl = (hl + stride) & 0xFFFF;
     t += 20 + 10 + 11 + 10 + 10 + 10 + (k > 1 ? 13 : 8);
@@ -340,6 +348,7 @@ function rfFighter(m, f, bx, by, tally){
   const b = (m[0xC41B + 2 * f] - (m[bx] & 0xFC)) & 0xFF;
   const c = (m[0xC41C + 2 * f] - m[by]) & 0xFF;
   const hl = m[0xC428 + 2 * f] | m[0xC429 + 2 * f] << 8;
+  M1.m1 += 1 + 17 + 1;
   return 17 + 161 + rfParts(m, b, c, hl, tally) + 10;
 }
 /* $C091 / $C101 / $C151: size the box at (bx..bx+1, by..by+1) into
@@ -350,13 +359,14 @@ function rfBox(m, x0, y0, sp){
   const l = (m[y0 + 1] - m[y0]) & 0xFF;
   m[0xC409] = l;
   m[0xC41A] = m[y0];
+  M1.m1 += 27;
   return 207 + rfShadow(m, h, l, m[x0] & 0xFC, (m[y0] - 0x48) & 0xFF, sp);
 }
 /* $C3E4 after its set-up at $C0E8: the box at (x0, y0) to the display.  T. */
 function rfCopyOut(m, x0, y0){
-  let [de, t] = rfScreenAddr(m[y0]);
+  let [de, t, sm] = rfScreenAddr(m[y0]);
   de = (de + (m[x0] >> 2)) & 0xFFFF;
-  t += 13 + 13 + 8 + 8 + 4 + 7 + 11 + 4 + 10 + 17 + 34;
+  t += 13 + 13 + 8 + 8 + 4 + 7 + 11 + 4 + 10 + 17 + 34; M1.m1 += sm + 16 + 1;   // with the RET
   let hl = 0xF730;
   const w = m[0xC40A];
   rfCost.copy += (m[0xC409] || 256) * (w || 0x10000);
@@ -364,12 +374,12 @@ function rfCopyOut(m, x0, y0){
   for (let k = m[0xC409] || 256; k > 0; k--){
     [hl] = rfLdir(m, hl, de, w);
     let d = (de >> 8) + 1 & 0xFF, e = de & 0xFF;
-    t += 11 + 11 + 7 + 21 * (w || 0x10000) - 5 + 10 + 10 + 4 + 4 + 7;
-    if (d & 7) t += 12;
+    t += 11 + 11 + 7 + 21 * (w || 0x10000) - 5 + 10 + 10 + 4 + 4 + 7; M1.m1 += 8 + 2 * (w || 0x10000) + 1;   // with the DJNZ
+    if (d & 7){ t += 12; M1.m1 += 1; }
     else {
-      t += 7 + 7 + 4 + 4;
+      t += 7 + 7 + 4 + 4; M1.m1 += 4;
       e += 0x20;
-      if (e > 0xFF){ e &= 0xFF; t += 12; } else { d = (d - 8) & 0xFF; t += 7 + 4 + 7 + 4; }
+      if (e > 0xFF){ e &= 0xFF; t += 12; M1.m1 += 1; } else { d = (d - 8) & 0xFF; t += 7 + 4 + 7 + 4; M1.m1 += 4; }
     }
     de = d << 8 | e;
     t += k > 1 ? 13 : 8;
@@ -395,12 +405,12 @@ function renderFighters(m, paths, sp = 0x5BF5, cost){
   m[0xC41D] = m[0xAA59]; m[0xC41E] = m[0xAA58]; m[0xC420] = m[0xAA57];
   m[0xC423] = m[0xAA12]; m[0xC424] = 0;
   m[0xC41B] = m[0xAA19]; m[0xC41C] = m[0xAA18]; m[0xC41F] = m[0xAA17];
-  t += 236;
+  t += 236; M1.m1 += 20;
   for (const [idx, out] of [[0xC423, 0xC428], [0xC425, 0xC42A]]){
     const a = (0xC440 + 2 * m[idx]) & 0xFFFF;
     const p = (0x44CC + (m[a] | m[a + 1 & 0xFFFF] << 8)) & 0xFFFF;
     m[out] = p & 0xFF; m[out + 1] = p >> 8;
-    t += 110;
+    t += 110; M1.m1 += 13;
   }
   /* $BF73: each box the union of this frame and the last; y-max forced to $BE */
   for (let f = 0; f < 2; f++){
@@ -408,10 +418,10 @@ function renderFighters(m, paths, sp = 0x5BF5, cost){
     const fr = m[0xC428 + 2 * f] | m[0xC429 + 2 * f] << 8;
     const w = m[fr + 1 & 0xFFFF], hh = m[fr + 2 & 0xFFFF];
     let r;
-    r = rfMinMax(x, m[last]); m[box] = r[0]; t += 51 + r[2];
-    r = rfMinMax(m[last + 1], (x + w) & 0xFF); m[box + 1] = r[1]; t += 94 + r[2];
-    r = rfMinMax(y, m[last + 2]); m[box + 2] = r[0]; t += 51 + r[2];
-    r = rfMinMax(m[last + 3], (y + hh) & 0xFF); m[box + 3] = 0xBE; t += 81 + r[2];
+    r = rfMinMax(x, m[last]); m[box] = r[0]; t += 51 + r[2]; M1.m1 += 6 + r[3];
+    r = rfMinMax(m[last + 1], (x + w) & 0xFF); m[box + 1] = r[1]; t += 94 + r[2]; M1.m1 += 11 + r[3];
+    r = rfMinMax(y, m[last + 2]); m[box + 2] = r[0]; t += 51 + r[2]; M1.m1 += 6 + r[3];
+    r = rfMinMax(m[last + 3], (y + hh) & 0xFF); m[box + 3] = 0xBE; t += 81 + r[2]; M1.m1 += 10 + r[3];
   }
   /* $C007: this frame becomes the last */
   for (let f = 0; f < 2; f++){
@@ -420,37 +430,38 @@ function renderFighters(m, paths, sp = 0x5BF5, cost){
     m[last] = x; m[last + 1] = (x + m[fr + 1 & 0xFFFF]) & 0xFF;
     m[last + 2] = y; m[last + 3] = (y + m[fr + 2 & 0xFFFF]) & 0xFF;
   }
-  t += 248;
+  t += 248; M1.m1 += 24;
   /* $C03B: the overlap test, 8-bit, with 11 pixels of slack */
   let apart = ((m[0xC439] + 11) & 0xFF) < m[0xC434];
-  t += 51;
-  if (!apart){ apart = ((m[0xC435] + 11) & 0xFF) < m[0xC438]; t += 51; }
+  t += 51; M1.m1 += 6;
+  if (!apart){ apart = ((m[0xC435] + 11) & 0xFF) < m[0xC438]; t += 51; M1.m1 += 6; }
   if (apart){
     tally('separate');
     t += rfBox(m, 0xC434, 0xC436, sp) + rfFighter(m, 0, 0xC434, 0xC436, tally);
     t += rfCopyOut(m, 0xC434, 0xC436);
     t += rfBox(m, 0xC438, 0xC43A, sp) + rfFighter(m, 1, 0xC438, 0xC43A, tally);
     t += rfCopyOut(m, 0xC438, 0xC43A);
-    return t + 10;
+    M1.m1 += 1; return t + 10;
   }
   tally('merged');
   let r;
-  r = rfMinMax(m[0xC434], m[0xC438]); m[0xC434] = r[0]; t += 51 + r[2];
-  r = rfMinMax(m[0xC435], m[0xC439]); m[0xC435] = r[1]; t += 51 + r[2];
-  r = rfMinMax(m[0xC436], m[0xC43A]); m[0xC436] = r[0]; t += 51 + r[2];
-  r = rfMinMax(m[0xC437], m[0xC43B]); m[0xC437] = r[1]; t += 51 + r[2];
+  r = rfMinMax(m[0xC434], m[0xC438]); m[0xC434] = r[0]; t += 51 + r[2]; M1.m1 += 6 + r[3];
+  r = rfMinMax(m[0xC435], m[0xC439]); m[0xC435] = r[1]; t += 51 + r[2]; M1.m1 += 6 + r[3];
+  r = rfMinMax(m[0xC436], m[0xC43A]); m[0xC436] = r[0]; t += 51 + r[2]; M1.m1 += 6 + r[3];
+  r = rfMinMax(m[0xC437], m[0xC43B]); m[0xC437] = r[1]; t += 51 + r[2]; M1.m1 += 6 + r[3];
   t += rfBox(m, 0xC434, 0xC436, sp);
   m[0xC438] = m[0xC434]; m[0xC43A] = m[0xC436];
-  t += 52 + 27;
+  t += 52 + 27; M1.m1 += 7;
   if (m[0xC427]){
     tally('p1-first');
+    M1.m1 += 1;                                    // JP $C0E8
     t += rfFighter(m, 0, 0xC434, 0xC436, tally) + rfFighter(m, 1, 0xC438, 0xC43A, tally) + 10;
   } else {
     tally('p2-first');
     t += rfFighter(m, 1, 0xC438, 0xC43A, tally) + rfFighter(m, 0, 0xC434, 0xC436, tally);
   }
   t += rfCopyOut(m, 0xC434, 0xC436);
-  return t + 10;
+  M1.m1 += 1; return t + 10;
 }
 
 /* ---- fighter_step $97BB: one fighter's move and frame advance --------
@@ -911,16 +922,21 @@ function yyLine(m, pos, de){                       // $92CA with its CALL: one c
   const [scr, ts] = rfScreenAddr(pos & 0xFF);
   let a = (scr + (pos >> 8)) & 0xFFFF;
   let t = 17 + 11 + 11 + 4 + ts + 10 + 4 + 7 + 11 + 10 + 4 + 7;
+  /* M1 (for R): its CALL, 3, Screen_Calc $C203 with its CALL (24: every
+     yin-yang cell is at row 8 or 16, above row $40), 7, 7 per row with
+     $9229's 5/9/12, the RET
+     (python tools/blockcost.py 0x92CA 0x92E4 ; 0xC203 0xC234 ; 0x9229 0x923A) */
+  M1.m1 += 1 + 3 + 24 + 7 + 8 * 7 + 1;
   for (let b = 8; b > 0; b--){
     m[a] = m[de]; de = (de + 1) & 0xFFFF;
     t += 7 + 7 + 6 + 4 + 17 + 4 + (b > 1 ? 13 : 8);
     /* $9229: down one pixel row */
     let h = ((a >> 8) + 1) & 0xFF, l = a & 0xFF;
-    if (h & 7) t += 37;
+    if (h & 7){ t += 37; M1.m1 += 5; }
     else {
       const s = l + 0x20; l = s & 0xFF;
-      if (s > 0xFF) t += 59;
-      else { h = (h - 8) & 0xFF; t += 69; }
+      if (s > 0xFF){ t += 59; M1.m1 += 9; }
+      else { h = (h - 8) & 0xFF; t += 69; M1.m1 += 12; }
     }
     a = h << 8 | l;
   }
@@ -928,6 +944,7 @@ function yyLine(m, pos, de){                       // $92CA with its CALL: one c
 }
 function yyCopy(m, de, pos){                       // Yin_Yang_Copy $9255 with its CALL: 2x2 cells, 32 bytes from de
   const right = (pos + 0x100) & 0xFFFF, low = pos & 0xFF00 | (pos + 8) & 0xFF;
+  M1.m1 += 1 + 2 + 9 + 11 + 10 + 1;               // its CALL, the code between the four $92CA calls, RET
   return 17 + 11 + 11 + yyLine(m, pos, de)
        + 10 + 10 + 11 + 4 + 10 + 4 + 11 + 4 + 11 + yyLine(m, right, de + 8)
        + 10 + 10 + 11 + 4 + 7 + 4 + 10 + 4 + 11 + 4 + 11 + yyLine(m, low, de + 16)
@@ -935,30 +952,32 @@ function yyCopy(m, de, pos){                       // Yin_Yang_Copy $9255 with i
 }
 function yyAward(m, cnt, a, pos1, pos2){           // from LD HL,count: add a, draw by the new count
   a = m[cnt] = (a + m[cnt]) & 0xFF;
-  let t = 10 + 7 + 7 + 7;
-  if (a === 1) return t + 7 + 20 + yyCopy(m, YY_HALF, pos1) + 10;
-  t += 12 + 7;
-  if (a === 2) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 10;
-  t += 12 + 7;
-  if (a === 3) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + yyCopy(m, YY_HALF, pos2) + 10;
-  return t + 12 + 20 + yyCopy(m, YY_FULL, pos2) + 10;
+  let t = 10 + 7 + 7 + 7; M1.m1 += 4;
+  if (a === 1){ M1.m1 += 4; return t + 7 + 20 + yyCopy(m, YY_HALF, pos1) + 10; }
+  t += 12 + 7; M1.m1 += 2;
+  if (a === 2){ M1.m1 += 4; return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 10; }
+  t += 12 + 7; M1.m1 += 2;
+  if (a === 3){ M1.m1 += 6; return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + yyCopy(m, YY_HALF, pos2) + 10; }
+  M1.m1 += 4; return t + 12 + 20 + yyCopy(m, YY_FULL, pos2) + 10;
 }
 function yinYang(m){                               // Yin_Yang_1UP $900E with its CALL
-  let t = 17 + 13 + 4 + 10;
+  let t = 17 + 13 + 4 + 10; M1.m1 += 4;
   if (m[0xAA08]) return t + yyAward(m, 0xAA01, m[0xAA08], 0x0408, 0x0108);
-  t += 13 + 4;                                     // Yin_Yang_2UP $9057
+  t += 13 + 4; M1.m1 += 2;                         // Yin_Yang_2UP $9057
+  M1.m1 += 1;
   if (!m[0xAA48]) return t + 11;
   return t + 5 + yyAward(m, 0xAA41, m[0xAA48], 0x1A08, 0x1D08);
 }
 function yinYang2P(m){
-  let t = 13 + 7;
+  let t = 13 + 7; M1.m1 += 2;
+  M1.m1 += 1;
   if (m[0x9C2C] !== 2) return t + 12;
-  t += 7 + 17 + 47 + 4;                            // CALL $AF01 and its body, AND A
-  if ((m[0xAA03] ^ m[0xAA43]) & 0x10) t += 12;
-  else { m[0xAA08] = 0; m[0xAA48] = 0; t += 7 + 30; }
+  t += 7 + 17 + 47 + 4; M1.m1 += 1 + 5 + 1;      // CALL $AF01 and its body, AND A
+  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){ t += 12; M1.m1 += 1; }
+  else { m[0xAA08] = 0; m[0xAA48] = 0; t += 7 + 30; M1.m1 += 4; }
   t += yinYang(m);
   m[0xAA01] = 0; m[0xAA41] = 0;
-  return t + 30;
+  M1.m1 += 3; return t + 30;
 }
 
 /* ---- the sound effect $B15A: effect a, inline and blocking --------------
@@ -1205,72 +1224,75 @@ function p1HitsP2(m){
    clamped to 0..$5F.  Returns the uncontended T from the CALL at $978D to
    $9790 (python tools/callio.py --capture --call 0x978D 0x9790). */
 function fighterMotion(m){
+  M1.m1 += 6;                                      // the site's CALL, LD HL / CALL twice, RET
   return 17 + 10 + 17 + motion(0xAA00) + 10 + 17 + motion(0xAA40) + 10;
 
   function motion(A){
     const f = m[A + 0x16];
     m[0x9743] = f;
-    let t = 60;
-    if (!m[A + 0x0C]) return t + 11;
-    t += 5 + 33;
+    /* M1 (for R): one per instruction, two for SBC HL and the CB shifts
+       (python tools/blockcost.py 0x95D4 0x9743) */
+    let t = 60; M1.m1 += 8;
+    if (!m[A + 0x0C]) { M1.m1 += 1; return t + 11; }
+    t += 5 + 33; M1.m1 += 6;
     if (!m[A + 0x0B]) return t + start();
-    t += 53;
+    t += 53; M1.m1 += 7;
     if (!f){
-      t += 7 + 4;
-      if (m[A + 0x10]){ m[A + 0x10]--; return t + 7 + 11 + 10 + tail(); }
-      t += 12 + 6 + 6 + 7 + 4;
-      if (!m[A + 0x0E]) return t + 12 + done();
+      t += 7 + 4; M1.m1 += 2;
+      if (m[A + 0x10]){ m[A + 0x10]--; M1.m1 += 3; return t + 7 + 11 + 10 + tail(); }
+      t += 12 + 6 + 6 + 7 + 4; M1.m1 += 5;
+      if (!m[A + 0x0E]) { M1.m1 += 1; return t + 12 + done(); }
       m[A + 0x0E]--;
-      return t + 7 + 11 + 10 + step();
+      M1.m1 += 3; return t + 7 + 11 + 10 + step();
     }
-    t += 12 + 6 + 7 + 6;
-    if (m[A + 0x10] !== m[A + 0x11]){ m[A + 0x10]++; return t + 7 + 11 + 10 + tail(); }
-    t += 12 + 6 + 7 + 4 + 6 + 7;
-    if (((m[A + 0x0F] - 1) & 0xFF) === m[A + 0x0E]) return t + 12 + done();
+    t += 12 + 6 + 7 + 6; M1.m1 += 4;
+    if (m[A + 0x10] !== m[A + 0x11]){ m[A + 0x10]++; M1.m1 += 3; return t + 7 + 11 + 10 + tail(); }
+    t += 12 + 6 + 7 + 4 + 6 + 7; M1.m1 += 6;
+    if (((m[A + 0x0F] - 1) & 0xFF) === m[A + 0x0E]) { M1.m1 += 1; return t + 12 + done(); }
     m[A + 0x0E]++;
-    return t + 7 + 11 + step();
+    M1.m1 += 2; return t + 7 + 11 + step();
 
     function done(){                               // $9613
       m[A + 0x0D] = 1; m[A + 0x0C] = 0;
-      return 42;
+      M1.m1 += 5; return 42;
     }
     function step(){                               // $962B: next 4-byte frame
-      let t = 61;
+      let t = 61; M1.m1 += 7;
       m[A + 0x13] = 0;
       if (m[0x9743]){
         const v = m[A + 0x14] - 4;
         m[A + 0x14] = v;
-        t += 7 + 7 + 7 + 6;
-        if (v < 0){ m[A + 0x15]--; t += 7 + 11 + 12; } else t += 12;
+        t += 7 + 7 + 7 + 6; M1.m1 += 4;
+        if (v < 0){ m[A + 0x15]--; t += 7 + 11 + 12; M1.m1 += 3; } else { t += 12; M1.m1 += 1; }
       } else {
         const v = m[A + 0x14] + 4;
         m[A + 0x14] = v;
-        t += 12 + 7 + 7 + 6;
-        if (v > 0xFF){ m[A + 0x15]++; t += 7 + 11; } else t += 12;
+        t += 12 + 7 + 7 + 6; M1.m1 += 4;
+        if (v > 0xFF){ m[A + 0x15]++; t += 7 + 11; M1.m1 += 2; } else { t += 12; M1.m1 += 1; }
       }
       return t + load();
     }
     function load(){                               // $9649
       const p = m[A + 0x14] | m[A + 0x15] << 8;
-      let t = 73;
+      let t = 73; M1.m1 += 10;
       m[A + 0x10] = 1;
       const a = m[p];
-      if (m[0x9743]) t += 12;
-      else { m[A + 0x10] = a - 1; t += 26; }
+      if (m[0x9743]) { t += 12; M1.m1 += 1; }
+      else { m[A + 0x10] = a - 1; t += 26; M1.m1 += 5; }
       m[A + 0x11] = a;
       const b = m[(p + 1) & 0xFFFF];
       m[A + 0x12] = b; m[A + 0x13] = b;
-      t += 108;
+      t += 108; M1.m1 += 15;
       for (let i = 0x1A; i <= 0x2B; i++) m[A + i] = 0xFF;   // ROM $39xx/$3Axx: all $FF
       m[0x9744] = 0;
-      t += 8 * (88 + 38) + 88 + 12;
-      t += 66;
+      t += 8 * (88 + 38) + 88 + 12; M1.m1 += 8 * 16 + 13;
+      t += 66; M1.m1 += 7;
       if (m[A + 0x17] === 1){                      // $971E: swap three pairs
         for (const b of [0x1A, 0x20, 0x26]) for (const k of [0, 1]){
           const x = m[A + b + k]; m[A + b + k] = m[A + b + k + 4]; m[A + b + k + 4] = x;
         }
-        t += 17 + 39 + 3 * 138 + 12 + 12 + 7 + 10;
-      } else t += 10;
+        t += 17 + 39 + 3 * 138 + 12 + 12 + 7 + 10; M1.m1 += 1 + 5 + 3 * 21 + 1;
+      } else { t += 10; M1.m1 += 1; }
       return t + tail();
     }
     function start(){                              // $96CE: begin script A+$0C
@@ -1279,17 +1301,17 @@ function fighterMotion(m){
       m[A + 0x0D] = 0;
       const w = 0x9368 + 2 * c;
       const w0 = m[w] | m[w + 1] << 8, w1 = m[w + 2] | m[w + 3] << 8;
-      let t = 213;
+      let t = 213; M1.m1 += 28;
       let p = w0;
-      if (m[0x9743]){ p = (w1 - 4) & 0xFFFF; t += 55; } else t += 12;
+      if (m[0x9743]){ p = (w1 - 4) & 0xFFFF; t += 55; M1.m1 += 8; } else { t += 12; M1.m1 += 1; }
       m[A + 0x14] = p & 0xFF; m[A + 0x15] = p >> 8;
       const n = (((w1 - w0) & 0xFFFF) >> 2) & 0xFF;
       m[A + 0x0E] = 0;
-      t += 111;
-      if (m[0x9743]) t += 12;
-      else { m[A + 0x0E] = n - 1; t += 22; }
+      t += 111; M1.m1 += 19;
+      if (m[0x9743]) { t += 12; M1.m1 += 1; }
+      else { m[A + 0x0E] = n - 1; t += 22; M1.m1 += 4; }
       m[A + 0x0F] = n;
-      return t + 33 + load();
+      M1.m1 += 5; return t + 33 + load();
     }
     function tail(){                               // $9698: y and x each pass
       const p = m[A + 0x14] | m[A + 0x15] << 8;
@@ -1297,16 +1319,16 @@ function fighterMotion(m){
       m[0x9743] = back;
       m[A + 0x18] += m[(p + 2) & 0xFFFF];
       const d = m[(p + 3) & 0xFFFF];
-      let t = 166;
+      let t = 166; M1.m1 += 23;
       let x;
-      if (back){ x = (m[A + 0x19] - d) & 0xFF; t += 23; }
-      else { x = (m[A + 0x19] + d) & 0xFF; t += 16; }
-      t += 4 + 12 + 7;                             // AND A clears carry: JR NC always
-      if (x < 0x5F){ m[A + 0x19] = x; return t + 12 + 7 + 10; }
-      t += 7 + 7;
-      if (x >= 0xC8){ m[A + 0x19] = 0; return t + 12 + 10 + 10; }
+      if (back){ x = (m[A + 0x19] - d) & 0xFF; t += 23; M1.m1 += 3; }
+      else { x = (m[A + 0x19] + d) & 0xFF; t += 16; M1.m1 += 2; }
+      t += 4 + 12 + 7; M1.m1 += 3;                 // AND A clears carry: JR NC always
+      if (x < 0x5F){ m[A + 0x19] = x; M1.m1 += 3; return t + 12 + 7 + 10; }
+      t += 7 + 7; M1.m1 += 2;
+      if (x >= 0xC8){ m[A + 0x19] = 0; M1.m1 += 3; return t + 12 + 10 + 10; }
       m[A + 0x19] = 0x5F;
-      return t + 7 + 10 + 10;
+      M1.m1 += 3; return t + 7 + 10 + 10;
     }
   }
 }

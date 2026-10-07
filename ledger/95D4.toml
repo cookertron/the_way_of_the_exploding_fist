@@ -33,3 +33,8 @@ by     = "python tools/callio.py --capture --state p1 --keys W --call 0x978D 0x9
 kind   = "gated"
 says   = "fighterMotion writes every byte of all 143 cases, reads no ROM (the $FF copy is written as $FF), and tallies the exact uncontended T; every branch reached; 24 mutants killed"
 by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "gated"
+says   = "fighterMotion counts its M1 cycles into M1.m1 (one per instruction, two for SBC HL and the CB shifts at $9702-$9708) and matches rx - r mod 128 on all 143 callio cases"
+by     = "python tools/blockcost.py 0x95D4 0x9743 ; python tools/build.py ; node test/kit.test.js"

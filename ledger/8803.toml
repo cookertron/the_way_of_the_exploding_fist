@@ -52,3 +52,8 @@ by     = "node test/kit.test.js ; python tools/mutants.py --match 8803"
 kind   = "measured"
 says   = "only stack ops contend in $8803; per-call spread is frame phase, which the JS tally cannot hold (DI, free-running), so charge the play-weighted mean: T x 1.0317 (s1 1.03179, p1 1.03167, p1b 1.03167; D4)"
 by     = "python tools/sprdec.py --capture --state s1 --frames 1500 --out scratch/cap.json ; same for p1, p1b at 600"
+
+[[fact]]
+kind   = "measured"
+says   = "M1 per instruction is 1 except BIT, SLA, RRD, LD DE,(nn) and each LDIR repeat (2); the plot skip block $8A3A-$8A4A is 15 instructions; no raw row ($8858) occurs in any of 441 sprdec cases, so its M1 count has no oracle case"
+by     = "python tools/blockcost.py 0x8803 0x8AE9 ; python tools/sprdec.py --check --paths"

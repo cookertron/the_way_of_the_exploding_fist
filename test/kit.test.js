@@ -516,13 +516,15 @@ const mockCtx = (state) => ({
   const tables = Buffer.from(fx.tables, 'hex');
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
   const paths = {};
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000);
     m.set(tables, 0xB500); put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.renderFighters(m, paths, c.sp);
+    if ((P.M1.m1 & 0x7F) !== c.m1 && !badM1++) firstM1 = `case ${i} [${c.paths}]: M1 ${P.M1.m1} want ${c.m1} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++){
       if (a === c.sp - 64) a = c.sp + 2;
@@ -534,6 +536,8 @@ const mockCtx = (state) => ({
   }
   check(`renderFighters writes every byte the real $BF13 wrote (${fx.cases.length} rendfx cases)`, [badBytes, firstBytes], [0, '']);
   check('renderFighters tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's m1 is how far R advanced from $BF13 to $9793 (rendfx.py --stamp-r) */
+  check('renderFighters counts the M1 cycles of every case as R advanced in the real $BF13', [badM1, firstM1], [0, '']);
   check('the rendfx cases reach every render path seen in play',
         ['separate', 'merged', 'p1-first', 'p2-first', 'floor-part', 'flip', 'unflipped'].filter(k => !paths[k]), []);
   /* per comparison, margin 0 is the last merged case and 1 the first drawn
@@ -784,13 +788,15 @@ const mockCtx = (state) => ({
 {
   const fx = P.assets.motion95d4;
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.fighterMotion(m);
+    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
@@ -798,6 +804,8 @@ const mockCtx = (state) => ({
   }
   check('fighterMotion writes every byte the real $95D4 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
   check('fighterMotion tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
+  check('fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4', [badM1, firstM1], [0, '']);
   const pcs = fx.cases.map(c => { const s = new Set();
     for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
   check('the callio cases reach every branch of $95D4 and its swap $971E',
@@ -936,13 +944,15 @@ const mockCtx = (state) => ({
 {
   const fx = P.assets.yy976f;
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.yinYang2P(m);
+    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
@@ -950,6 +960,8 @@ const mockCtx = (state) => ({
   }
   check('yinYang2P writes every byte the real $976F-$978D wrote (callio cases)', [badBytes, firstBytes], [0, '']);
   check('yinYang2P tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's R at $976F and at $978D (callio.py --check --stamp-r) */
+  check('yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D', [badM1, firstM1], [0, '']);
   const pcs = fx.cases.map(c => { const s = new Set();
     for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
   check('the callio cases reach every branch of $976F, $900E and its copy $9255',

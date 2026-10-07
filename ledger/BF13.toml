@@ -47,8 +47,8 @@ by     = "python tools/adis.py 0xC091 50 ; python tools/adis.py 0xC234 60"
 [[fact]]
 kind   = "measured"
 at     = "$BF13"
-says   = "gated (template.html): renderFighters writes every byte and the uncontended T of all 50 rendfx cases (saved SP at $C2B0 = entry SP - 2); rfPlayT pools at 1.00026 of their contended T (gate 0.25%), worst 2.43% (gate 3%)"
-by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --match \"BF13 play T||BF13 cost\""
+says   = "gated (template.html): renderFighters writes every byte, the uncontended T and the M1 count (R) of all 50 rendfx cases (saved SP at $C2B0 = entry SP - 2); rfPlayT pools at 1.00026 of their contended T (gate 0.25%), worst 2.43% (gate 3%)"
+by     = "python tools/blockcost.py 0xBF13 0xC407 ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --match \"BF13 play T||BF13 cost||BF13 M1\""
 
 [[fact]]
 kind   = "insn"

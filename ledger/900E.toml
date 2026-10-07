@@ -34,3 +34,8 @@ by     = "python tools/grepbytes.py \"01 AA\" ; python tools/grepbytes.py \"CD 0
 kind   = "gated"
 says   = "yinYang2P writes every byte and the exact uncontended T of all 22 cases; every branch of $976F, $900E, $9255 and both $9229 exits reached; 15 mutants killed; dropping $9229's H-8 step is equivalent here (it follows the last byte)"
 by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "gated"
+says   = "yinYang2P and its helpers count their M1 into M1.m1 and match rx - r mod 128 on all 22 callio cases; every cell is at row 8 or 16, so Screen_Calc takes its 24-M1 top-third path and $9229 never steps to the next third"
+by     = "python tools/blockcost.py 0x976F 0x978D ; python tools/blockcost.py 0x900E 0x9090 ; python tools/blockcost.py 0x9255 0x92A0 ; node test/kit.test.js"

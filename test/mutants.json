@@ -18,8 +18,8 @@
  {
   "file": "template.html",
   "label": "8803 end-of-sprite T",
-  "old": "if (m[hl] === 0) return t + 10;",
-  "new": "if (m[hl] === 0) return t + 11;",
+  "old": "if (m[hl] === 0){ M1.m1 += 1; return t + 10; }",
+  "new": "if (m[hl] === 0){ M1.m1 += 1; return t + 11; }",
   "increment": "8803-js",
   "kills": "spriteDecode tallies the uncontended T of every case exactly"
  },
@@ -66,8 +66,8 @@
  {
   "file": "template.html",
   "label": "8803 mirror skip flag T",
-  "old": "if (a){ a |= 0x40; t += 7; }",
-  "new": "if (a){ a |= 0x40; t += 8; }",
+  "old": "if (a){ a |= 0x40; t += 7; M1.m1 += 1; }",
+  "new": "if (a){ a |= 0x40; t += 8; M1.m1 += 1; }",
   "increment": "8803-js",
   "kills": "spriteDecode tallies the uncontended T of every case exactly"
  },
@@ -130,8 +130,8 @@
  {
   "file": "template.html",
   "label": "8803 skip bytes T",
-  "old": "t += 89; }",
-  "new": "t += 90; }",
+  "old": "t += 89; M1.m1 += 15; }",
+  "new": "t += 90; M1.m1 += 15; }",
   "increment": "8803-js",
   "kills": "spriteDecode tallies the uncontended T of every case exactly"
  },
@@ -258,8 +258,8 @@
  {
   "file": "template.html",
   "label": "BF13 copy-out next char row",
-  "old": "if (e > 0xFF){ e &= 0xFF; t += 12; } else { d = (d - 8) & 0xFF; t += 7 + 4 + 7 + 4; }",
-  "new": "if (e > 0xFF){ e &= 0xFF; t += 12; } else { d = (d - 7) & 0xFF; t += 7 + 4 + 7 + 4; }",
+  "old": "if (e > 0xFF){ e &= 0xFF; t += 12; M1.m1 += 1; } else { d = (d - 8) & 0xFF;",
+  "new": "if (e > 0xFF){ e &= 0xFF; t += 12; M1.m1 += 1; } else { d = (d - 7) & 0xFF;",
   "increment": "BF13-js",
   "kills": "renderFighters writes every byte the real $BF13 wrote (50 rendfx cases)"
  },
@@ -274,16 +274,16 @@
  {
   "file": "template.html",
   "label": "BF13 minmax T",
-  "old": "return d < e ? [d, e, 66] : [e, d, 78];",
-  "new": "return d < e ? [d, e, 66] : [e, d, 66];",
+  "old": "return d < e ? [d, e, 66, 7] : [e, d, 78, 10];",
+  "new": "return d < e ? [d, e, 66, 7] : [e, d, 66, 10];",
   "increment": "BF13-js",
   "kills": "renderFighters tallies the uncontended T of every case exactly"
  },
  {
   "file": "template.html",
   "label": "BF13 multiply T",
-  "old": "222 - [0, 1, 2, 3, 4, 5, 6, 7]",
-  "new": "221 - [0, 1, 2, 3, 4, 5, 6, 7]",
+  "old": "222 - rfPop(e)",
+  "new": "221 - rfPop(e)",
   "increment": "BF13-js",
   "kills": "renderFighters tallies the uncontended T of every case exactly"
  },
@@ -914,8 +914,8 @@
  {
   "file": "template.html",
   "label": "motion: idle test on A+$0B",
-  "old": "if (!m[A + 0x0C]) return t + 11;",
-  "new": "if (!m[A + 0x0B]) return t + 11;",
+  "old": "if (!m[A + 0x0C]) { M1.m1 += 1; return t + 11; }",
+  "new": "if (!m[A + 0x0B]) { M1.m1 += 1; return t + 11; }",
   "increment": "95D4-port",
   "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
  },
@@ -986,8 +986,8 @@
  {
   "file": "template.html",
   "label": "motion: hold loaded without the -1",
-  "old": "else { m[A + 0x10] = a - 1; t += 26; }",
-  "new": "else { m[A + 0x10] = a; t += 26; }",
+  "old": "else { m[A + 0x10] = a - 1; t += 26; M1.m1 += 5; }",
+  "new": "else { m[A + 0x10] = a; t += 26; M1.m1 += 5; }",
   "increment": "95D4-port",
   "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
  },
@@ -1098,8 +1098,8 @@
  {
   "file": "template.html",
   "label": "motion: idle T",
-  "old": "if (!m[A + 0x0C]) return t + 11;",
-  "new": "if (!m[A + 0x0C]) return t + 5;",
+  "old": "if (!m[A + 0x0C]) { M1.m1 += 1; return t + 11; }",
+  "new": "if (!m[A + 0x0C]) { M1.m1 += 1; return t + 5; }",
   "increment": "95D4-port",
   "kills": "fighterMotion tallies the uncontended T of every case exactly"
  },
@@ -1698,24 +1698,24 @@
  {
   "file": "template.html",
   "label": "yy: reel bit 3 not 4",
-  "old": "if ((m[0xAA03] ^ m[0xAA43]) & 0x10) t += 12;",
-  "new": "if ((m[0xAA03] ^ m[0xAA43]) & 0x08) t += 12;",
+  "old": "if ((m[0xAA03] ^ m[0xAA43]) & 0x10){ t += 12;",
+  "new": "if ((m[0xAA03] ^ m[0xAA43]) & 0x08){ t += 12;",
   "increment": "900E",
   "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
  },
  {
   "file": "template.html",
   "label": "yy: equal reels keep P2 points",
-  "old": "else { m[0xAA08] = 0; m[0xAA48] = 0; t += 7 + 30; }",
-  "new": "else { m[0xAA08] = 0; t += 7 + 30; }",
+  "old": "else { m[0xAA08] = 0; m[0xAA48] = 0; t += 7 + 30; M1.m1 += 4; }",
+  "new": "else { m[0xAA08] = 0; t += 7 + 30; M1.m1 += 4; }",
   "increment": "900E",
   "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
  },
  {
   "file": "template.html",
   "label": "yy: counts not cleared after",
-  "old": "m[0xAA01] = 0; m[0xAA41] = 0;\n  return t + 30;",
-  "new": "m[0xAA01] = 0;\n  return t + 30;",
+  "old": "m[0xAA01] = 0; m[0xAA41] = 0;\n  M1.m1 += 3; return t + 30;",
+  "new": "m[0xAA01] = 0;\n  M1.m1 += 3; return t + 30;",
   "increment": "900E",
   "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
  },
@@ -1730,16 +1730,16 @@
  {
   "file": "template.html",
   "label": "yy: count 3 skips the half",
-  "old": "if (a === 3) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + yyCopy(m, YY_HALF, pos2) + 10;",
-  "new": "if (a === 3) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + 10;",
+  "old": "if (a === 3){ M1.m1 += 6; return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + yyCopy(m, YY_HALF, pos2) + 10; }",
+  "new": "if (a === 3){ M1.m1 += 6; return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 20 + 10; }",
   "increment": "900E",
   "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
  },
  {
   "file": "template.html",
   "label": "yy: count 2 draws the half",
-  "old": "if (a === 2) return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 10;",
-  "new": "if (a === 2) return t + 7 + 20 + yyCopy(m, YY_HALF, pos1) + 10;",
+  "old": "if (a === 2){ M1.m1 += 4; return t + 7 + 20 + yyCopy(m, YY_FULL, pos1) + 10; }",
+  "new": "if (a === 2){ M1.m1 += 4; return t + 7 + 20 + yyCopy(m, YY_HALF, pos1) + 10; }",
   "increment": "900E",
   "kills": "yinYang2P writes every byte the real $976F-$978D wrote (callio cases)"
  },
@@ -1778,8 +1778,8 @@
  {
   "file": "template.html",
   "label": "yy: $9229 back-8 step T one short (the step itself is unobservable: it follows the last byte)",
-  "old": "else { h = (h - 8) & 0xFF; t += 69; }\n    }\n    a = h << 8 | l;\n  }\n  return t + 10;\n}\nfunction yyCopy",
-  "new": "else { h = (h - 8) & 0xFF; t += 68; }\n    }\n    a = h << 8 | l;\n  }\n  return t + 10;\n}\nfunction yyCopy",
+  "old": "else { h = (h - 8) & 0xFF; t += 69; M1.m1 += 12; }\n    }\n    a = h << 8 | l;\n  }\n  return t + 10;\n}\nfunction yyCopy",
+  "new": "else { h = (h - 8) & 0xFF; t += 68; M1.m1 += 12; }\n    }\n    a = h << 8 | l;\n  }\n  return t + 10;\n}\nfunction yyCopy",
   "increment": "900E",
   "kills": "yinYang2P tallies the uncontended T of every case exactly"
  },
@@ -2174,5 +2174,317 @@
   "new": "M1.m1 += 18; return t + 7 + 7 + 4",
   "increment": "9745-m1",
   "kills": "fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D"
+ },
+ {
+  "file": "template.html",
+  "label": "95D4 M1: site CALL, LD HL/CALL x2, RET one over",
+  "old": "  M1.m1 += 6;                                      // the site's CALL",
+  "new": "  M1.m1 += 7;                                      // the site's CALL",
+  "increment": "9745-r",
+  "kills": "fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4"
+ },
+ {
+  "file": "template.html",
+  "label": "95D4 M1: forward x step one over",
+  "old": "t += 16; M1.m1 += 2; }",
+  "new": "t += 16; M1.m1 += 3; }",
+  "increment": "9745-r",
+  "kills": "fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4"
+ },
+ {
+  "file": "template.html",
+  "label": "95D4 M1: $971E swap pass 20 not 21",
+  "old": "M1.m1 += 1 + 5 + 3 * 21 + 1;",
+  "new": "M1.m1 += 1 + 5 + 3 * 20 + 1;",
+  "increment": "9745-r",
+  "kills": "fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4"
+ },
+ {
+  "file": "template.html",
+  "label": "95D4 M1: $96CE start body one short",
+  "old": "let t = 213; M1.m1 += 28;",
+  "new": "let t = 213; M1.m1 += 27;",
+  "increment": "9745-r",
+  "kills": "fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4"
+ },
+ {
+  "file": "template.html",
+  "label": "95D4 M1: $9613 done one short",
+  "old": "M1.m1 += 5; return 42;",
+  "new": "M1.m1 += 4; return 42;",
+  "increment": "9745-r",
+  "kills": "fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4"
+ },
+ {
+  "file": "template.html",
+  "label": "95D4 M1: $963F borrow one short",
+  "old": "if (v < 0){ m[A + 0x15]--; t += 7 + 11 + 12; M1.m1 += 3; }",
+  "new": "if (v < 0){ m[A + 0x15]--; t += 7 + 11 + 12; M1.m1 += 2; }",
+  "increment": "9745-r",
+  "kills": "fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4"
+ },
+ {
+  "file": "template.html",
+  "label": "95D4 M1: $9671 last pass one short",
+  "old": "M1.m1 += 8 * 16 + 13;",
+  "new": "M1.m1 += 8 * 16 + 12;",
+  "increment": "9745-r",
+  "kills": "fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4"
+ },
+ {
+  "file": "template.html",
+  "label": "yy M1: $92CA cell one short",
+  "old": "M1.m1 += 1 + 3 + 24 + 7 + 8 * 7 + 1;",
+  "new": "M1.m1 += 1 + 3 + 23 + 7 + 8 * 7 + 1;",
+  "increment": "9745-r",
+  "kills": "yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D"
+ },
+ {
+  "file": "template.html",
+  "label": "yy M1: $9255 copy one short",
+  "old": "M1.m1 += 1 + 2 + 9 + 11 + 10 + 1;",
+  "new": "M1.m1 += 1 + 2 + 9 + 11 + 10;",
+  "increment": "9745-r",
+  "kills": "yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D"
+ },
+ {
+  "file": "template.html",
+  "label": "yy M1: count 3 one short",
+  "old": "if (a === 3){ M1.m1 += 6;",
+  "new": "if (a === 3){ M1.m1 += 5;",
+  "increment": "9745-r",
+  "kills": "yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D"
+ },
+ {
+  "file": "template.html",
+  "label": "yy M1: unequal reels one over",
+  "old": "if ((m[0xAA03] ^ m[0xAA43]) & 0x10){ t += 12; M1.m1 += 1; }",
+  "new": "if ((m[0xAA03] ^ m[0xAA43]) & 0x10){ t += 12; M1.m1 += 2; }",
+  "increment": "9745-r",
+  "kills": "yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D"
+ },
+ {
+  "file": "template.html",
+  "label": "yy M1: Yin_Yang_2UP RET Z dropped",
+  "old": "  M1.m1 += 1;\n  if (!m[0xAA48]) return t + 11;",
+  "new": "  if (!m[0xAA48]) return t + 11;",
+  "increment": "9745-r",
+  "kills": "yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D"
+ },
+ {
+  "file": "template.html",
+  "label": "yy M1: 1P exit JR dropped",
+  "old": "  let t = 13 + 7; M1.m1 += 2;\n  M1.m1 += 1;\n",
+  "new": "  let t = 13 + 7; M1.m1 += 2;\n",
+  "increment": "9745-r",
+  "kills": "yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: recolour byte 16 not 17",
+  "old": "M1.m1 += 12 + 17 * n;",
+  "new": "M1.m1 += 12 + 16 * n;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: mirror byte 9 not 10",
+  "old": "M1.m1 += 7 + 13 + 10 * n + 2;",
+  "new": "M1.m1 += 7 + 13 + 9 * n + 2;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: shift-6 byte 9 not 10",
+  "old": "M1.m1 += 10 * k + 7;",
+  "new": "M1.m1 += 9 * k + 7;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: shift-2 head one short",
+  "old": "M1.m1 += 12 + 10 * k;",
+  "new": "M1.m1 += 11 + 10 * k;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: RRD counted as one M1",
+  "old": "M1.m1 += 4 + 4 * k;",
+  "new": "M1.m1 += 4 + 3 * k;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: skip block 14 (the first draft)",
+  "old": "t += 89; M1.m1 += 15; }",
+  "new": "t += 89; M1.m1 += 14; }",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: single byte one short",
+  "old": "t += 121; M1.m1 += 21;",
+  "new": "t += 121; M1.m1 += 20;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: middle LDIR one M1 a byte",
+  "old": "M1.m1 += 2 + 2 * b; }",
+  "new": "M1.m1 += 2 + b; }",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: end-of-sprite RET dropped",
+  "old": "if (m[hl] === 0){ M1.m1 += 1; return t + 10; }",
+  "new": "if (m[hl] === 0){ return t + 10; }",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "8803 M1: INC B for the extra byte one over",
+  "old": "if (m[0x8B0A]){ b++; t += 4; M1.m1 += 1; }",
+  "new": "if (m[0x8B0A]){ b++; t += 4; M1.m1 += 2; }",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: $C319 one short",
+  "old": "38 + rfPop(e)",
+  "new": "37 + rfPop(e)",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: minmax swap path one short",
+  "old": "[e, d, 78, 10]",
+  "new": "[e, d, 78, 9]",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: minmax keep path one over",
+  "old": "[d, e, 66, 7]",
+  "new": "[d, e, 66, 8]",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: Screen_Calc lower thirds one short",
+  "old": "hi === 0 ? 24 : 27]",
+  "new": "hi === 0 ? 24 : 26]",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: shadow overflow one short",
+  "old": "l = nl; t += 77; M1.m1 += 11;",
+  "new": "l = nl; t += 77; M1.m1 += 10;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: shadow row one short",
+  "old": "M1.m1 += 8 + 2 * (h || 0x10000);",
+  "new": "M1.m1 += 7 + 2 * (h || 0x10000);",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: zero-fill block 4 not 5",
+  "old": "M1.m1 += 16 + 5 * blocks + 3;",
+  "new": "M1.m1 += 16 + 4 * blocks + 3;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: odd zero bytes 3 not 4",
+  "old": "M1.m1 += 3 + 4 * r;",
+  "new": "M1.m1 += 3 + 3 * r;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: $C2B5 x&3=3 path one short",
+  "old": "[4, 7, 9, 9][s]",
+  "new": "[4, 7, 9, 8][s]",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: flipped part x one short",
+  "old": "t += 111; M1.m1 += 17;",
+  "new": "t += 111; M1.m1 += 16;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: floor part one short",
+  "old": "t += 60; M1.m1 += 8;",
+  "new": "t += 60; M1.m1 += 7;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: copy-out row one short",
+  "old": "M1.m1 += 8 + 2 * (w || 0x10000) + 1;",
+  "new": "M1.m1 += 8 + 2 * (w || 0x10000);",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: copy-out back-8 one short",
+  "old": "if (e > 0xFF){ e &= 0xFF; t += 12; M1.m1 += 1; } else { d = (d - 8) & 0xFF; t += 7 + 4 + 7 + 4; M1.m1 += 4; }",
+  "new": "if (e > 0xFF){ e &= 0xFF; t += 12; M1.m1 += 1; } else { d = (d - 8) & 0xFF; t += 7 + 4 + 7 + 4; M1.m1 += 3; }",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: box x-max one over",
+  "old": "t += 94 + r[2]; M1.m1 += 11 + r[3];",
+  "new": "t += 94 + r[2]; M1.m1 += 12 + r[3];",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: p1-first JP dropped",
+  "old": "    M1.m1 += 1;                                    // JP $C0E8\n",
+  "new": "",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
+ },
+ {
+  "file": "template.html",
+  "label": "BF13 M1: separate path RET one over",
+  "old": "    M1.m1 += 1; return t + 10;",
+  "new": "    M1.m1 += 2; return t + 10;",
+  "increment": "9745-r",
+  "kills": "renderFighters counts the M1 cycles of every case as R advanced in the real $BF13"
  }
 ]
