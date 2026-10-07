@@ -47,12 +47,19 @@ how many reads were fetches.
              the case's log in order (the twin logs them from the keys held
              in the capture); R is set from the case and checked at the
              return, so a routine reading LD A,R replays exactly.
+  --poke ADDR=VAL[,...]  (capture) set data bytes in the machine before play
+             -- a mode or a control set no saved state holds (2P, Kempston);
+             each case records them as "poked".  Never ROM, never a byte the
+             fixture already fetched as code.  The oracle is still the
+             machine code; the start is constructed, so say so.
+  --kempston MASK  (capture) hold these Kempston bits (active high) all run.
   --derive   a path driven play never reached: replay case N over the
              target image with some of the bytes it read changed (--set),
              and append what the real code then did as a new case, marked
              "derived" with its parent and the bytes set.  The oracle is
              still the machine code; the input is constructed, so say so
-             wherever the case is counted.
+             wherever the case is counted.  --r VAL replays it with R at
+             the CALL set to VAL instead (the AI's draws, Q18).
 
 Usage:
     python tools/callio.py --state NAME --call SITE RET [--frames 1500] [--keys D+W]
@@ -64,6 +71,7 @@ Usage:
                            --out build/callio_9c6f.json
     python tools/callio.py --check --state s1 --fixture build/callio_97bb.json
     python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 12 --set 0xAA44=0x12
+    python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --r 0x15
 """
 import json
 import os
@@ -235,6 +243,7 @@ def table(title, touched, firstpc, extra=None, gap=None):
 def capture(args):
     t = parse_target(args)
     calls, frames, keys, per, out, append, blind = [], 1500, [], 2, None, False, []
+    pokes, kemp = {}, 0
     while args:
         a = args[0]
         if a == '--call':
@@ -251,6 +260,13 @@ def capture(args):
             append = True; del args[:1]
         elif a == '--blind':
             lo, hi = args[1].split('-'); blind.append([int(lo, 0), int(hi, 0)]); del args[:2]
+        elif a == '--poke':
+            for kv in args[1].split(','):
+                pa, pv = kv.split('=')
+                pokes[int(pa, 0)] = int(pv, 0)
+            del args[:2]
+        elif a == '--kempston':
+            kemp = int(args[1], 0); del args[:2]
         else:
             sys.exit(f'callio: unknown argument {a}  (target: {TARGET_HELP})')
     if not calls or not out:
@@ -258,8 +274,16 @@ def capture(args):
     h = boot_target(t, 'callio')
     r, m = h.regs, h.memobj.m
     image = bytes(m)
+    code_now = set()
+    if append and os.path.exists(out):
+        code_now = {a for lo, hi in json.load(open(out))['code'] for a in range(lo, hi + 1)}
+    for pa, pv in pokes.items():
+        if pa < 0x4000 or pa in code_now:
+            sys.exit(f'callio: --poke ${pa:04X} is ROM or a byte the fixture fetched as code')
+        m[pa] = pv
     for k in keys:
         press(h.ports, k)
+    h.ports.kempston = kemp
     fx = {'calls': [[s, e] for s, e in calls], 'code': [], 'cases': []}
     if append and os.path.exists(out):
         fx = json.load(open(out))
@@ -296,7 +320,8 @@ def capture(args):
         fx['cases'].append({'site': site, 'sp': sp, 'regs': [regs_in[i] for i in REGS],
                             **case_io(pre, lm, blind),
                             'exit': [lm.exit[i] for i in REGS], 'r': regs_in[R], 'rx': lm.exit[R],
-                            **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig})
+                            **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig,
+                            **({'poked': {f'{a:04x}': v for a, v in pokes.items()}} if pokes else {})})
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
     fx['regs'] = REGS
     fx['about'] = ('Purpose: frozen oracle for the routine called at ' + ', '.join(f'${s:04X}' for s, _ in calls)
@@ -369,7 +394,7 @@ def check(args):
 
 def derive(args):
     t = parse_target(args)
-    fixture, base, sets = None, None, {}
+    fixture, base, sets, rset = None, None, {}, None
     while args:
         if args[0] == '--fixture':
             fixture = args[1]; del args[:2]
@@ -380,9 +405,11 @@ def derive(args):
                 a, v = kv.split('=')
                 sets[int(a, 0)] = int(v, 0)
             del args[:2]
+        elif args[0] == '--r':
+            rset = int(args[1], 0); del args[:2]
         else:
             sys.exit(f'callio: unknown argument {args[0]}')
-    if not fixture or base is None or not sets:
+    if not fixture or base is None or not (sets or rset is not None):
         sys.exit('callio: --derive needs --fixture FILE --case N --set ADDR=VAL[,ADDR=VAL...]')
     h = boot_target(t, 'callio')
     fx = json.load(open(fixture))
@@ -403,6 +430,10 @@ def derive(args):
     regs[PC], regs[SP], regs[T] = c['site'], sp, 0
     if 'r' in c:
         regs[R] = c['r']
+    if rset is not None:
+        if 'r' not in c:
+            sys.exit('callio: --r needs a fixture that records R (r, rx)')
+        regs[R] = rset
     pl = PortLog(logged=c.get('ports', []))
     dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], ports=pl)
     if pl.bad or pl.left():
@@ -414,9 +445,10 @@ def derive(args):
     fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': c['regs'],
                         **case_io(mem, lm, fx.get('blind', [])),
                         'exit': [lm.exit[k] for k in fx['regs']],
-                        **({'r': c['r'], 'rx': lm.exit[R]} if 'r' in c else {}),
+                        **({'r': regs[R], 'rx': lm.exit[R]} if 'r' in c else {}),
                         **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig,
-                        'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()}}})
+                        'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()},
+                                    **({'r': rset} if rset is not None else {})}})
     with open(fixture, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
     print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {dt}; PCs no case reached before: '

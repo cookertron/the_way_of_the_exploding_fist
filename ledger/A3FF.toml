@@ -42,7 +42,12 @@ by     = "python tools/readwatch.py --state p1 --lo 0xA645 --hi 0xA646 --frames 
 window = "p1 and s1, 400 frames each (control: $A5F1-$A644 read by $AB42 etc in the same window)"
 n      = 0
 
-[[open]]
-ask    = "what does the JS substitute for R look like -- one 7-bit draw per AI pass with the measured fixed offsets for the later draws, or an M1-count model per path?"
-tried  = "drawlog over p1 and s1 shows the offsets are constant per caller pair (7, 7, 6, 13), so they are instruction counts between the two LD A,R"
-settle = "when the AI pass $A0xx-$A5xx is read in phase 10, count M1 cycles between each caller pair and freeze them; behavioural test asserts bit 7 never set and pair deltas hold"
+[[fact]]
+kind   = "measured"
+says   = "$A646, the $A16D draw mask, is rank table $B432[$A614] (written $A450): 0 only from rank 16; the $A181 draw is the $A16D draw + 13 M1, so $A18A falls through only when $A646 AND $73 = 0; derived and gated"
+by     = "python tools/adis.py 0xA402 40 ; python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 50 --set 0xA646=0 --r 59"
+
+[[fact]]
+kind   = "gated"
+says   = "an M1-count model per path: controlPass counts R from io.r plus every M1 it executes, and matches R and every draw on all 670 cases of build/callio_97cb.json, the 128-R sweeps included"
+by     = "python tools/build.py ; node test/kit.test.js"

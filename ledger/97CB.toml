@@ -28,3 +28,15 @@ by     = "python tools/adis.py 0x97CB 80 ; python tools/adis.py 0x987A 60 ; pyth
 kind   = "measured"
 says   = "fixture build/callio_97cb.json: 456 cases, one per PC set (s1; p1 x 7 keys; p1b W), ports and R per case; --check 456/456, T 882-9393; play never reached $A096 $A2A6 $A49A-$A4C7 $A57B $A5C3-$A5EB, nor $909E/$8C54"
 by     = "python tools/callio.py --capture --state s1 --call 0x9757 0x975A --frames 6000 --per 2 --out build/callio_97cb.json (p1, p1b --append; one per PC set kept) ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"
+
+[[fact]]
+kind   = "gated"
+says   = "cases reach every outcome of every executed conditional in $97CB/$8B1F/$A090 but 11: 4 menu exits to $909E/$8C54, 7 dead; 670 cases (456 play, 202 keyed/poked: H G X 1, 2P, Kempston; 12 derived); controlPass passes all"
+by     = "python tools/branches.py --fixture build/callio_97cb.json ; python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "unreachable"
+says   = "dead on hardware: $A094 fall ($AA03/$AA43 tested 0 before each AI call), $A49F fall ($A49A only from $A580, after $A614 < 7), $98A2 fall ($8B1F sets bits 0-4 only); and the A3FF R-bit-7 outcomes"
+by     = "python tools/adis.py 0xA090 6 ; python tools/grepbytes.py \"9A A4\" ; python tools/adis.py 0x8B1F 70"
+window = "$97CB-$98BE, $8B1F-$8BD1, $A090-$A5EB"
+n      = 0
