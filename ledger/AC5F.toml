@@ -39,3 +39,8 @@ by     = "python tools/sample.py --state p1 --at 0xAE29 --poke 0xAA01=4,0xAA3C=1
 kind   = "gated"
 says   = "live: won (stage 3) and drawn bouts play the tune inside the pass reaching $AC5F (3422 edges logged), setupRest the next pass, out at CALL $AD18 matching the machine's sample; charge 0.007% / 0.16% off"
 by     = "node test/kit.test.js (liveGate P1, time) ; python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "measured"
+says   = "confirmed from a real start: the port matches the cases captured from the user's snapshot (state stage2, nothing poked) exactly, as it matches the poke-built ones"
+by     = "python tools/callio.py --check --state stage2 --fixture (this routine's fixture) ; node test/kit.test.js"

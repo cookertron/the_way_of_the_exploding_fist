@@ -23,6 +23,11 @@ kind   = "gated"
 says   = "Fist on roundPass+pointPath follows p1 row for row for 335 keyed passes, through the point at pass 169, and leaves by $AD94 (P2 wins) on the machine's pass; charge 0.26% under the machine, worst pass 2.42%"
 by     = "node test/kit.test.js (round_loop live block)"
 
+[[fact]]
+kind   = "measured"
+says   = "confirmed from a real start: the port matches the cases captured from the user's snapshot (state stage2, nothing poked) exactly, as it matches the poke-built ones"
+by     = "python tools/callio.py --check --state stage2 --fixture (this routine's fixture) ; node test/kit.test.js"
+
 [[open]]
 ask    = "can $9C28 hold a value >= $80, taking the RET M at $AD1C (pointPath 'quit', ported from the listing, ungated)?"
 tried  = "callio --derive --reg 0=0x80 runs out of the bracket into the caller of $AD18 (641k T) -- no case"

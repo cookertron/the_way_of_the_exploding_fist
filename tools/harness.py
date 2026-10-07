@@ -133,6 +133,11 @@ def load_snapshot(path):
         sys.exit('harness: this SkoolKit cannot read snapshots')
     snap = Snapshot.get(path)
     ram = snap.ram(-1)
+    if len(ram) != 0xC000 and (getattr(snap, 'out7ffd', 0) & 0x17) == 0x10:
+        # a 128K machine in the 48K configuration -- ROM 1 (48 BASIC), bank
+        # 0 at $C000 -- as a 128K emulator saves a 48K game: its 48K view
+        # (banks 5, 2, 0) is the machine (the timing is the 48K harness's)
+        ram = snap.ram()
     if len(ram) != 0xC000:
         sys.exit(f'harness: {path} is a 128K snapshot ({len(ram)} bytes of RAM); '
                  'the 48K harness cannot page it; use a 128K harness for a paged game')

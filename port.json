@@ -94,7 +94,7 @@
       "key": "point_ad1b",
       "file": "build/callio_ad1b.json",
       "required": true,
-      "note": "oracle for the point path $AD1B back to $AE29 (or out at $AD5F, $AD94, $AD44): python tools/callio.py --capture --state p1 --call 0xAD1B 0xAE29,0xAD5F,0xAD94,0xAD44 --blind each score row $4000-$471F, then --derive case 0 with --set 0xAA03=0 / 0xAA08=2,0xAA48=0 / 0xAA08=1,0xAA48=0 / 0xAA48=1 / 0x9C2C=2 / 0x9C2C=0,0xAA08=2,0xAA48=0 / 0x9C2C=2,0xB019=0 / 0xB030=0x95,0xB031=0x99 / 0x9C2B=1 / 0xAA08=2,0xAA48=0,0xAA01=2 / 0x9C2B=1,0xAA03=0"
+      "note": "oracle for the point path $AD1B back to $AE29 (or out at $AD5F, $AD94, $AD44): python tools/callio.py --capture --state p1 --call 0xAD1B 0xAE29,0xAD5F,0xAD94,0xAD44 --blind each score row $4000-$471F, then --derive case 0 with --set 0xAA03=0 / 0xAA08=2,0xAA48=0 / 0xAA08=1,0xAA48=0 / 0xAA48=1 / 0x9C2C=2 / 0x9C2C=0,0xAA08=2,0xAA48=0 / 0x9C2C=2,0xB019=0 / 0xB030=0x95,0xB031=0x99 / 0x9C2B=1 / 0xAA08=2,0xAA48=0,0xAA01=2 / 0x9C2B=1,0xAA03=0; plus 2 (a point played on, P2 winning the next bout) real case(s) marked source \"stage2\": python tools/callio.py --capture --state stage2 (the same --call and --blind) --frames 4000 --per 1, appended -- stage2 from python tools/snapimport.py snapshots/going_to_stage_2.szx --save stage2 (the user's 128K .szx in the 48K configuration, inside P1's victory pose before the time bonus; gitignored, rule 7)"
     },
     {
       "key": "win_ad94",
@@ -130,7 +130,7 @@
       "key": "next_aca6",
       "file": "build/callio_aca6.json",
       "required": true,
-      "note": "oracle for the 1UP game after a bout, $ACA6 to $AC5F (won, ranks up, draw) or $AC39 (lost): python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39 --frames 3000, played, then appended with --poke 0xAA01=4 (P1 wins), and with 0xAA3C=1, 0xAF34=3, 0xB05F=0x10 added, and 0x9CA5=1 (the draw); the rank-up run's draw case dropped (draw_ad44 gates that pose)"
+      "note": "oracle for the 1UP game after a bout, $ACA6 to $AC5F (won, ranks up, draw) or $AC39 (lost): python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39 --frames 3000, played, then appended with --poke 0xAA01=4 (P1 wins), and with 0xAA3C=1, 0xAF34=3, 0xB05F=0x10 added, and 0x9CA5=1 (the draw); the rank-up run's draw case dropped (draw_ad44 gates that pose); plus 2 (rank up won, then lost) real case(s) marked source \"stage2\": python tools/callio.py --capture --state stage2 (the same --call and --blind) --frames 4000 --per 1, appended -- stage2 from python tools/snapimport.py snapshots/going_to_stage_2.szx --save stage2 (the user's 128K .szx in the 48K configuration, inside P1's victory pose before the time bonus; gitignored, rule 7)"
     },
     {
       "key": "hiscore_ac39",
@@ -142,7 +142,7 @@
       "key": "setup_ac5f",
       "file": "build/callio_ac5f.json",
       "required": true,
-      "note": "oracle for the next bout's setup, $AC5F to the CALL $AD18 (new stage: Intro_Music, the scenery, the score, players, high score and rank rows; New_Round, Init_Time), the starts constructed (P1 wins the last bout at a rank): python tools/callio.py --capture --state p1 --poke 0xAA01=4,0xAA3C=1,0xAF34=S,0xB05F=R --call 0xAC5F 0xAD18 --frames 8000 with the text cells blinded (--blind 0x4n00-0x4n7F for n 0-7, 0x4080-0x4091, 0x4n80-0x4n87 for n 2-7, 0x40A0-0x40A7, 0x41A0-0x41A7; D5) for S,R = 1,0 2,1 3,2 3,5 (--append), then --derive case 0 --set 0xAF35=0 (no new stage), 0xB2FA=0 (sound off), 0xB05F=0 (novice)"
+      "note": "oracle for the next bout's setup, $AC5F to the CALL $AD18 (new stage: Intro_Music, the scenery, the score, players, high score and rank rows; New_Round, Init_Time), the starts constructed (P1 wins the last bout at a rank): python tools/callio.py --capture --state p1 --poke 0xAA01=4,0xAA3C=1,0xAF34=S,0xB05F=R --call 0xAC5F 0xAD18 --frames 8000 with the text cells blinded (--blind 0x4n00-0x4n7F for n 0-7, 0x4080-0x4091, 0x4n80-0x4n87 for n 2-7, 0x40A0-0x40A7, 0x41A0-0x41A7; D5) for S,R = 1,0 2,1 3,2 3,5 (--append), then --derive case 0 --set 0xAF35=0 (no new stage), 0xB2FA=0 (sound off), 0xB05F=0 (novice); plus 1 (stage 3 with the tune) real case(s) marked source \"stage2\": python tools/callio.py --capture --state stage2 (the same --call and --blind) --frames 4000 --per 1, appended -- stage2 from python tools/snapimport.py snapshots/going_to_stage_2.szx --save stage2 (the user's 128K .szx in the 48K configuration, inside P1's victory pose before the time bonus; gitignored, rule 7)"
     },
     {
       "key": "live_time",

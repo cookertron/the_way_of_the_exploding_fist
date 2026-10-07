@@ -1460,9 +1460,9 @@ const mockCtx = (state) => ({
   }
   check("boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly",
         [bad, first], [0, '']);
-  check("...and the cases take every arm: lost, won with bouts left, rank up, rank up with the stage wrapping, the top rank's random, the draw",
-        [fx.cases.map(c => c.regs[iA]), fx.cases.map(c => c.t)],
-        [[0, 1, 0, 1, 1, 1, 0x81, 1], [40, 54, 40, 222, 240, 251, fx.cases[6].t, 222]]);
+  check("...and the cases take every arm: lost, won with bouts left, rank up, rank up with the stage wrapping, the top rank's random, the draw; and from a real snapshot (stage2, not poked): rank up, then lost",
+        [fx.cases.map(c => c.regs[iA]), fx.cases.map(c => c.t), fx.cases.map(c => c.source)],
+        [[0, 1, 0, 1, 1, 1, 0x81, 1, 1, 0], [40, 54, 40, 222, 240, 251, fx.cases[6].t, 222, 222, 40], [...Array(8).fill(undefined), 'stage2', 'stage2']]);
   check('...and one derived: the rank from 9 to $10, a BCD carry through DAA',
         [fx.cases[7].derived, fx.cases[7].out.find(([a]) => a === 0xB05F)], [{ from: 3, set: { b05f: 9 } }, [0xB05F, '10']]);
 }
@@ -1541,11 +1541,11 @@ const mockCtx = (state) => ({
   check("setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly",
         [bad, first], [0, '']);
   const at = (c, x) => { for (const [a, h] of c.in) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
-  check('...and the cases take every arm: each stage (2, 3, the wrap to 1) and rank suffix, the tune played, and derived: no new stage (neither read), sound off, novice',
+  check('...and the cases take every arm: each stage (2, 3, the wrap to 1) and rank suffix, the tune played, and derived: no new stage (neither read), sound off, novice; and stage 3 from a real snapshot (stage2, not poked)',
         [fx.cases.map(c => at(c, 0xAF34)), fx.cases.map(c => at(c, 0xB05F)), fx.cases.map(c => (c.outs || []).length),
-         fx.cases.map(c => c.derived && c.derived.set)],
-        [[2, 3, 1, 1, undefined, 2, 2], [1, 2, 3, 6, undefined, 1, 0], [3422, 3422, 3422, 3422, 0, 0, 3422],
-         [undefined, undefined, undefined, undefined, { af35: 0 }, { b2fa: 0 }, { b05f: 0 }]]);
+         fx.cases.map(c => c.derived && c.derived.set), fx.cases.map(c => c.source)],
+        [[2, 3, 1, 1, undefined, 2, 2, 3], [1, 2, 3, 6, undefined, 1, 0, 1], [3422, 3422, 3422, 3422, 0, 0, 3422, 3422],
+         [undefined, undefined, undefined, undefined, { af35: 0 }, { b2fa: 0 }, { b05f: 0 }, undefined], [...Array(7).fill(undefined), 'stage2']]);
 }
 
 /* ---- the attract demo after a lost bout: $AC3C to its first $AE29 -------

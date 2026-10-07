@@ -23,3 +23,8 @@ by     = "python tools/adis.py 0xAC40 80 ; python tools/adis.py 0xAF27 6"
 kind   = "measured"
 says   = "boutNext (drawStart, pose, JP for $81) match the machine $ACA6 to $AC5F/$AC39 on 8 cases: lost 40 T x2, won 54, rank up 222, wrap 240, top 251 (R at r+22), draw, rank 9 to $10 derived; bytes, T, R, PC; starts poked"
 by     = "python tools/callio.py --check --state p1 --fixture build/callio_aca6.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "confirmed from a real start: the port matches the cases captured from the user's snapshot (state stage2, nothing poked) exactly, as it matches the poke-built ones"
+by     = "python tools/callio.py --check --state stage2 --fixture (this routine's fixture) ; node test/kit.test.js"
