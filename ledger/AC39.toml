@@ -1,0 +1,31 @@
+# ledger/AC39.toml -- current truth about check_highscore (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "check_highscore"
+entries  = ["$AC39", "$A647"]
+oracle   = "tools/callio.py"
+fixtures = ["hiscore_ac39"]
+port     = "checkHighScore"
+manual   = ["7.2"]
+
+[[fact]]
+kind   = "insn"
+at     = "$A6A0"
+says   = "Is_HighScore walks the 3 BCD bytes high to low and is carry at the first byte below the table's -- a higher byte before it does not stop it: 100000 against 001000 is not a high score; a tie is"
+by     = "python tools/adis.py 0xA647 60 ; python tools/callio.py --check --state p1 --fixture build/callio_ac39.json (case 5)"
+
+[[fact]]
+kind   = "insn"
+at     = "$A654"
+says   = "2UP ($9C2C=2) compares P1 with P2 first, LDDRs a higher P2 over P1, sets $A6B6 (2, then 0 on a tie or 1), then P1 against $B038 rather than Hi_Score $B035; also called at $ADF3"
+by     = "python tools/adis.py 0xA647 60 ; python tools/grepbytes.py \"CD 47 A6\""
+
+[[fact]]
+kind   = "measured"
+says   = "checkHighScore matches the machine $AC39 to $AC3C on 12 cases (2 played, 10 derived: below, tie, above, high top byte, 2UP arms): bytes outside the text cells, T 343-11621, R exactly"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac39.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "live (P2 lost) now runs past $AC39 through checkHighScore and stops at the machine's $AC3C sample, compared there; rows after it are Main_Game_Loop's demo"
+by     = "node test/kit.test.js (live block, P2 leave row)"

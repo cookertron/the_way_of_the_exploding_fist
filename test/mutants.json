@@ -3117,15 +3117,15 @@
   "old": "if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); this.win = 0; }",
   "new": "if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); }",
   "increment": "AD94-win",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
  },
  {
   "file": "template.html",
   "label": "AD94 win: Fist: the bout lost unnamed",
-  "old": "if (b.at === 0xAC39){ this.exit = { exit: 'lost', at: b.at }; return b.t; }",
-  "new": "if (b.at === 0xAC39){ this.exit = { exit: 'p2', at: b.at }; return b.t; }",
+  "old": "this.exit = { exit: 'lost', at: 0xAC3C };",
+  "new": "this.exit = { exit: 'p2', at: 0xAC3C };",
   "increment": "AD94-win",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
  },
  {
   "file": "template.html",
@@ -3533,7 +3533,7 @@
   "old": "t += winEnd(); t += this.next(0, t);",
   "new": "t += winEnd(); this.exit = { exit: 'lost', at: 0xAC5F };",
   "increment": "ACA6-next",
-  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)"
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
  },
  {
   "file": "template.html",
@@ -3845,5 +3845,117 @@
   "old": "  let t = 17 + 17 + 9; M1.m1 += 1 + 1 + 2;         // CALL $AE26: CALL $9CA8: LD A,R",
   "new": "  let t = 17 + 9; M1.m1 += 1 + 1 + 2;         // CALL $AE26: CALL $9CA8: LD A,R",
   "increment": "AD18-in"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: isHigh: a byte equal counts as below",
+  "old": "    if (x < y){ m[0xA6B7] = n;",
+  "new": "    if (x <= y){ m[0xA6B7] = n;",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: isHigh: equal bytes not counted",
+  "old": "    if (x === y) n++;\n",
+  "new": "    if (x === y) n += 0;\n",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: isHigh: carry exit M1 not counted",
+  "old": "m[0xA6B7] = n; M1.m1 += 3; return",
+  "new": "m[0xA6B7] = n; return",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: isHigh: DJNZ out costed as taken",
+  "old": "    t += 6 + 6 + (b > 1 ? 13 : 8); M1.m1 += 3;     // DEC DE",
+  "new": "    t += 6 + 6 + 13; M1.m1 += 3;     // DEC DE",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: lddr3: copies upward",
+  "old": "  for (let i = 0; i < 3; i++) m[(de - i) & 0xFFFF] = m[(hl - i) & 0xFFFF];",
+  "new": "  for (let i = 0; i < 3; i++) m[(de + i) & 0xFFFF] = m[(hl + i) & 0xFFFF];",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: checkHighScore: any player count but 0 takes the 2UP path",
+  "old": "  if (m[0x9C2C] !== 2) t += 12;",
+  "new": "  if (m[0x9C2C] === 0) t += 12;",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: checkHighScore: P2 higher copied the wrong way",
+  "old": "lddr3(m, 0xB032, de)",
+  "new": "lddr3(m, de, 0xB032)",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: checkHighScore: 2UP tie at 2 equal bytes",
+  "old": "      if (m[0xA6B7] === 3){ m[0xA6B6] = 0;",
+  "new": "      if (m[0xA6B7] === 2){ m[0xA6B6] = 0;",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: checkHighScore: 2UP compares with Hi_Score",
+  "old": "    hl = 0xB038; t += 10;",
+  "new": "    hl = 0xB035; t += 10;",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: checkHighScore: RET C costed as not taken",
+  "old": "  if (h.c) return t + 11;",
+  "new": "  if (h.c) return t + 5;",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: checkHighScore: 2UP prints Hi_Score",
+  "old": "  return t + 7 + scoreBuffer(m, hl)",
+  "new": "  return t + 7 + scoreBuffer(m, 0xB035)",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: checkHighScore: Print_HighScore M1 short",
+  "old": "  M1.m1 += 4;                                      // Print_HighScore",
+  "new": "  M1.m1 += 3;                                      // Print_HighScore",
+  "increment": "AC39",
+  "kills": "checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: Fist.next: the lost bout skips the high score",
+  "old": "return b.t + checkHighScore(this.m); }",
+  "new": "return b.t; }",
+  "increment": "AC39",
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AC39: Fist.next: the lost bout stops at $AC39",
+  "old": "this.exit = { exit: 'lost', at: 0xAC3C };",
+  "new": "this.exit = { exit: 'lost', at: 0xAC39 };",
+  "increment": "AC39",
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)"
  }
 ]

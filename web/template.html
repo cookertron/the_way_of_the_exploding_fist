@@ -2416,6 +2416,60 @@ function boutNext(m, a, r){
   return { t: t + 7 + 7 + 4 + 7 + 10 + 11 + 10, at: 0xAC5F };
 }
 
+/* ---- the lost bout's way on: Check_HighScore $A647, from the listing ----
+   (python tools/adis.py 0xA647 60.)  Scores are 3 BCD bytes, highest at
+   the address named: Score_P1 $B02F, Score_P2 $B032, Hi_Score $B035, and
+   $B038 the one the 2UP path compares with.  Is_HighScore $A697 walks the
+   3 bytes high to low, counts the equal ones in $A6B7, and is carry (not
+   a high score) at the FIRST byte below the table's, a higher byte before
+   it notwithstanding: 100000 against 001000 is not a high score.  Equal
+   is.  2UP ($9C2C = 2): $A6B6 = 2, P1 against P2; P2 higher is LDDRed
+   over P1, else $A6B6 = 0 on a tie, 1 otherwise; then P1 against $B038.
+   A high score is LDDRed over the table and Print_HighScore $A685 draws
+   it at $0A19.  Returns T with the CALL at $AC39 and the RET; gated
+   against python tools/callio.py --capture --call 0xAC39 0xAC3C
+   (build/callio_ac39.json, 2 played, 10 derived). */
+function isHigh(m, de, hl){                        // CALL Is_HighScore $A697: { t, c }
+  let t = 17 + 7 + 13 + 11 + 11 + 7, n = 0; M1.m1 += 6;   // CALL: LD A,0: LD ($A6B7),A: PUSH DE: PUSH HL: LD B,3
+  for (let b = 3; b > 0; b--){
+    const x = m[de], y = m[hl];
+    t += 7 + 7; M1.m1 += 3;                        // LD A,(DE): CP (HL): JR C
+    if (x < y){ m[0xA6B7] = n; M1.m1 += 3; return { t: t + 12 + 10 + 10 + 10, c: true }; }   // POP HL: POP DE: RET
+    t += 7 + (x === y ? 7 + 13 + 4 + 13 : 12); M1.m1 += x === y ? 4 : 1;   // JR NZ, or LD A,(nn): INC A: LD (nn),A
+    if (x === y) n++;
+    de = (de - 1) & 0xFFFF; hl = (hl - 1) & 0xFFFF;
+    t += 6 + 6 + (b > 1 ? 13 : 8); M1.m1 += 3;     // DEC DE: DEC HL: DJNZ
+  }
+  m[0xA6B7] = n; M1.m1 += 5;                       // SCF: CCF: POP HL: POP DE: RET
+  return { t: t + 4 + 4 + 10 + 10 + 10, c: false };
+}
+function lddr3(m, hl, de){                         // LDDR with BC = 3: (HL) to (DE), down
+  for (let i = 0; i < 3; i++) m[(de - i) & 0xFFFF] = m[(hl - i) & 0xFFFF];
+  M1.m1 += 6; return 21 + 21 + 16;
+}
+function checkHighScore(m){
+  let t = 17 + 10 + 10 + 13 + 7, hl = 0xB035, de = 0xB02F; M1.m1 += 6;   // CALL: LD HL: LD DE: LD A,(Num_Players): CP 2: JR NZ
+  if (m[0x9C2C] !== 2) t += 12;
+  else {
+    m[0xA6B6] = 2; t += 7 + 13 + 10; M1.m1 += 2;   // LD ($A6B6),A: LD HL,Score_P2
+    const h = isHigh(m, de, 0xB032);
+    t += h.t; M1.m1 += 1;                          // JR NC
+    if (h.c){ t += 7 + 10 + lddr3(m, 0xB032, de) + 10 + 12; M1.m1 += 3; }   // LD BC: LDDR: LD DE: JR
+    else {
+      t += 12 + 13 + 7 + 7; M1.m1 += 4;            // LD A,($A6B7): CP 3: LD A,1: JR NZ
+      if (m[0xA6B7] === 3){ m[0xA6B6] = 0; t += 7 + 4; M1.m1 += 1; } else { m[0xA6B6] = 1; t += 12; }   // XOR A
+      t += 13; M1.m1 += 1;                         // LD ($A6B6),A
+    }
+    hl = 0xB038; t += 10; M1.m1 += 1;              // LD HL,$B038
+  }
+  const h = isHigh(m, de, hl);
+  t += h.t; M1.m1 += 1;                            // RET C
+  if (h.c) return t + 11;
+  t += 5 + 11 + 4 + 10 + lddr3(m, de, hl) + 10; M1.m1 += 4;   // PUSH HL: EX DE,HL: LD BC,3: LDDR: POP HL
+  M1.m1 += 4;                                      // Print_HighScore: LD B,3: LD DE: LD HL: RET
+  return t + 7 + scoreBuffer(m, hl) + 20 + printString(m, 0x0A19, 0xB024, M1) + 10;
+}
+
 /* ---- the next bout's setup: $AC5F to the CALL $AD18, from the listing ---
    (python tools/adis.py 0xAC5F 30; the scenery code is put at $5F22 at
    boot: python tools/boot.py --state p1 --steps 0 --out F, then adis.py
@@ -2705,8 +2759,8 @@ class Fist {
   }
   /* one iteration of the victory pose, or one second of P1's time bonus;
      out by the pose's RET, the 1UP bout is lost (P2) or the bonus counts
-     (P1), out to $ACA6 won; then boutNext to $AC39 (lost, not ported yet:
-     D7) or $AC5F (won), the next bout's setup */
+     (P1), out to $ACA6 won; then boutNext to $AC39 (lost: the high score
+     checked, out at $AC3C) or $AC5F (won), the next bout's setup */
   winPass(){
     const cost = { dec: 0, copy: 0, ldir: 0 };
     M1.m1 = 0;
@@ -2731,11 +2785,12 @@ class Fist {
     return t;
   }
   /* $ACA6 on from a bout lost (a = 0) or won (1), t into a pass whose M1
-     are counted from this.r: the T; lost sets .exit at $AC39, won goes on
-     into the setup's tune */
+     are counted from this.r: the T; lost checks the high score and sets
+     .exit at $AC3C (JR Main_Game_Loop, the menu: D7), won goes on into the
+     setup's tune */
   next(a, t){
     const b = boutNext(this.m, a, this.r);
-    if (b.at === 0xAC39){ this.exit = { exit: 'lost', at: b.at }; return b.t; }
+    if (b.at === 0xAC39){ this.exit = { exit: 'lost', at: 0xAC3C }; return b.t + checkHighScore(this.m); }
     return b.t + this.music('won', t + b.t);
   }
   /* $AC5F, t into the pass: setupMusic charged inside this pass whole (DI
@@ -2869,5 +2924,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, roundIn, winStart, winPass, winEnd, boutNext, setupMusic, setupRest, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

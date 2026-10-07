@@ -1386,6 +1386,44 @@ const mockCtx = (state) => ({
         [fx.cases[7].derived, fx.cases[7].out.find(([a]) => a === 0xB05F)], [{ from: 3, set: { b05f: 9 } }, [0xB05F, '10']]);
 }
 
+/* ---- the lost bout's way on: Check_HighScore, $AC39 to $AC3C ----------
+   python tools/callio.py --capture --state p1 --call 0xAC39 0xAC3C
+   (port.json: played below the table and with the table poked to 0, the
+   rest derived: below, a tie, above, a higher top byte with a lower bottom
+   one, and 2UP).  checkHighScore: every byte outside the stack frames and
+   the text cells (D5), the score buffer the text is drawn from, T and R. */
+{
+  const fx = P.assets.hiscore_ac39;
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    P.M1.m1 = 0;
+    let t;
+    try { t = P.checkHighScore(m); } catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
+    let diff = -1;
+    for (let x = 0; x < 0x10000; x++){
+      if (x === c.sp - 128) x = c.sp + 2;
+      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
+    }
+    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff];
+    const wnt = [c.t, c.rx, -1];
+    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
+      first = `case ${i}: T, R, first bad byte ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
+  }
+  check('checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly',
+        [bad, first], [0, '']);
+  const hi = c => (c.out.find(([a]) => a === 0xB024) || [, ''])[1].slice(0, 16);
+  check("...and the cases take every arm: below (twice), the table beaten (played, a tie, above), a higher top byte not enough; 2UP: a tie, P2 higher (copied over P1) beating and tying the table, P1 higher beating it and not",
+        [fx.cases.map(c => c.t), fx.cases.map(c => c.derived && c.derived.from), fx.cases.map(hi)],
+        [[368, 11336, 368, 11208, 11106, 343, 807, 11596, 11621, 11597, 783, 11597],
+         [undefined, undefined, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6],
+         ['', '2020202020202030', '', '2020202031303030', '2020203131353030', '', '', '2020202032303030', '2020202031303030', '2020202035303030', '', '2020202035303030']]);
+}
+
 /* ---- the next bout's setup: $AC5F to the CALL $AD18 --------------------
    python tools/callio.py --capture --state p1 --call 0xAC5F 0xAD18 (port.json:
    the starts constructed, P1 winning the last bout at a rank, each stage;
@@ -1438,7 +1476,8 @@ const mockCtx = (state) => ({
    cells left out: D5).  The first differing row names the bug.  T is
    compared apart: the engine charges D4's means, the machine is contended.
    Run over three fixtures: live (the script's second point wins for P2,
-   the pose $AEB2, out to $ACA6 lost), live_p1w (P1's count poked to 4: the
+   the pose $AEB2, out to $ACA6 lost, the high score checked
+   to $AC3C, sampled there), live_p1w (P1's count poked to 4: the
    first point wins for P1, the pose $AE8E, the time bonus $AD6E, out won)
    and live_time (Time poked to 1: no point, the round end $AE67 and its
    loop $AD0B, the draw at $AD44 and both posing again at $AD0B, out at
@@ -1506,7 +1545,7 @@ function liveGate(L, who, how){
       edges = e.length; if (edges) tail = t1 - e[edges - 1][0] * P.T_FRAME;
       cost += g.pass(kb); setupT = cost; setupM = seq[k].t;
     }
-    if (g.exit){ exit = g.exit.exit; at = seq[k].p; break; }
+    if (g.exit && g.exit.at !== seq[k].pc){ exit = g.exit.exit; at = seq[k].p; break; }
     if ((g.win || g.bonus || g.both) && seq[k].p <= out) subs++;
     if (g.enter) enters.push(seq[k].p);
     else if (seq[k - 1] && seq[k - 1].pc === 0xAD18) enterT.push(cost / seq[k].t);
@@ -1519,13 +1558,14 @@ function liveGate(L, who, how){
       const j = got.findIndex((x, i) => x !== w[i]);
       first = `${seq[k].sub ? `sub-row ${seq[k].j} ($${seq[k].pc.toString(16).toUpperCase()}) before row` : 'row'} ${seq[k].p}: ${names[j]} ${got[j]} want ${w[j]}`; break;
     }
+    if (g.exit){ exit = g.exit.exit; at = seq[k].p; break; }   // stopped where the machine was sampled: the row compared first
   }
   const what = { won: ', the victory pose and the time bonus', lost: ' and the victory pose', draw: ', the round end and the draw' }[how];
   check(`${who}: roundPass${what} follow the machine sample for sample over keyed 1P play until the bout ends`, first, '');
   if (how === 'lost')
-    check(`${who}: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, on to $AC39)`,
-          [at, exit, g.exit && g.exit.at, seq[k] && (seq[k].sub ? seq[k].pc : 'row'), g.win, g.bonus, g.both, g.setup],
-          [out, how, 0xAC39, 'row', 0, false, null, null]);
+    check(`${who}: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost, the high score checked, sampled at $AC3C on the way to Main_Game_Loop)`,
+          [at, exit, g.exit && g.exit.at, seq[k] && (seq[k].sub ? seq[k].pc : 'row'), g.win, g.bonus, g.both, g.setup, L.rows[out].m.includes(0xAC09)],
+          [out, how, 0xAC3C, 0xAC3C, 0, false, null, null, true]);
   else {
     /* the machine's samples at the CALL $AD18: the setup's ends */
     const wantIn = L.rows.map((r, i) => subsOf(r).some(x => x.pc === 0xAD18) ? i : -1).filter(i => i >= 0);
@@ -1533,7 +1573,7 @@ function liveGate(L, who, how){
           [at, exit, k, enters, enters[0] === out, g.win, g.bonus, g.both, g.setup, g.enter],
           [-1, null, seq.length, wantIn, true, 0, false, null, null, false]);
   }
-  const sub = ((L.rows[out] || {}).s || []).filter(x => x.pc !== 0xAD18);
+  const sub = ((L.rows[out] || {}).s || []).filter(x => x.pc !== 0xAD18 && x.pc !== 0xAC3C);
   const end = how === 'draw' ? sub.findIndex(x => x.t > 1e6) : 0;   // the round end's loop: to the delays
   check(`${who}: ...which the script reaches ${how === 'draw' ? 'by the clock, no point played, the round end loop then' : 'through points played on, the way out the last, after'} 66 passes of the pose${how === 'won' ? ' and a pass a second' : ''}`,
         [marked.filter(i => i <= out).length, outKind, subs, sub.filter(x => x.pc !== 0xAD6E).length - end, sub.filter(x => x.pc === 0xAD6E).length > 1, end],

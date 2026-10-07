@@ -133,6 +133,12 @@
       "note": "oracle for the 1UP game after a bout, $ACA6 to $AC5F (won, ranks up, draw) or $AC39 (lost): python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39 --frames 3000, played, then appended with --poke 0xAA01=4 (P1 wins), and with 0xAA3C=1, 0xAF34=3, 0xB05F=0x10 added, and 0x9CA5=1 (the draw); the rank-up run's draw case dropped (draw_ad44 gates that pose)"
     },
     {
+      "key": "hiscore_ac39",
+      "file": "build/callio_ac39.json",
+      "required": true,
+      "note": "oracle for Check_HighScore $A647 called at $AC39 after a lost 1UP bout, to $AC3C: python tools/callio.py --capture --state p1 --call 0xAC39 0xAC3C --frames 3000 --blind 0x4000-0x47FF (D5: the high score's text cells), played, then --append with --poke 0xB033=0,0xB034=0,0xB035=0 (the table beaten); derived from case 0 with --set 0xB02D=0x05 (below), 0xB02D=0x10 (a tie), 0xB02D=0x15,0xB02E=0x01 (above), 0xB02F=0x10 with the rest 0 (higher top byte, lower bottom: not a high score), 0x9C2C=2 (2UP); from that case 6, 0xB030=0x20 (P2 higher), 0xB030=0x10, 0xB030=0x20,0xB02D=0x50, 0xB02D=0x05, 0xB02D=0x50"
+    },
+    {
       "key": "setup_ac5f",
       "file": "build/callio_ac5f.json",
       "required": true,
@@ -154,7 +160,7 @@
       "key": "live",
       "file": "build/live_p1.json",
       "required": true,
-      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --json build/live_p1.json (the script, vars, marks and ranges are stored in the file)"
+      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --also 0xAC3C --mark 0xAC09 --json build/live_p1.json (the script, vars, marks and ranges are stored in the file)"
     }
   ],
   "tape": {
