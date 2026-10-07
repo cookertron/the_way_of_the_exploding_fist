@@ -1350,6 +1350,13 @@ function fighterMotion(m){
    R there.  Starting a game (1/Kempston fire, 2) runs New_Round $909E and
    returns $80; key 0 (code 0x23) runs the options menu $8C54 (configs,
    below) and returns $80. */
+function newRound(m, cnt){                         // New_Round $909E without its CALL: the counts cleared, the yin-yang cells blanked
+  m[0xAA01] = 0; m[0xAA41] = 0; m[0xAA02] = 0; m[0xAA42] = 0;
+  let t = 4 + 4 * 13; cnt.m1 += 5;
+  for (const pos of [0x0108, 0x0110, 0x1A08, 0x1A10]){ t += 20 + printString(m, pos, 0xB064, cnt); cnt.m1 += 2; }
+  cnt.m1 += 1;
+  return t + 10;
+}
 function controlPass(m, io){
   let t = 0, n = 0;
   const k = (T, R) => { t += T; n += R; };
@@ -1385,17 +1392,10 @@ function controlPass(m, io){
   function start(p){                               // $97EF Start_1UP / $9808 Start_2UP
     m[0x9C2C] = p; m[0xAA46] = p === 1 ? 1 : 0; m[0xAA06] = 0;
     k(67, 6);
-    newRound();
+    const c = { m1: 0 };
+    k(newRound(m, c), c.m1);
     k(17, 2);
     return out(0x80);
-  }
-
-  function newRound(){                             // $909E New_Round, CALL counted by the caller
-    m[0xAA01] = 0; m[0xAA41] = 0; m[0xAA02] = 0; m[0xAA42] = 0;
-    k(4 + 4 * 13, 5);
-    const c = { m1: 0 };
-    for (const pos of [0x0108, 0x0110, 0x1A08, 0x1A10]) k(20 + printString(m, pos, 0xB064, c), 2);
-    k(10, 1 + c.m1);
   }
 
   /* $8C54 Game_Configs_Main and its screens, with its RET.  The machine
@@ -2147,22 +2147,31 @@ function scoreAdd(m, de, b){                       // $AFC2 with its CALL: BCD a
   M1.m1 += 5 + 5 + 4 + 1;
   return t + 28 + 31 + 25 + 10;
 }
-function scoreBuffer(m, hl){                       // Populate_Score_Buffer $AFDA and Write_00 $AFED, each with its CALL
+function populate(m, hl, b){                      // Populate_Score_Buffer $AFDA with its CALL: b bytes down from hl, two digits each, to $B024
   let de = 0xB024, t = 17 + 10; M1.m1 += 2;
-  for (let b = 3; b > 0; b--){                     // two digits a byte, high first, down from hl
+  for (; b > 0; b--){                              // high digit first, each by Convert_ASCII $B004 with its CALL
     const v = m[hl];
     m[de++] = 0x30 + (v >> 4); m[de++] = 0x30 + (v & 15);
     hl--; t += 7 + 16 + 54 + 7 + 54 + 6 + (b > 1 ? 13 : 8); M1.m1 += 20;
   }
-  t += 10; M1.m1 += 1;
-  m[de++] = 0x30; m[de++] = 0x30; m[de] = 0;
-  t += 17 + 7 + 7 + 6 + 7 + 6 + 4 + 7 + 10 + 7; M1.m1 += 10;
-  for (let p = 0xB024, b = 7; ; ){                 // $AFF3 Zero_To_Space: leading '0's of 7 to spaces
+  M1.m1 += 1;
+  return t + 10;
+}
+function zeroToSpace(m, de){                       // Zero_To_Space $AFF3 without a CALL: 0 at de, leading '0's of 7 at $B024 to spaces
+  m[de] = 0;
+  let t = 4 + 7 + 10 + 7; M1.m1 += 4;
+  for (let p = 0xB024, b = 7; ; ){
     t += 7 + 7; M1.m1 += 3;
     if (m[p] !== 0x30) return t + 11;
     m[p++] = 0x20; t += 5 + 10 + 6; M1.m1 += 3;
     if (--b) t += 13; else { M1.m1 += 1; return t + 8 + 10; }
   }
+}
+function scoreBuffer(m, hl){                       // Populate_Score_Buffer $AFDA (B = 3) and Write_00 $AFED, each with its CALL
+  let t = populate(m, hl, 3);
+  m[0xB02A] = 0x30; m[0xB02B] = 0x30;
+  t += 17 + 7 + 7 + 6 + 7 + 6; M1.m1 += 6;         // CALL: LD A,'0': LD (DE),A: INC DE twice, falling into $AFF3
+  return t + zeroToSpace(m, 0xB02C);
 }
 const SIDE1 = { pts: 0xAA08, cnt: 0xAA02, sc: 0xB02D, show: m => m[0x9C2C] !== 0, hl: 0xB02F, pos: 0x0100 };
 const SIDE2 = { pts: 0xAA48, cnt: 0xAA42, sc: 0xB030, show: m => m[0x9C2C] === 2, hl: 0xB032, pos: 0x1600 };
@@ -2401,6 +2410,187 @@ function boutNext(m, a, r){
   return { t: t + 7 + 7 + 4 + 7 + 10 + 11 + 10, at: 0xAC5F };
 }
 
+/* ---- the next bout's setup: $AC5F to the CALL $AD18, from the listing ---
+   (python tools/adis.py 0xAC5F 30; the scenery code is put at $5F22 at
+   boot: python tools/boot.py --state p1 --steps 0 --out F, then adis.py
+   --image F 0x5F22 120.)  With the new-stage flag $AF35 set it is cleared,
+   Intro_Music $90D1 plays (DI; the tune at $9128 on the beeper, notes of
+   [C, B, E, D]: BC the half-period loop, DE the cycles, B = 0 C = 1 a rest,
+   C = 0 the end; nothing with Flag_Sound $B2FA 0), the stage's scenery is
+   drawn ($9200, A = $AF34: Change_Background clears the screen and attrs to
+   $3F and decodes the stage's runs of UDGs and attrs, then y $48-$87 goes
+   to the shadow buffer $8000), P1's score is shown (B = 0 into $AF52), then
+   the players row $98BF, the high score, the rank and Show_Rank $AEBF.
+   Always: New_Round, Init_Time, CALL $AD18.  setupMusic is $AC5F through
+   the music's RET (or the JR Z with no new stage), its $FE writes pushed to
+   outs as [T from $AC5F, value]; setupRest is the rest, to $AD18 with the
+   CALL.  T uncontended, M1 into M1.m1.  Gated against python
+   tools/callio.py --capture --call 0xAC5F 0xAD18 (build/callio_ac5f.json). */
+function introMusic(m, outs, t0){                  // Intro_Music $90D1 with its CALL, t0 the T at the CALL
+  let t = 17 + 4 + 13 + 4; M1.m1 += 4;             // CALL: DI: LD A,(Flag_Sound): AND A
+  if (!m[0xB2FA]){ M1.m1 += 1; return t + 11; }
+  t += 5 + 13 + 7 + 4 + 7 + 4 + 14; M1.m1 += 1 + 5 + 2;   // RET Z: LD A,($90D0)..LD L,A: LD IX
+  const h = m[0x90D0] & 0x1F, l = h & 7;
+  for (let ix = 0x9128; ; ix = (ix + 4) & 0xFFFF){
+    const c = m[ix];
+    t += 19 + 4 + 4; M1.m1 += 2 + 1 + 1 + 1;       // LD C,(IX): XOR A: OR C: RET Z
+    if (!c) return t + 11;
+    const b = m[(ix + 1) & 0xFFFF], de = m[(ix + 3) & 0xFFFF] << 8 | m[(ix + 2) & 0xFFFF];
+    t += 5 + 10 + 3 * (19 + 10) + 4 + 4; M1.m1 += 6 * 2 + 2 + 3;   // INC IX, LD B..INC IX: LD A,B: AND A: JR NZ
+    if (!b){
+      t += 7 + 4 + 4; M1.m1 += 3;                  // INC A: CP C: JR NZ
+      if (c === 1){                                // a rest: LD BC,$0AF4 and Intro_Music_Delay_1, JR
+        t += 7 + 10 + 26 * 0xAF4 - 5 + 12; M1.m1 += 1 + 4 * 0xAF4 + 1;
+        continue;
+      }
+    }
+    t += 12;
+    const n = (b << 8 | c) || 0x10000, k = de || 0x10000;
+    for (let i = 0; i < k; i++){                   // Intro_Music_Play: H out, delay, L out, delay
+      outs.push([t0 + t + 15, h]);
+      t += 11 + 4 + 11 + 26 * n - 5;
+      outs.push([t0 + t + 4, l]);
+      t += 4 + 11 + 10 + 11 + 26 * n - 5 + 10 + 6 + 4 + 4 + (i < k - 1 ? 12 : 7);
+      M1.m1 += 12 + 8 * n;
+    }
+    t += 12; M1.m1 += 1;                           // JR Intro_Music_Loop
+  }
+}
+function bgUdg(m, de){                             // Copy_UDG $5FF4 with its CALL: 8 rows from Background_Current_UDG to de
+  const s = m[0x5F04] | m[0x5F05] << 8;
+  for (let i = 0; i < 8; i++) m[(de + (i << 8)) & 0xFFFF] = m[(s + i) & 0xFFFF];
+  M1.m1 += 72;
+  return 17 + 11 + 11 + 7 + 16 + 8 * 48 - 5 + 30;
+}
+function bgNext(de){                               // $6007 with its CALL: the next cell, over a third's edge: [de, T]
+  de = (de + 1) & 0xFFFF;
+  if (!(de & 0x100)){ M1.m1 += 5; return [de, 17 + 6 + 8 + 11]; }
+  M1.m1 += 9;
+  return [(de + 0x700) & 0xFFFF, 17 + 6 + 8 + 5 + 7 + 4 + 4 + 10];
+}
+function bgRuns(m, hl, de){                        // Background_Fetch_Next $5FBE without its CALL: the runs at hl to the cells from de
+  let t = 0;
+  const cell = () => { t += bgUdg(m, de); const [d, tn] = bgNext(de); de = d; t += tn; };
+  for (;;){
+    const a = m[hl]; hl = (hl + 1) & 0xFFFF;
+    t += 7 + 6 + 7; M1.m1 += 3;                    // LD A,(HL): INC HL: CP (HL)
+    if (a === m[hl]){
+      t += 7 + 4; M1.m1 += 2;                      // JR NZ: AND A
+      if (!a){ M1.m1 += 2; return t + 12 + 10; }   // JR Z to the RET
+      t += 7; M1.m1 += 1;
+    } else { t += 12; M1.m1 += 1; }
+    const udg = ((a & 0x7F) * 8 + (m[0x5F08] | m[0x5F09] << 8)) & 0xFFFF;
+    m[0x5F04] = udg & 0xFF; m[0x5F05] = udg >> 8;
+    t += 134; M1.m1 += 18;                         // BIT 7: RES 7: PUSH AF: EXX..LD (Background_Current_UDG),HL: EXX
+    cell();
+    t += 10; M1.m1 += 2;                           // POP AF: JR Z
+    if (!(a & 0x80)){ t += 12; continue; }
+    let b = (m[hl] - 1) & 0xFF; hl = (hl + 1) & 0xFFFF;
+    t += 7 + 7 + 6 + 4; M1.m1 += 3;                // LD B,(HL): INC HL: DEC B
+    do { cell(); b = (b - 1) & 0xFF; t += b ? 13 : 8; M1.m1 += 1; } while (b);
+    t += 12; M1.m1 += 1;                           // JR Background_Fetch_Next
+  }
+}
+function bgAttrs(m, hl){                           // Background_Attributes $6010 without its CALL: the runs at hl to $5800 on
+  let de = 0x5800, t = 10; M1.m1 += 1;
+  for (;;){
+    const a = m[hl]; hl = (hl + 1) & 0xFFFF;
+    t += 7 + 6 + 7; M1.m1 += 3;
+    if (a === m[hl]){
+      t += 7 + 4; M1.m1 += 2;
+      if (!a){ M1.m1 += 1; return t + 11; }        // RET Z
+      t += 5; M1.m1 += 1;
+    } else { t += 12; M1.m1 += 1; }
+    m[de] = a & 0x7F; de = (de + 1) & 0xFFFF;
+    t += 8 + 8 + 7 + 6; M1.m1 += 2 + 2 + 1 + 1 + 1;   // BIT 7: RES 7: LD (DE),A: INC DE: JR Z
+    if (!(a & 0x80)){ t += 12; continue; }
+    let b = (m[hl] - 1) & 0xFF; hl = (hl + 1) & 0xFFFF;
+    t += 7 + 7 + 6 + 4; M1.m1 += 3;
+    do { m[de] = a & 0x7F; de = (de + 1) & 0xFFFF; b = (b - 1) & 0xFF; t += 7 + 6 + (b ? 13 : 8); M1.m1 += 3; } while (b);
+    t += 12; M1.m1 += 1;
+  }
+}
+const BG_STAGE = { 0x5F53: 0x602B, 0x5F62: 0x603D, 0x5F71: 0x604F };   // Copy_Background_1-3: LD HL,Background_n_Addresses
+function scenery(m, a){                            // $9200 with its CALL, A the stage
+  let t = 17 + 13 + 17; M1.m1 += 3;                // CALL: LD (Background_Reference),A: CALL Change_Background
+  m[0x5F00] = a;
+  m.fill(0x3F, 0x5800, 0x5B00); m.fill(0, 0x4000, 0x5800);   // two fills by LDIR
+  t += 2 * (10 + 4 + 4 + 6 + 10 + 10) + 21 * (0x2FF + 0x17FF) - 10; M1.m1 += 12 + 2 * (0x2FF + 0x17FF);
+  const p = 0x5F0A + ((a - 1) * 2 & 0xFF), go = m[p] | m[(p + 1) & 0xFFFF] << 8, src = BG_STAGE[go];
+  m[0x5F00] = 0;
+  t += 10 + 7 + 4 + 4 + 4 + 7 + 7 + 10 + 11 + 7 + 6 + 7 + 4 + 17 + 4; M1.m1 += 15;   // ..CALL Indirect_Jump: JP (HL)
+  if (src === undefined) throw new Error(`Change_Background: stage ${a} jumps to $${go.toString(16)}`);
+  m.copyWithin(0x5F10, src, src + 18);
+  t += 10 + 10 + 10 + 21 * 18 - 5 + 17; M1.m1 += 3 + 36 + 1;   // LD HL: LD DE: LD BC: LDIR: CALL Create_Background
+  m[0x5F02] = 0x80; m[0x5F03] = 0x40;
+  t += 10 + 16 + 10 + 7; M1.m1 += 4;               // Create_Background
+  let hl = 0x5F10;
+  for (let b = 4; b > 0; b--){
+    m[0x5F08] = m[hl]; m[0x5F09] = m[hl + 1];
+    const data = m[hl + 2] | m[hl + 3] << 8;
+    hl += 4;
+    t += 11 + 7 + 6 + 7 + 6 + 20 + 7 + 6 + 7 + 6 + 11 + 16 + 4 + 17; M1.m1 += 15;   // ..CALL Background_Fetch_Next
+    t += bgRuns(m, data, m[0x5F02] | m[0x5F03] << 8);
+    let s = ((m[0x5F02] | m[0x5F03] << 8) + 0x80) & 0xFFFF;
+    t += 16 + 10 + 11 + 8; M1.m1 += 5;            // LD HL,(nn): LD BC: ADD HL,BC: BIT 0,H
+    if (s & 0x100){ s = (s + 0x700) & 0xFFFF; t += 7 + 7 + 4 + 4; M1.m1 += 4; } else { t += 12; M1.m1 += 1; }
+    m[0x5F02] = s & 0xFF; m[0x5F03] = s >> 8;
+    t += 16 + 10 + 10 + (b > 1 ? 13 : 8); M1.m1 += 4;
+  }
+  t += 7 + 6 + 7 + 4 + 17; M1.m1 += 5;             // LD E,(HL): INC HL: LD D,(HL): EX DE,HL: CALL Background_Attributes
+  t += bgAttrs(m, m[hl] | m[hl + 1] << 8);
+  t += 10 + 10 + 10; M1.m1 += 3;                   // the RETs of Create_Background, Copy_Background_n, Change_Background
+  let [scr, ts, ms] = rfScreenAddr(0x48);
+  t += 7 + ts + 7 + 10; M1.m1 += 1 + ms + 2;       // LD A,$48: CALL Screen_Calc: LD B,$40: LD DE,Shadow_Buffer
+  for (let b = 0x40, de = 0x8000; b > 0; b--, de += 0x20){
+    m.copyWithin(de, scr, scr + 0x20);
+    t += 11 + 11 + 11 + 10 + 21 * 32 - 5 + 10 + 10 + 10 + 17; M1.m1 += 3 + 1 + 64 + 3 + 1;
+    let h = ((scr >> 8) + 1) & 0xFF, l = scr & 0xFF;   // $9229: down a pixel row
+    if (h & 7){ t += 37; M1.m1 += 5; }
+    else {
+      const x = l + 0x20; l = x & 0xFF;
+      if (x > 0xFF){ t += 59; M1.m1 += 9; } else { h = (h - 8) & 0xFF; t += 69; M1.m1 += 12; }
+    }
+    scr = h << 8 | l;
+    t += 11 + 10 + 4 + 11 + 4 + 10 + (b > 1 ? 13 : 8); M1.m1 += 7;
+  }
+  M1.m1 += 1;
+  return t + 10;
+}
+function showRank(m){                              // Show_Rank $AEBF with its CALL
+  const r = m[0xB05F] & 0x1F;
+  let t = 17 + 10 + 13 + 7; M1.m1 += 5;            // CALL: LD HL: LD A,(Current_Rank): AND $1F: JR NZ
+  if (!r){ M1.m1 += 2; return t + 7 + 10 + printString(m, 0x0122, 0xB045, M1) + 10; }
+  t += 12;
+  const k = Math.min(r, 4);                        // ST, ND, RD by LD DE: CP 1-3: JR Z, else TH
+  t += [29, 53, 77, 82][k - 1]; M1.m1 += [3, 6, 9, 10][k - 1] + 4;
+  return t + 10 + printString(m, 0x0222, [0xB04D, 0xB050, 0xB053, 0xB056][k - 1], M1) + 10 + 10 + printString(m, 0x0422, 0xB059, M1) + 10;
+}
+function setupMusic(m, outs){                      // $AC5F to the music's RET, or the JR Z: { t, stage }
+  let t = 13 + 4; M1.m1 += 3;                      // LD A,($AF35): AND A: JR Z
+  if (!m[0xAF35]) return { t: t + 12, stage: false };
+  m[0xAF35] = (m[0xAF35] - 1) & 0xFF;
+  t += 7 + 4 + 13; M1.m1 += 2;                     // DEC A: LD ($AF35),A
+  return { t: t + introMusic(m, outs, t), stage: true };
+}
+function setupRest(m, stage){                      // on to $AD18, with the CALL
+  let t = 0;
+  if (stage){
+    t += 13 + scenery(m, m[0xAF34]) + 7 + 17; M1.m1 += 3;   // LD A,($AF34): CALL $9200: LD B,0: CALL $AF52
+    t += awardTail(m, 0, SIDE1);
+    t += 17 + 10 + 7 + populate(m, 0x9C2C, 1) + 17; M1.m1 += 4;   // CALL $98BF: LD HL,Num_Players: LD B,1: ..CALL Zero_To_Space
+    t += zeroToSpace(m, 0xB026) + 20 + printString(m, 0x0019, 0xB024, M1) + 20 + printString(m, 0x0319, 0xB03E, M1) + 10; M1.m1 += 5;
+    t += 10 + 17 + 7 + scoreBuffer(m, 0xB035) + 20 + printString(m, 0x0A19, 0xB024, M1) + 10; M1.m1 += 6;   // Print_HighScore
+    m[0xAF33] = m[0xB05F] & 0x1F;
+    t += 13 + 7 + 10 + 7 + 7 + populate(m, 0xAF33, 1) + 17; M1.m1 += 6;   // LD A,(Current_Rank)..LD B,1: CALL Populate: CALL Zero_To_Space
+    t += zeroToSpace(m, 0xB026) + 20 + printString(m, 0x0022, 0xB024, M1) + showRank(m); M1.m1 += 2;
+  }
+  t += 17 + newRound(m, M1) + 17 + 7 + 13; M1.m1 += 1 + 3;   // CALL New_Round: CALL Init_Time: LD A,30: LD (Time),A
+  m[0x9CA5] = 0x1E;
+  t += printTime(m) + 10 + 17; M1.m1 += 2;         // RET: CALL $AD18
+  return t;
+}
+
 /* ---- the live game: round_loop on the 7.2 accumulator ------------------
    Starts from the machine at the CALL at $AE29 (build/live_p1.json, from
    python tools/sample.py --json: a mid-bout state, scaffolding until the
@@ -2618,5 +2808,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, boutNext, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, boutNext, setupMusic, setupRest, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

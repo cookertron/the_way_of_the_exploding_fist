@@ -133,6 +133,12 @@
       "note": "oracle for the 1UP game after a bout, $ACA6 to $AC5F (won, ranks up, draw) or $AC39 (lost): python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39 --frames 3000, played, then appended with --poke 0xAA01=4 (P1 wins), and with 0xAA3C=1, 0xAF34=3, 0xB05F=0x10 added, and 0x9CA5=1 (the draw); the rank-up run's draw case dropped (draw_ad44 gates that pose)"
     },
     {
+      "key": "setup_ac5f",
+      "file": "build/callio_ac5f.json",
+      "required": true,
+      "note": "oracle for the next bout's setup, $AC5F to the CALL $AD18 (new stage: Intro_Music, the scenery, the score, players, high score and rank rows; New_Round, Init_Time), the starts constructed (P1 wins the last bout at a rank): python tools/callio.py --capture --state p1 --poke 0xAA01=4,0xAA3C=1,0xAF34=S,0xB05F=R --call 0xAC5F 0xAD18 --frames 8000 with the text cells blinded (--blind 0x4n00-0x4n7F for n 0-7, 0x4080-0x4091, 0x4n80-0x4n87 for n 2-7, 0x40A0-0x40A7, 0x41A0-0x41A7; D5) for S,R = 1,0 2,1 3,2 3,5 (--append), then --derive case 0 --set 0xAF35=0 (no new stage), 0xB2FA=0 (sound off), 0xB05F=0 (novice)"
+    },
+    {
       "key": "live_time",
       "file": "build/live_time.json",
       "required": true,

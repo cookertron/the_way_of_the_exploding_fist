@@ -1370,8 +1370,8 @@
  {
   "file": "template.html",
   "label": "start: returns $81",
-  "old": "    return out(0x80);\n  }\n\n  function newRound",
-  "new": "    return out(0x81);\n  }\n\n  function newRound",
+  "old": "    k(17, 2);\n    return out(0x80);\n  }",
+  "new": "    k(17, 2);\n    return out(0x81);\n  }",
   "increment": "909E",
   "kills": "controlPass returns the A the real $97CB returned (the RET M at $975B)"
  },
@@ -1402,8 +1402,8 @@
  {
   "file": "template.html",
   "label": "newRound: RET M1 dropped",
-  "old": "k(10, 1 + c.m1);",
-  "new": "k(10, c.m1);",
+  "old": "  cnt.m1 += 1;\n  return t + 10;\n}\nfunction controlPass",
+  "new": "  return t + 10;\n}\nfunction controlPass",
   "increment": "909E",
   "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
  },
@@ -3542,5 +3542,165 @@
   "new": "if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }",
   "increment": "ACA6-next",
   "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F)"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: music: the H out a T early",
+  "old": "outs.push([t0 + t + 15, h]);",
+  "new": "outs.push([t0 + t + 14, h]);",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: music: the rest's delay 5 T long",
+  "old": "t += 7 + 10 + 26 * 0xAF4 - 5 + 12;",
+  "new": "t += 7 + 10 + 26 * 0xAF4 + 12;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: music: sound off without the RET's M1",
+  "old": "if (!m[0xB2FA]){ M1.m1 += 1; return t + 11; }",
+  "new": "if (!m[0xB2FA]){ return t + 11; }",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: music: L keeps the MIC bit",
+  "old": "const h = m[0x90D0] & 0x1F, l = h & 7;",
+  "new": "const h = m[0x90D0] & 0x1F, l = h & 0xF;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: music: a rest taken for C = 2",
+  "old": "if (c === 1){                                // a rest",
+  "new": "if (c === 2){                                // a rest",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: bgUdg: seven rows",
+  "old": "for (let i = 0; i < 8; i++) m[(de + (i << 8)) & 0xFFFF]",
+  "new": "for (let i = 0; i < 7; i++) m[(de + (i << 8)) & 0xFFFF]",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: bgRuns: a repeat's M1 one short",
+  "old": "t += 7 + 7 + 6 + 4; M1.m1 += 3;                // LD B,(HL): INC HL: DEC B",
+  "new": "t += 7 + 7 + 6 + 4; M1.m1 += 2;                // LD B,(HL): INC HL: DEC B",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: bgAttrs: a repeated attr keeps bit 7",
+  "old": "do { m[de] = a & 0x7F; de = (de + 1) & 0xFFFF; b = (b - 1) & 0xFF;",
+  "new": "do { m[de] = a; de = (de + 1) & 0xFFFF; b = (b - 1) & 0xFF;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: scenery: pixels cleared to 1",
+  "old": "m.fill(0x3F, 0x5800, 0x5B00); m.fill(0, 0x4000, 0x5800);",
+  "new": "m.fill(0x3F, 0x5800, 0x5B00); m.fill(1, 0x4000, 0x5800);",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: scenery: 63 shadow rows",
+  "old": "for (let b = 0x40, de = 0x8000; b > 0;",
+  "new": "for (let b = 0x3F, de = 0x8000; b > 0;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: scenery: $9229 forgets the third back",
+  "old": "} else { h = (h - 8) & 0xFF; t += 69; M1.m1 += 12; }",
+  "new": "} else { t += 69; M1.m1 += 12; }",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: scenery: Background_Reference not cleared",
+  "old": "  m[0x5F00] = 0;\n",
+  "new": "  \n",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: scenery: the screen address over a third by $800",
+  "old": "if (s & 0x100){ s = (s + 0x700) & 0xFFFF;",
+  "new": "if (s & 0x100){ s = (s + 0x800) & 0xFFFF;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: showRank: TH costed as RD",
+  "old": "t += [29, 53, 77, 82][k - 1];",
+  "new": "t += [29, 53, 77, 77][k - 1];",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: setupMusic: the new-stage flag kept",
+  "old": "  m[0xAF35] = (m[0xAF35] - 1) & 0xFF;\n",
+  "new": "  \n",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: setupRest: Time printed before it is set",
+  "old": "  m[0x9CA5] = 0x1E;\n  t += printTime(m) + 10 + 17; M1.m1 += 2;",
+  "new": "  t += printTime(m) + 10 + 17; M1.m1 += 2;\n  m[0x9CA5] = 0x1E;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: setupRest: P1's score not shown ($AF52 skipped)",
+  "old": "t += awardTail(m, 0, SIDE1);",
+  "new": "t += 0;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: zeroToSpace: no terminator",
+  "old": "  m[de] = 0;\n  let t = 4 + 7 + 10 + 7;",
+  "new": "  let t = 4 + 7 + 10 + 7;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: populate: a byte's M1 one short",
+  "old": "(b > 1 ? 13 : 8); M1.m1 += 20;",
+  "new": "(b > 1 ? 13 : 8); M1.m1 += 19;",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AC5F setup: newRound: three cells blanked",
+  "old": "for (const pos of [0x0108, 0x0110, 0x1A08, 0x1A10]){",
+  "new": "for (const pos of [0x0108, 0x0110, 0x1A08]){",
+  "increment": "AC5F-setup",
+  "kills": "setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly"
  }
 ]

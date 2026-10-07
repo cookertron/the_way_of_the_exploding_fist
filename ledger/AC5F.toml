@@ -1,0 +1,31 @@
+# ledger/AC5F.toml -- current truth about bout_setup (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "bout_setup"
+entries  = ["$AC5F", "$90D1", "$9200", "$5F22", "$AEBF"]
+oracle   = "tools/callio.py"
+fixtures = ["setup_ac5f"]
+port     = "setupRest"
+manual   = ["7.2", "3.7"]
+
+[[fact]]
+kind   = "gated"
+says   = "the text cells are blinded (D5), so which suffix string Show_Rank picks (ST/ND/RD/TH, all 2 chars) is checked by T and R only, not by the glyphs drawn"
+by     = "node test/kit.test.js (setup block) ; python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "insn"
+at     = "$AC5F"
+says   = "$AF35 set: cleared, Intro_Music $90D1 (DI; notes [C,B,E,D] at $9128, B=0 C=1 a rest; none with $B2FA 0), $9200 scenery, $AF52 B=0, $98BF, high score, rank, Show_Rank; always New_Round, Init_Time, CALL $AD18"
+by     = "python tools/adis.py 0xAC5F 30 ; python tools/adis.py 0x90D1 40"
+
+[[fact]]
+kind   = "insn"
+at     = "$5F22"
+says   = "Change_Background is RAM code put there at boot: attrs $3F, pixels 0, stage table ($602B/$603D/$604F) to $5F10: 4 blocks of UDG runs from $4080, 4 char rows each, then attr runs; bit 7 = a count follows"
+by     = "python tools/boot.py --state p1 --steps 0 --out F ; python tools/adis.py 0x5F22 120 --image F"
+
+[[fact]]
+kind   = "measured"
+says   = "setupMusic+setupRest match the machine $AC5F to CALL $AD18 on 7 cases: stages 2, 3, wrap to 1, ST ND RD TH (12.89M T, 3422 $FE writes), derived no stage, sound off, novice; bytes, text cells, T, R, $FE writes"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac5f.json ; node test/kit.test.js"

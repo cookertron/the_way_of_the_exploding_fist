@@ -1386,6 +1386,49 @@ const mockCtx = (state) => ({
         [fx.cases[7].derived, fx.cases[7].out.find(([a]) => a === 0xB05F)], [{ from: 3, set: { b05f: 9 } }, [0xB05F, '10']]);
 }
 
+/* ---- the next bout's setup: $AC5F to the CALL $AD18 --------------------
+   python tools/callio.py --capture --state p1 --call 0xAC5F 0xAD18 (port.json:
+   the starts constructed, P1 winning the last bout at a rank, each stage;
+   no new stage, sound off and novice derived).  setupMusic then setupRest:
+   every byte outside the stack frames and the text cells (D5), the text
+   cells written, T, R and every $FE write of the tune at its T. */
+{
+  const fx = P.assets.setup_ac5f;
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    P.M1.m1 = 0;
+    const outs = [];
+    let t;
+    try { const s = P.setupMusic(m, outs); t = s.t + P.setupRest(m, s.stage); }
+    catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
+    let diff = -1;
+    for (let x = 0; x < 0x10000; x++){
+      if (x === c.sp - 128) x = c.sp + 2;
+      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
+    }
+    const wrote = [], blind = [];
+    for (let x = 0; x < 0x10000; x++) if (inBlind(x) && m[x] !== 0xA5) wrote.push(x);
+    for (const [lo, hi] of c.blind || []) for (let x = lo; x <= hi; x++) blind.push(x);
+    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, wrote.join() === blind.join(), JSON.stringify(outs) === JSON.stringify(c.outs || [])];
+    const wnt = [c.t, c.rx, -1, true, true];
+    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
+      first = `case ${i}: T, R, first bad byte, text cells, tune ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
+  }
+  check("setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly",
+        [bad, first], [0, '']);
+  const at = (c, x) => { for (const [a, h] of c.in) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
+  check('...and the cases take every arm: each stage (2, 3, the wrap to 1) and rank suffix, the tune played, and derived: no new stage (neither read), sound off, novice',
+        [fx.cases.map(c => at(c, 0xAF34)), fx.cases.map(c => at(c, 0xB05F)), fx.cases.map(c => (c.outs || []).length),
+         fx.cases.map(c => c.derived && c.derived.set)],
+        [[2, 3, 1, 1, undefined, 2, 2], [1, 2, 3, 6, undefined, 1, 0], [3422, 3422, 3422, 3422, 0, 0, 3422],
+         [undefined, undefined, undefined, undefined, { af35: 0 }, { b2fa: 0 }, { b05f: 0 }]]);
+}
+
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
    House rule 2: python tools/sample.py --state p1 --at 0xAE29 --script
    (keys BY PASS) --json build/live_p1.json samples the machine at every
