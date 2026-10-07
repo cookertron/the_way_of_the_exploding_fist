@@ -42,7 +42,7 @@ kind   = "measured"
 says   = "playPass, composed from the callees, matches the machine on all 130 driven pass cases and the quit: bytes, timer cells, T, A, R, port order; ROM-effect $FE writes in count, value and first T (D6 moves inner edges)"
 by     = "node test/kit.test.js (play_pass block; build/callio_ae29.json, 24 cases after callio --cover)"
 
-[[open]]
-ask    = "two composition mutants survive every driven whole-pass case: $9C29 left 0 for P1's step (the $97BB branches that read the opponent, $9920/$9994) and P2's step after the 2P yin-yang award; no pass case reaches them"
-tried  = "all 130 captured cases before --cover (scratch replay): both survive"
-settle = "callio --derive on a pass case with --set putting P1 in a move whose $97BB path reads the opponent (reuse the sets of the derived 97bb cases), and a 2P case where P2's step changes $AA43/$AA48; then mutants.py --affected kills both"
+[[fact]]
+kind   = "gated"
+says   = "derived pass case (case 19, $AA03=3, $AA56=1) sends P1's step through $9930, reading P2 via $9C29: kills \"$9C29 left 0\"; the yinYang2P/P2-step swap is equivalent (disjoint reads, writes; T126), now \"P2 stepped after the motion\""
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_ae29.json --case 19 --set 0xAA03=3,0xAA56=1 ; python tools/mutants.py --match \"9745 pass\""

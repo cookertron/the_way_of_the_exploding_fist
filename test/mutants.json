@@ -2577,9 +2577,9 @@
  },
  {
   "file": "template.html",
-  "label": "9745 pass: fighters stepped in the wrong order",
-  "old": "  t += fighterStep(m, 0x40) + yinYang2P(m)",
-  "new": "  t += yinYang2P(m) + fighterStep(m, 0x40)",
+  "label": "9745 pass: P2 stepped after the motion",
+  "old": "  t += fighterStep(m, 0x40) + yinYang2P(m) + fighterMotion(m);",
+  "new": "  t += yinYang2P(m) + fighterMotion(m) + fighterStep(m, 0x40);",
   "increment": "9745-pass",
   "kills": "playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)"
  }

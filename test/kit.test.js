@@ -1020,7 +1020,9 @@ const mockCtx = (state) => ({
 
 /* ---- play_pass $9745, the whole pass, against its frozen oracle --------
    Bracketed from the CALL at $AE29 to $AE2C (python tools/callio.py
-   --capture, s1, p1 and 2P by --poke; the quit derived by --script H+G;
+   --capture, s1, p1 and 2P by --poke; the quit derived by --script H+G,
+   and P1 on frame 3 against a P2 with $AA56 set by --set $AA03, $AA56,
+   so P1's step reads the opponent through $9C29 at $9930;
    shrunk by --cover to the cases that reach every PC).  Each callee is
    gated alone above; this checks the composition: the glue, the order, SP
    into $BF13, R carried through the AI draws, and where the effect's
