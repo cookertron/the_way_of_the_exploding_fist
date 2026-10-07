@@ -2164,18 +2164,24 @@ function scoreBuffer(m, hl){                       // Populate_Score_Buffer $AFD
     if (--b) t += 13; else { M1.m1 += 1; return t + 8 + 10; }
   }
 }
+const SIDE1 = { pts: 0xAA08, cnt: 0xAA02, sc: 0xB02D, show: m => m[0x9C2C] !== 0, hl: 0xB02F, pos: 0x0100 };
+const SIDE2 = { pts: 0xAA48, cnt: 0xAA42, sc: 0xB030, show: m => m[0x9C2C] === 2, hl: 0xB032, pos: 0x1600 };
 function award(m){                                 // $AF36 with its CALL: score the points of one side
   let t = 17 + 13 + 7 + 10; M1.m1 += 4;            // LD A,($AA08): CP 0: JP Z
-  let pts = 0xAA08, cnt = 0xAA02, sc = 0xB02D, show = m[0x9C2C] !== 0, hl = 0xB02F, pos = 0x0100;
-  if (!m[pts]){
+  let s = SIDE1;
+  if (!m[s.pts]){
     t += 13 + 7; M1.m1 += 3;                       // $AF7D: LD A,($AA48): CP 0: RET Z
     if (!m[0xAA48]) return t + 11;
-    t += 5;
-    pts = 0xAA48; cnt = 0xAA42; sc = 0xB030; show = m[0x9C2C] === 2; hl = 0xB032; pos = 0x1600;
+    t += 5; s = SIDE2;
   }
   let b = m[(0xB00B + m[0xAA3F]) & 0xFFFF];        // the table at $B00B by $AA3F (ADD HL,BC)
   t += 72; M1.m1 += 8;
-  if (m[pts] === 1){ b >>= 1; t += 7 + 8; M1.m1 += 3; } else { t += 12; M1.m1 += 1; }   // SRL B
+  if (m[s.pts] === 1){ b >>= 1; t += 7 + 8; M1.m1 += 3; } else { t += 12; M1.m1 += 1; }   // SRL B
+  return t + awardTail(m, b, s);
+}
+function awardTail(m, b, s){                       // $AF52 / $AF97 on: b to the count and the score, shown, to the RET
+  const { pts, cnt, sc, hl, pos } = s, show = s.show(m);
+  let t = 0;
   m[cnt] = (b + m[cnt]) & 0xFF;
   t += 38 + scoreAdd(m, sc, b) + 37; M1.m1 += 5 + 4 + 1;   // ... LD DE: CALL $AFC2: XOR A..CP: RET cc
   m[pts] = 0;
@@ -2265,6 +2271,49 @@ function winPass(m, A, sp, cost){
 }
 function winEnd(){ M1.m1 += 2; return 4 + 10; }   // $AD97 XOR A: RET, to $ACA6 with A = 0
 
+/* ---- P1 wins: the time bonus $AD62-$AD90, from the listing --------------
+   (python tools/adis.py 0xAD18 60.)  After P1's pose ($AD5F CALL $AE7A),
+   each second left on the clock scores one: a delay $AF1D (BC = $F000),
+   then per second B = 1 into award's tail at $AF52 (P1's count $AA02 and
+   score $B02D, printed), Time_Tick, Print_Time and the delay again, until
+   Time is 0; then Print_Time and the long delay $AF1A (BC = 0).  Init_Time
+   always, and A = 1 to $ACA6: the bout won.  bonusStart: $AD62 to the loop
+   top $AD6E, or out ($ACA6) when the clock is already 0.  bonusPass: the
+   loop top back to it, or out.  Gated whole against python tools/callio.py
+   --capture --poke 0xAA01=4 --call 0xAD5F 0xACA6 (build/callio_ad5f.json,
+   Time 0 derived) and live, second by second (build/live_p1w.json). */
+function delayLoop(b, c){                          // $AF1D: LD A,(IX): INC C: JR NZ: INC B: JR NZ: RET; BC on entry
+  const w = b ? 256 - b : 256, n = (c ? 256 - c : 256) + (w - 1) * 256;   // B steps, then iterations
+  M1.m1 += 4 * n + 2 * w + 1;
+  return n * 23 + (n - w) * 12 + w * 11 + (w - 1) * 12 + 7 + 10;
+}
+function printTime(m){                             // CALL Print_Time $9C93: Time in five digits at $0B00
+  M1.m1 += 1 + 4 + 1;
+  return 17 + 13 + 7 + 4 + 10 + printNumber(m, m[0x9CA5], 0x0B00) + 10;
+}
+function bonusOut(m){                              // $AD8B: CALL Init_Time: LD A,1: RET, to $ACA6 with A = 1
+  m[0x9CA5] = 0x1E; M1.m1 += 1 + 2 + 1 + 2;
+  return 17 + 7 + 13 + printTime(m) + 10 + 7 + 10;
+}
+function bonusStart(m){
+  M1.m1 += 3;                                      // LD A,(Time): AND A: JR Z
+  if (!m[0x9CA5]) return { t: 13 + 4 + 12 + bonusOut(m), out: true };
+  M1.m1 += 2;                                      // LD BC: CALL $AF1D
+  return { t: 13 + 4 + 7 + 10 + 17 + delayLoop(0xF0, 0), out: false };
+}
+function bonusPass(m){
+  M1.m1 += 2;                                      // LD B,1: CALL $AF52
+  let t = 7 + 17 + awardTail(m, 1, SIDE1);
+  m[0x9CA5]--; M1.m1 += 1 + 3;                     // CALL Time_Tick: LD HL: DEC (HL): RET
+  t += 17 + 10 + 11 + 10 + printTime(m);
+  M1.m1 += 2 + 3;                                  // LD BC: CALL $AF1D; LD A,(Time): AND A: JR NZ
+  t += 10 + 17 + delayLoop(0xF0, 0) + 13 + 4;
+  if (m[0x9CA5]) return { t: t + 12, out: false };
+  M1.m1 += 1 + 1;                                  // CALL $AF1A: LD BC,0 (CALL Print_Time counted there)
+  t += 7 + printTime(m) + 17 + 10 + delayLoop(0, 0);
+  return { t: t + bonusOut(m), out: true };
+}
+
 /* ---- the live game: round_loop on the 7.2 accumulator ------------------
    Starts from the machine at the CALL at $AE29 (build/live_p1.json, from
    python tools/sample.py --json: a mid-bout state, scaffolding until the
@@ -2285,6 +2334,7 @@ class Fist {
     this.r = st.r; this.sp = st.sp;
     this.passes = 0; this.simT = 0; this.acc = 0; this.exit = null;
     this.win = 0;                                  // the winner's base while the victory pose loops, else 0
+    this.bonus = false;                            // P1's time bonus counting ($AD6E), after the pose
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();
@@ -2293,13 +2343,14 @@ class Fist {
   get simFrame(){ return this.simT / T_FRAME; }
   /* one pass with these keys; returns its charged T */
   pass(kb){
-    if (this.win) return this.winPass();
+    if (this.win || this.bonus) return this.winPass();
     const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
     const res = roundPass(this.m, io, this.sp);
     let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
-    if (res.exit === 'p2'){                        // $AD94: on into the victory pose, to its loop top
-      M1.m1 = 0; cost += winStart(this.m, 0xAA40);
-      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null; this.win = 0xAA40;
+    if (res.exit === 'p2' || res.exit === 'p1'){   // $AD94 / $AD5F: on into the victory pose, to its loop top
+      const A = res.exit === 'p1' ? 0xAA00 : 0xAA40;
+      M1.m1 = 0; cost += winStart(this.m, A);
+      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null; this.win = A;
     }
     for (const [t, v] of io.out){
       this.border = v & 7;
@@ -2310,14 +2361,27 @@ class Fist {
     if (res.exit) this.exit = res;
     return cost;
   }
-  /* one iteration of the victory pose; out by its RET, the 1UP bout is lost
-     at $ACA6 -- the way back to the menu is not ported (D7) */
+  /* one iteration of the victory pose, or one second of P1's time bonus;
+     out by the pose's RET, the 1UP bout is lost (P2) or the bonus counts
+     (P1), out to $ACA6 won -- the way on from $ACA6 is not ported (D7) */
   winPass(){
     const cost = { dec: 0, copy: 0, ldir: 0 };
     M1.m1 = 0;
-    const w = winPass(this.m, this.win, this.sp, cost);
-    let t = w.t + rfPlayT(cost.t, cost) - cost.t;
-    if (w.out){ t += winEnd(); this.win = 0; this.exit = { exit: 'lost' }; }
+    let t;
+    if (this.bonus){
+      const b = bonusPass(this.m);
+      t = b.t;
+      if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }
+    } else {
+      const w = winPass(this.m, this.win, this.sp, cost);
+      t = w.t + rfPlayT(cost.t, cost) - cost.t;
+      if (w.out && this.win === 0xAA40){ t += winEnd(); this.win = 0; this.exit = { exit: 'lost' }; }
+      else if (w.out){                             // $AD62: the clock counted down from here, or out at once
+        const b = bonusStart(this.m);
+        t += b.t; this.win = 0;
+        if (b.out) this.exit = { exit: 'won' }; else this.bonus = true;
+      }
+    }
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.simT += t; this.passes++;
     if (this.exit) this.exit.r = this.r;
@@ -2417,5 +2481,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, bonusStart, bonusPass, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

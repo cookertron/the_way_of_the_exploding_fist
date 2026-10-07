@@ -33,12 +33,16 @@ a loop the main loop calls that runs many times between two visits to --at
 v, r, t, h}, ...], in order); t is then always since the previous sample of
 either kind, so the engine can charge each sub-loop pass its own T.
 
+--poke ADDR=VAL[,...] sets data bytes before play, as callio.py --poke: a
+start no saved state holds (P1 one point from the bout).  The JSON records
+them as "poked"; the start state is constructed, so say so.
+
 Usage:
     python tools/sample.py --state NAME --at PC --var NAME=ADDR [--var ...]
                            [--passes 1000] [--changes] [--keys D+W]
                            [--script "40:,60:D"] [--json FILE]
                            [--hash LO-HI ...] [--skip LO-HI ...] [--mark PC ...]
-                           [--also PC ...]
+                           [--also PC ...] [--poke ADDR=VAL,...]
     python tools/sample.py --state s1 --at 0x9745 --var time=0x9CA5 --var cnt=0x9CA6 --changes
 """
 import json
@@ -82,6 +86,7 @@ def main():
     target = parse_target(args)
     at, passes, changes, keys, vars_ = None, 1000, False, None, []
     script, out, hashes, skip, marks, also = None, None, [], [], [], []
+    pokes = {}
     i = 0
     while i < len(args):
         a = args[i]
@@ -105,6 +110,11 @@ def main():
             marks.append(int(args[i + 1], 0)); i += 2
         elif a == '--also':
             also.append(int(args[i + 1], 0)); i += 2
+        elif a == '--poke':
+            for kv in args[i + 1].split(','):
+                pa, pv = kv.split('=')
+                pokes[int(pa, 0)] = int(pv, 0)
+            i += 2
         elif a == '--skip':
             skip.append(parse_range(args[i + 1])); i += 2
         else:
@@ -114,6 +124,10 @@ def main():
     if keys and script:
         sys.exit('sample.py: --keys or --script, not both')
     h = boot_target(target, 'sample.py')
+    for pa, pv in pokes.items():            # before play, as callio.py --poke: a start no saved state holds
+        if pa < 0x4000:
+            sys.exit(f'sample.py: --poke ${pa:04X} is ROM')
+        h.memobj.m[pa] = pv
     for k in (keys.split('+') if keys else []):
         press(h.ports, k)
     plan = []                               # the keys held on each pass, by pass
@@ -168,7 +182,8 @@ def main():
             json.dump({'at': at, 'source': source_label(target), 'script': script,
                        'vars': [[nm, a, n] for nm, a, n in vars_],
                        'hash': hashes, 'skip': skip, 'marks': marks,
-                       **({'also': also} if also else {}), 'start': start, 'rows': rows}, f)
+                       **({'also': also} if also else {}),
+                       **({'poked': {f'{a:04x}': v for a, v in pokes.items()}} if pokes else {}), 'start': start, 'rows': rows}, f)
         print(f'# wrote {out}: {len(rows)} rows')
 
 

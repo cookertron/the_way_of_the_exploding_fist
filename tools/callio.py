@@ -285,6 +285,19 @@ def case_io(src, lm, blind):
     return io
 
 
+def up_io(src, sp, lm):
+    """A bracket that leaves through its caller's frame (a RET past the
+    entry SP: $AD90 back to $ACA6) pops the bytes at SP and SP + 1, which
+    frame() keeps out of the inputs: record them as "up" so --check can
+    replay the way out."""
+    return {'up': bytes(src[(sp + i) & 0xFFFF] for i in range(2)).hex()} if lm.exit[SP] > sp else {}
+
+
+def seed_up(mem, c):
+    for i, v in enumerate(bytes.fromhex(c.get('up', ''))):
+        mem[(c['sp'] + i) & 0xFFFF] = v
+
+
 def addrs(rs):
     return {a for lo, hi in rs for a in range(lo, hi + 1)}
 
@@ -391,6 +404,7 @@ def capture(args):
         new += 1
         fx['cases'].append({'site': site, 'sp': sp, 'regs': [regs_in[i] for i in REGS],
                             **case_io(pre, lm, blind),
+                            **up_io(pre, sp, lm),
                             'exit': [lm.exit[i] for i in REGS], 'r': regs_in[R], 'rx': lm.exit[R],
                             **({'xpc': lm.exit[PC]} if len(ends(rets[site])) > 1 else {}),
                             **({'ports': pl.log} if pl.log else {}),
@@ -403,7 +417,8 @@ def capture(args):
                    '(SkoolKit indices in regs) at the CALL, the bytes read before written as [addr, hex] runs '
                    '(in; fetches and the call frame excepted), every byte written outside the frame (out), '
                    'the registers at the return (exit), R at the call and the return (r, rx), the port reads '
-                   'in order as [port, value] (ports), the uncontended T (t); code lists the fetched '
+                   'in order as [port, value] (ports), the uncontended T (t), the two bytes at SP for a '
+                   'bracket that returns through its caller (up); code lists the fetched '
                    'addresses, whose bytes come from the target, as do ROM data reads (rom, addresses '
                    'only, D5); outputs inside the blind ranges are addresses only (blind). Read by: python tools/callio.py --check, '
                    'and the JS gate of that routine.')
@@ -440,6 +455,7 @@ def check(args):
         rom = addrs(c.get('rom', []))
         for a in rom:
             mem[a] = src[a]
+        seed_up(mem, c)
         sp = c['sp']
         lm = Logged(bytes(mem), frame(sp))
         regs = list(h.regs)
@@ -523,6 +539,7 @@ def derive(args):
     mem = bytearray(h.memobj.m)                    # the target, for code the case never fetched
     for a, v in {**ins, **sets}.items():
         mem[a] = v
+    seed_up(mem, c)
     sp = c['sp']
     lm = Logged(bytes(mem), frame(sp))
     regs = list(h.regs)
@@ -557,6 +574,7 @@ def derive(args):
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
     fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': [regs[k] for k in fx['regs']],
                         **case_io(mem, lm, fx.get('blind', [])),
+                        **({'up': c['up']} if 'up' in c else {}),
                         'exit': [lm.exit[k] for k in fx['regs']],
                         **({'xpc': lm.exit[PC]} if len(ends(dict((s, e) for s, e in fx['calls'])[c['site']])) > 1 else {}),
                         **({'r': regs[R], 'rx': lm.exit[R]} if 'r' in c else {}),

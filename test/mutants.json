@@ -2725,7 +2725,7 @@
   "old": "    let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;",
   "new": "    let cost = res.t;",
   "increment": "AE26-loop",
-  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
+  "kills": "P2: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
  },
  {
   "file": "template.html",
@@ -2733,7 +2733,7 @@
   "old": "    this.simT += cost; this.r = res.r; this.passes++;",
   "new": "    this.simT += cost; this.passes++;",
   "increment": "AE26-loop",
-  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
  {
   "file": "template.html",
@@ -2749,7 +2749,7 @@
   "old": "  const tr = renderFighters(m, null, (sp - 4) & 0xFFFF, io.cost);",
   "new": "  const tr = renderFighters(m, null, (sp - 4) & 0xFFFF);",
   "increment": "AE26-loop",
-  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
+  "kills": "P2: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
  },
  {
   "file": "template.html",
@@ -2826,24 +2826,24 @@
  {
   "file": "template.html",
   "label": "AD1B point: award: P1 shown in any mode",
-  "old": "show = m[0x9C2C] !== 0, hl = 0xB02F",
-  "new": "show = true, hl = 0xB02F",
+  "old": "show: m => m[0x9C2C] !== 0, hl: 0xB02F",
+  "new": "show: m => true, hl: 0xB02F",
   "increment": "AD1B-point",
   "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
  },
  {
   "file": "template.html",
   "label": "AD1B point: award: P2 shown in 1P too",
-  "old": "show = m[0x9C2C] === 2; hl = 0xB032",
-  "new": "show = m[0x9C2C] !== 0; hl = 0xB032",
+  "old": "show: m => m[0x9C2C] === 2, hl: 0xB032",
+  "new": "show: m => m[0x9C2C] !== 0, hl: 0xB032",
   "increment": "AD1B-point",
   "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
  },
  {
   "file": "template.html",
   "label": "AD1B point: award: one point not halved",
-  "old": "  if (m[pts] === 1){ b >>= 1;",
-  "new": "  if (m[pts] === 1){ b >>= 0;",
+  "old": "  if (m[s.pts] === 1){ b >>= 1;",
+  "new": "  if (m[s.pts] === 1){ b >>= 0;",
   "increment": "AD1B-point",
   "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
  },
@@ -2866,8 +2866,8 @@
  {
   "file": "template.html",
   "label": "AD1B point: award: P2 printed at P1's column",
-  "old": "hl = 0xB032; pos = 0x1600;",
-  "new": "hl = 0xB032; pos = 0x0100;",
+  "old": "hl: 0xB032, pos: 0x1600 }",
+  "new": "hl: 0xB032, pos: 0x0100 }",
   "increment": "AD1B-point",
   "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
  },
@@ -2965,7 +2965,7 @@
   "old": "  if (b.exit !== 'ret') return b;",
   "new": "  if (b.exit !== 'ret' || 1) return b;",
   "increment": "AD1B-point",
-  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
  {
   "file": "template.html",
@@ -3074,18 +3074,18 @@
  {
   "file": "template.html",
   "label": "AD94 win: Fist: P2 win stops the engine",
-  "old": "    if (res.exit === 'p2'){",
-  "new": "    if (res.exit === 'p2x'){",
+  "old": "    if (res.exit === 'p2' || res.exit === 'p1'){",
+  "new": "    if (res.exit === 'p1'){",
   "increment": "AD94-win",
-  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
  {
   "file": "template.html",
-  "label": "AD94 win: Fist: the pose for P1",
-  "old": "res.exit = null; this.win = 0xAA40;",
-  "new": "res.exit = null; this.win = 0xAA00;",
+  "label": "AD94 win: Fist: the pose always P1's",
+  "old": "      const A = res.exit === 'p1' ? 0xAA00 : 0xAA40;",
+  "new": "      const A = 0xAA00;",
   "increment": "AD94-win",
-  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
  {
   "file": "template.html",
@@ -3093,7 +3093,7 @@
   "old": "      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null;",
   "new": "      res.exit = null;",
   "increment": "AD94-win",
-  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
  {
   "file": "template.html",
@@ -3101,23 +3101,23 @@
   "old": "    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);\n    this.simT += t; this.passes++;",
   "new": "    this.simT += t; this.passes++;",
   "increment": "AD94-win",
-  "kills": "roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout is lost"
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
  {
   "file": "template.html",
   "label": "AD94 win: Fist: pose $BF13 uncontended",
-  "old": "    let t = w.t + rfPlayT(cost.t, cost) - cost.t;",
-  "new": "    let t = w.t;",
+  "old": "      t = w.t + rfPlayT(cost.t, cost) - cost.t;",
+  "new": "      t = w.t;",
   "increment": "AD94-win",
-  "kills": "the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
+  "kills": "P2: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round and the pose"
  },
  {
   "file": "template.html",
   "label": "AD94 win: Fist: the pose never ends",
-  "old": "    if (w.out){ t += winEnd(); this.win = 0; this.exit = { exit: 'lost' }; }",
-  "new": "    if (w.out){ t += winEnd(); this.exit = { exit: 'lost' }; }",
+  "old": "if (w.out && this.win === 0xAA40){ t += winEnd(); this.win = 0; this.exit",
+  "new": "if (w.out && this.win === 0xAA40){ t += winEnd(); this.exit",
   "increment": "AD94-win",
-  "kills": "...and leave on the sample the machine left, the same way (P2 wins at $AD94, the pose, out to $ACA6)"
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost)"
  },
  {
   "file": "template.html",
@@ -3125,6 +3125,174 @@
   "old": "this.exit = { exit: 'lost' }; }",
   "new": "this.exit = { exit: 'p2' }; }",
   "increment": "AD94-win",
-  "kills": "...and leave on the sample the machine left, the same way (P2 wins at $AD94, the pose, out to $ACA6)"
+  "kills": "P2: ...and leave on the sample the machine left, the same way (P2 wins, out to $ACA6 lost)"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: delay: JR NZ out of the B loop at 12 T",
+  "old": "  return n * 23 + (n - w) * 12 + w * 11 + (w - 1) * 12 + 7 + 10;",
+  "new": "  return n * 23 + (n - w) * 12 + w * 12 + (w - 1) * 12 + 7 + 10;",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: delay: RET not counted in R",
+  "old": "  M1.m1 += 4 * n + 2 * w + 1;",
+  "new": "  M1.m1 += 4 * n + 2 * w;",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: delay: one B step too many",
+  "old": "n = (c ? 256 - c : 256) + (w - 1) * 256;",
+  "new": "n = (c ? 256 - c : 256) + w * 256;",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: printTime: time printed at the score",
+  "old": "  return 17 + 13 + 7 + 4 + 10 + printNumber(m, m[0x9CA5], 0x0B00) + 10;",
+  "new": "  return 17 + 13 + 7 + 4 + 10 + printNumber(m, m[0x9CA5], 0x0100) + 10;",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: printTime: R short",
+  "old": "  M1.m1 += 1 + 4 + 1;\n  return 17 + 13",
+  "new": "  M1.m1 += 1 + 4;\n  return 17 + 13",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Init_Time: 29 seconds",
+  "old": "  m[0x9CA5] = 0x1E; M1.m1 += 1 + 2 + 1 + 2;",
+  "new": "  m[0x9CA5] = 0x1D; M1.m1 += 1 + 2 + 1 + 2;",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Init_Time: LD A,1 not charged",
+  "old": "  return 17 + 7 + 13 + printTime(m) + 10 + 7 + 10;",
+  "new": "  return 17 + 7 + 13 + printTime(m) + 10 + 10;",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusStart: no time left, JR Z untaken",
+  "old": "return { t: 13 + 4 + 12 + bonusOut(m), out: true };",
+  "new": "return { t: 13 + 4 + 7 + bonusOut(m), out: true };",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusStart: no first delay",
+  "old": "  return { t: 13 + 4 + 7 + 10 + 17 + delayLoop(0xF0, 0), out: false };",
+  "new": "  return { t: 13 + 4 + 7 + 10 + 17, out: false };",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusPass: two points a second",
+  "old": "  let t = 7 + 17 + awardTail(m, 1, SIDE1);",
+  "new": "  let t = 7 + 17 + awardTail(m, 2, SIDE1);",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusPass: P2 scores the bonus",
+  "old": "  let t = 7 + 17 + awardTail(m, 1, SIDE1);",
+  "new": "  let t = 7 + 17 + awardTail(m, 1, SIDE2);",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusPass: Time_Tick R short",
+  "old": "  m[0x9CA5]--; M1.m1 += 1 + 3;",
+  "new": "  m[0x9CA5]--; M1.m1 += 1 + 2;",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusPass: loop JR NZ at 7 T",
+  "old": "  if (m[0x9CA5]) return { t: t + 12, out: false };",
+  "new": "  if (m[0x9CA5]) return { t: t + 7, out: false };",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusPass: short final delay",
+  "old": "  t += 7 + printTime(m) + 17 + 10 + delayLoop(0, 0);",
+  "new": "  t += 7 + printTime(m) + 17 + 10 + delayLoop(0xF0, 0);",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: bonusPass: no last Print_Time",
+  "old": "  t += 7 + printTime(m) + 17 + 10 + delayLoop(0, 0);",
+  "new": "  t += 7 + 17 + 10 + delayLoop(0, 0);",
+  "increment": "AD5F-bonus",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Fist: P1 win takes P2's pose",
+  "old": "      const A = res.exit === 'p1' ? 0xAA00 : 0xAA40;",
+  "new": "      const A = res.exit === 'p1' ? 0xAA40 : 0xAA40;",
+  "increment": "AD5F-bonus",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Fist: P1's pose out loses the bout",
+  "old": "      if (w.out && this.win === 0xAA40){",
+  "new": "      if (w.out){",
+  "increment": "AD5F-bonus",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Fist: no bonus count",
+  "old": "        if (b.out) this.exit = { exit: 'won' }; else this.bonus = true;",
+  "new": "        this.exit = { exit: 'won' };",
+  "increment": "AD5F-bonus",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Fist: the bonus passes never run",
+  "old": "    if (this.win || this.bonus) return this.winPass();",
+  "new": "    if (this.win) return this.winPass();",
+  "increment": "AD5F-bonus",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Fist: the bonus never stops",
+  "old": "      if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }",
+  "new": "      if (b.out){ this.exit = { exit: 'won' }; }",
+  "increment": "AD5F-bonus",
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won)"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F bonus: Fist: the pose base kept into the bonus",
+  "old": "        t += b.t; this.win = 0;",
+  "new": "        t += b.t;",
+  "increment": "AD5F-bonus",
+  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won)"
  }
 ]

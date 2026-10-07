@@ -1,0 +1,25 @@
+# ledger/AD5F.toml -- current truth about p1_wins_bonus (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "p1_wins_bonus"
+entries  = ["$AD5F"]
+oracle   = "tools/callio.py"
+fixtures = ["win_ad5f", "live_p1w"]
+port     = "bonusPass"
+manual   = ["7.2", "Q11"]
+
+[[fact]]
+kind   = "insn"
+at     = "$AD5F"
+says   = "P1 wins: CALL $AE7A (pose until $AA0D); if Time, per tick: delay $AF1D (BC=$F000), B=1 into $AF52 (award tail), Time_Tick, Print_Time, delay; then Print_Time, delay $AF1A (BC=0); always Init_Time; A=1 to $ACA6"
+by     = "python tools/adis.py 0xAD18 60 ; python tools/adis.py 0xAF1A 70 ; python tools/adis.py 0xAEF8 10"
+
+[[fact]]
+kind   = "measured"
+says   = "winStart+winPass x66+bonusStart+bonusPass match the machine from $AD5F to $ACA6 on 2 cases (1 played, P1 count poked to 4; Time 0 derived): bytes outside frames and score row, T 23268815 / 16440045, R"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ad5f.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "Fist follows live_p1w (P1 count poked to 4) sample for sample: 168 round passes, the point, 66 pose passes ($AE8E), 22 bonus seconds ($AD6E), out 'won' at $ACA6; charge 0.24% under over 256, bonus 0.60% under, worst 2.42%"
+by     = "node test/kit.test.js (live block, P1)"
