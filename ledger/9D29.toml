@@ -28,3 +28,8 @@ by     = "python tools/callio.py --capture --state p1 --keys D+W --call 0x974B 0
 kind   = "gated"
 says   = "p1HitsP2 writes every byte and the exact uncontended T of all 87 cases; derived: $AA19 either side of each outcome edge per $AA17/$AA57 pair on parents 11 and 24, $AA13 = 0, $AA52 = 0 on $A9BC; 6 mutants killed"
 by     = "python tools/callio.py --derive --state s1 --fixture build/callio_9d29.json --case 24 --set 0xAA17=1 --set 0xAA57=1 --set 0xAA19=83 ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"
+
+[[fact]]
+kind   = "gated"
+says   = "the JS counts its M1 cycles into M1.m1 and matches R advanced in the real code (rx - r mod 128, stamped by callio --stamp-r) on every callio case"
+by     = "python tools/build.py ; node test/kit.test.js"

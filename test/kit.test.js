@@ -648,12 +648,15 @@ const mockCtx = (state) => ({
   const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
   check('the lookalike font holds no $A5 byte (the poison marks screen writes)', P.font.includes(0xA5), false);
   let badBytes = 0, badBlind = 0, badT = 0, badGlyph = 0, firstBytes = '', firstBlind = '', firstT = '', firstGlyph = '';
+  let badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.boutTimer(m);
+    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++) if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++)
@@ -672,6 +675,8 @@ const mockCtx = (state) => ({
   check('boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)', [badBytes, firstBytes], [0, '']);
   check('boutTimer writes exactly the screen bytes the real $9C6F wrote', [badBlind, firstBlind], [0, '']);
   check('boutTimer tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
+  check('boutTimer counts the M1 cycles of every case as R advanced in the real $9C6F', [badM1, firstM1], [0, '']);
   check('each printed cell shows the lookalike glyph of its $932C character', [badGlyph, firstGlyph], [0, '']);
   const pcs = fx.cases.map(c => { const s = new Set();
     for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
@@ -691,13 +696,15 @@ const mockCtx = (state) => ({
 {
   const fx = P.assets.hit9ed2;
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.p2HitsP1(m);
+    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
@@ -705,6 +712,8 @@ const mockCtx = (state) => ({
   }
   check('p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
   check('p2HitsP1 tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
+  check('p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2', [badM1, firstM1], [0, '']);
   const pcs = fx.cases.map(c => { const s = new Set();
     for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
   /* each early RET: a case that passed the PC before it and not the one after */
@@ -727,13 +736,15 @@ const mockCtx = (state) => ({
 {
   const fx = P.assets.hit9d29;
   const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
+  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
   for (let i = 0; i < fx.cases.length; i++){
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
     put(m, c.in);
     const want = m.slice(); put(want, c.out);
+    P.M1.m1 = 0;
     const t = P.p1HitsP2(m);
+    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
     let diff = -1;
     for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
     if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
@@ -741,6 +752,8 @@ const mockCtx = (state) => ({
   }
   check('p1HitsP2 writes every byte the real $9D29 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
   check('p1HitsP2 tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
+  check('p1HitsP2 counts the M1 cycles of every case as R advanced in the real $9D29', [badM1, firstM1], [0, '']);
   const pcs = fx.cases.map(c => { const s = new Set();
     for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
   /* each early RET: a case that passed the PC before it and not the one after */

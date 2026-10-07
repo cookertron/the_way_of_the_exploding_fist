@@ -47,6 +47,13 @@ how many reads were fetches.
              the case's log in order (the twin logs them from the keys held
              in the capture); R is set from the case and checked at the
              return, so a routine reading LD A,R replays exactly.
+             Writes to port $FE are kept per case as [T from the CALL,
+             value] (outs) and --check compares them.
+             --stamp-r (check) adds R at the CALL and the return (r, rx)
+             to cases captured before R was recorded: replayed with the R
+             the boot left, which is not play's, so only rx - r (the M1
+             count mod 128) means anything; written only if every case
+             agrees.
   --poke ADDR=VAL[,...]  (capture) set data bytes in the machine before play
              -- a mode or a control set no saved state holds (2P, Kempston);
              each case records them as "poked".  Never ROM, never a byte the
@@ -81,7 +88,7 @@ Usage:
                            [--frames 1500] [--keys D+W] [--per 2] --out build/callio_97bb.json [--append]
     python tools/callio.py --capture --state s1 --call 0x9745 0x9748 --blind 0x4000-0x57FF
                            --out build/callio_9c6f.json
-    python tools/callio.py --check --state s1 --fixture build/callio_97bb.json
+    python tools/callio.py --check --state s1 --fixture build/callio_97bb.json [--stamp-r]
     python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 12 --set 0xAA44=0x12
     python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --r 0x15
     python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --script "4:0,2:,2:E"
@@ -152,6 +159,7 @@ class PortLog:
     reads in order, and count any read that does not match the log."""
     def __init__(self, live=None, logged=None):
         self.live, self.logged, self.log, self.bad = live, logged, [], 0
+        self.outs, self.t0 = [], 0
 
     def read_port(self, registers, port):
         if self.logged is None:
@@ -166,7 +174,8 @@ class PortLog:
         return v
 
     def write_port(self, registers, port, value, offset=0):
-        pass
+        if port & 0xFF == 0xFE:                    # the speaker and border: [T from the CALL, value]
+            self.outs.append([registers[T] - self.t0, value])
 
     def left(self):
         return len(self.logged) - len(self.log) if self.logged is not None else 0
@@ -200,6 +209,7 @@ def run_alone(mem, regs, ret, limit=20_000_000, ports=None):
     sim = Simulator(mem, config=FLAT)
     if ports is not None:
         sim.set_tracer(ports)
+        ports.t0 = regs[T]
     sim.registers[:] = regs
     r, ops, t0 = sim.registers, sim.opcodes, regs[T]
     mem.regs = r
@@ -358,7 +368,8 @@ def capture(args):
         fx['cases'].append({'site': site, 'sp': sp, 'regs': [regs_in[i] for i in REGS],
                             **case_io(pre, lm, blind),
                             'exit': [lm.exit[i] for i in REGS], 'r': regs_in[R], 'rx': lm.exit[R],
-                            **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig,
+                            **({'ports': pl.log} if pl.log else {}),
+                            **({'outs': pl.outs} if pl.outs else {}), 't': dt, 'sig': sig,
                             **({'poked': {f'{a:04x}': v for a, v in pokes.items()}} if pokes else {})})
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
     fx['regs'] = REGS
@@ -379,10 +390,12 @@ def capture(args):
 
 def check(args):
     t = parse_target(args)
-    fixture = None
+    fixture, stamp = None, False
     while args:
         if args[0] == '--fixture':
             fixture = args[1]; del args[:2]
+        elif args[0] == '--stamp-r':
+            stamp = True; del args[:1]
         else:
             sys.exit(f'callio: unknown argument {args[0]}')
     if not fixture:
@@ -391,7 +404,7 @@ def check(args):
     src = h.memobj.m
     fx = json.load(open(fixture))
     rets = dict((s, e) for s, e in fx['calls'])
-    bad = 0
+    bad = stamped = 0
     for i, c in enumerate(fx['cases']):
         mem = bytearray(0x10000)
         for lo, hi in fx['code']:
@@ -413,6 +426,7 @@ def check(args):
         pl = PortLog(logged=c.get('ports', []))
         dt, _ = run_alone(lm, regs, rets[c['site']], ports=pl)
         portsok = not pl.bad and not pl.left() and ('rx' not in c or lm.exit[R] == c['rx'])
+        portsok = portsok and pl.outs == c.get('outs', [])
         hid = addrs(fx.get('blind', []))
         out = {a: lm.m[a] for a in lm.writes if a not in hid}
         seen = sorted(a for a in lm.writes if a in hid) == sorted(addrs(c.get('blind', [])))
@@ -425,6 +439,15 @@ def check(args):
                       f'{out == unruns(c["out"]) and seen}; exit registers agree: {ex == c["exit"]}; '
                       f'ports and R agree: {portsok}; '
                       f'unrecorded reads {[hex(a) for a in unread[:6]]}')
+        elif stamp and 'r' not in c:
+            c['r'], c['rx'] = regs[R], lm.exit[R]
+            stamped += 1
+    if stamp and not bad and stamped:
+        with open(fixture, 'w') as f:
+            json.dump(fx, f, separators=(',', ':'))
+        print(f'callio: stamped R at the CALL and the return on {stamped} cases (R at the CALL as the harness left it)')
+    elif stamp:
+        print(f'callio: nothing stamped ({bad} cases disagree, {stamped} lacked R)')
     ts = [c['t'] for c in fx['cases']]
     print(f'callio: {fixture}: {len(fx["cases"])} cases, {bad} disagree; T {min(ts)}-{max(ts)}')
     sys.exit(1 if bad else 0)
@@ -501,7 +524,8 @@ def derive(args):
                         **case_io(mem, lm, fx.get('blind', [])),
                         'exit': [lm.exit[k] for k in fx['regs']],
                         **({'r': regs[R], 'rx': lm.exit[R]} if 'r' in c else {}),
-                        **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig,
+                        **({'ports': pl.log} if pl.log else {}),
+                        **({'outs': pl.outs} if pl.outs else {}), 't': dt, 'sig': sig,
                         'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()},
                                     **({'r': rset} if rset is not None else {}),
                                     **({'port': {str(i): v for i, v in psets.items()}} if psets else {}),

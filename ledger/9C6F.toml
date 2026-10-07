@@ -39,3 +39,8 @@ by     = "python tools/adis.py 0x9336 26 ; python tools/adis.py 0x92E4 40 ; pyth
 kind   = "measured"
 says   = "fixture build/callio_9c6f.json: 30 play cases at $9745 (s1, p1 D+W, p1b) + 1 derived ($9C2B=1); every exit, time-up, Time 30..0 printed; ROM reads and glyphs as addresses (D5); --check 31/31, T 45-8023"
 by     = "python tools/callio.py --capture --state s1 --call 0x9745 0x9748 --blind 0x4000-0x57FF --out build/callio_9c6f.json (+ p1, p1b --append; --derive --case 0 --set 0x9C2B=1) ; then --check"
+
+[[fact]]
+kind   = "gated"
+says   = "the JS counts its M1 cycles into M1.m1 and matches R advanced in the real code (rx - r mod 128, stamped by callio --stamp-r) on every callio case"
+by     = "python tools/build.py ; node test/kit.test.js"

@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     $9745 play_pass -- every callee is now ported and gated ($B15A last); compose playPass from them and gate it against a callio fixture of the whole pass
-Step:     python tools/callio.py --help, then bracket the CALL $9745 at $AE29 (--call 0xAE29 0xAE2C); playPass must hand soundEffect's edges to the bridge stamped in simulated T (manual 11.10)
-Then:     live loop design must drive the menu generator across frames (ledger/8C54.toml open 1); $ABD2/$AD22 also call $900E with counts 3+ (ledger/900E.toml); Intro_Music $90D1 is a separate tune player, not yet read
+Unit:     $9745 play_pass -- R must be carried through the pass: M1 tallies into M1.m1 for the remaining callees, then compose playPass and gate it
+Step:     soundEffect's M1 first (sfx field m1; a delay pass DEC BC/LD A,B/OR C/JR NZ is 4 M1), then $97BB $9AD7 $95D4 $976F (callio rx - r), then $BF13+$8803 (rendfx m1); gate as in the $9C6F block
+Then:     whole-pass fixture: callio --capture --call 0xAE29 0xAE2C, --blind each timer row $400B-$470F, states s1, p1, 2P poke; add to port.json; gate playPass bytes, T, ports, outs, rx
 Blocked:  none
-Notes:    sfx.py --measure is the D6 gate (real ROM T = substitute T); fx1 has no writer in play; $B150 holds the request and soundEffect clears it
+Notes:    callio logs $FE writes as outs; all callio fixtures carry r/rx (9745 open 1: the R plan); live loop must drive the menu generator (8C54 open 1)

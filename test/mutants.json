@@ -650,8 +650,8 @@
  {
   "file": "template.html",
   "label": "9C6F: time-up never set",
-  "old": "  else { m[0x9C2B] = 1; t += 7 + 7 + 13; }",
-  "new": "  else { t += 7 + 7 + 13; }",
+  "old": "  else { m[0x9C2B] = 1; t += 7 + 7 + 13; M1.m1 += 2; }",
+  "new": "  else { t += 7 + 7 + 13; M1.m1 += 2; }",
   "increment": "9C6F-port",
   "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)"
  },
@@ -842,8 +842,8 @@
  {
   "file": "template.html",
   "label": "9ED2: same-facing reel values swapped",
-  "old": "if (tb(0xB47E)){ m[V + 0x03] = 0x16; return t + 7 + 10 + 30; }",
-  "new": "if (tb(0xB47E)){ m[V + 0x03] = 0x1A; return t + 7 + 10 + 30; }",
+  "old": "if (tb(0xB47E)){ m[V + 0x03] = 0x16; M1.m1 += 4; return t + 7 + 10 + 30; }",
+  "new": "if (tb(0xB47E)){ m[V + 0x03] = 0x1A; M1.m1 += 4; return t + 7 + 10 + 30; }",
   "increment": "9ED2-port",
   "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
  },
@@ -1998,5 +1998,69 @@
   "new": ".concat(fx.cases.some(c => c.kind === 'derivd') ? [] : ['derived']), []);",
   "increment": "B15A",
   "kills": "the sfx cases cover the early returns, all six effects and the BC wrap"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9C6F: tick block",
+  "old": "M1.m1 += 6;   // $9C87 to the JR NZ",
+  "new": "M1.m1 += 7;   // $9C87 to the JR NZ",
+  "increment": "9745",
+  "kills": "boutTimer counts the M1 cycles of every case as R advanced in the real $9C6F"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9336: digit tail",
+  "old": "t += 4 + 19 + 10 + 10 + 4; M1.m1 += 8;",
+  "new": "t += 4 + 19 + 10 + 10 + 4; M1.m1 += 7;",
+  "increment": "9745",
+  "kills": "boutTimer counts the M1 cycles of every case as R advanced in the real $9C6F"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9336: blanking loop",
+  "old": "t += 7 + 7 + 6 + 10; M1.m1 += 4;",
+  "new": "t += 7 + 7 + 6 + 10; M1.m1 += 3;",
+  "increment": "9745",
+  "kills": "boutTimer counts the M1 cycles of every case as R advanced in the real $9C6F"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9ED2: gap sense JR",
+  "old": "M1.m1 += vFirst ? 9 : 8;",
+  "new": "M1.m1 += vFirst ? 8 : 8;",
+  "increment": "9745",
+  "kills": "p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9ED2: same-facing reel",
+  "old": "t += 12 + 33; M1.m1 += 7;",
+  "new": "t += 12 + 33; M1.m1 += 6;",
+  "increment": "9745",
+  "kills": "p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9ED2: reel $1A exit",
+  "old": "{ m[V + 0x03] = 0x1A; M1.m1 += 3; return t + 12 + 30; }",
+  "new": "{ m[V + 0x03] = 0x1A; M1.m1 += 2; return t + 12 + 30; }",
+  "increment": "9745",
+  "kills": "p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9ED2: far range test",
+  "old": "t += 5 + 37; M1.m1 += 9;",
+  "new": "t += 5 + 37; M1.m1 += 8;",
+  "increment": "9745",
+  "kills": "p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2"
+ },
+ {
+  "file": "template.html",
+  "label": "M1 9D29: x copy",
+  "old": "M1.m1 += 1 + 4;                                  // the CALL and the copy",
+  "new": "M1.m1 += 1 + 3;                                  // the CALL and the copy",
+  "increment": "9745",
+  "kills": "p1HitsP2 counts the M1 cycles of every case as R advanced in the real $9D29"
  }
 ]

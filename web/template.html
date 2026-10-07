@@ -780,6 +780,10 @@ const fontGlyphs = {
 const font = new Uint8Array(0x300);
 for (const [c, g] of Object.entries(fontGlyphs)) font.set(g, (c - 0x20) * 8);
 const fontMiss = { count: 0, codes: new Set() };
+/* the M1 tally for R (ledger/A3FF.toml): every routine below that does not
+   take a counter of its own adds the M1 cycles it executes here, so a
+   caller reads R as R at its CALL plus M1.m1 (mod 128, bit 7 kept) */
+const M1 = { m1: 0 };
 
 /* $923A with its CALL: character a at screen address hl.  Returns T;
    the M1 count (for R) is added to cnt.m1 when cnt is given. */
@@ -834,36 +838,37 @@ function printString(m, pos, de, cnt){
 function printNumber(m, hl, pos){
   let t = 17 + 11 + 14;
   t += 17 + 11 + 11 + 11 + 10;                    // $9309 Process_Time with its CALL
+  M1.m1 += 4 + 5;
   let ix = 0x932C, de = 0x92FF;
   for (;;){
     const c = m[de], bc = m[de + 1] << 8 | c;
     de += 2;
-    t += 52;
+    t += 52; M1.m1 += 8;
     let a = 0x2F;
     for (;;){                                     // hl ends as the value before the add that failed
       a++;
       const s = hl + bc;
-      t += 4 + 4 + 4 + 11;
+      t += 4 + 4 + 4 + 11; M1.m1 += 5;
       if (s > 0xFFFF){ hl = s & 0xFFFF; t += 12; } else { t += 7; break; }
     }
     m[ix++] = a;
-    t += 4 + 19 + 10 + 10 + 4;
+    t += 4 + 19 + 10 + 10 + 4; M1.m1 += 8;        // with the JR NZ
     if (((c + 1) & 0xFF) === 0){ t += 7; break; }
     t += 12;
   }
   t += 10 + 10 + 10 + 10;
   m[ix] = 0;
-  t += 15 + 10 + 7 + 7 + 10 + 10;
+  t += 15 + 10 + 7 + 7 + 10 + 10; M1.m1 += 4 + 7;
   let p = 0x932C;
   for (;;){
-    t += 7 + 7 + 10;
+    t += 7 + 7 + 10; M1.m1 += 3;
     if (m[p] !== 0x30) break;
     m[p++] = 0x20;
-    t += 7 + 7 + 6 + 10;
+    t += 7 + 7 + 6 + 10; M1.m1 += 4;
   }
-  t += 10 + 7 + 7 + 10;
-  if (m[0x9330] === 0x20){ m[0x9330] = 0x30; t += 7 + 7; }
-  return t + 10 + printString(m, pos, 0x932C) + 10;
+  t += 10 + 7 + 7 + 10; M1.m1 += 4 + 1 + 1;     // with LD DE,$932C and the RET
+  if (m[0x9330] === 0x20){ m[0x9330] = 0x30; t += 7 + 7; M1.m1 += 2; }
+  return t + 10 + printString(m, pos, 0x932C, M1) + 10;
 }
 
 /* ---- bout_timer $9C6F: the bout clock --------------------------------
@@ -874,19 +879,21 @@ function printNumber(m, hl, pos){
    --capture --call 0x9745 0x9748 --blind 0x4000-0x57FF; ledger/9C6F.toml). */
 function boutTimer(m){
   let t = 17 + 13 + 4;
+  M1.m1 += 4;                                      // to the first RET NZ
   if (m[0x9C2B]) return t + 11;
-  t += 5 + 13 + 10 + 7;
+  t += 5 + 13 + 10 + 7; M1.m1 += 4;
   if (m[0xAA03] | m[0xAA43]) return t + 11;
-  t += 5 + 13 + 7;
+  t += 5 + 13 + 7; M1.m1 += 3;
   if (m[0xAA04] === 0x17) return t + 11;
-  t += 5 + 10 + 11;
+  t += 5 + 10 + 11; M1.m1 += 3;
   m[0x9CA6]--;                                    // Uint8Array: wraps as DEC (HL)
   if (m[0x9CA6]) return t + 11;
   m[0x9CA6] = 13;
-  t += 5 + 10 + 17 + 10 + 11 + 10;
+  t += 5 + 10 + 17 + 10 + 11 + 10; M1.m1 += 6;   // $9C87 to the JR NZ
   m[0x9CA5]--;
   if (m[0x9CA5]) t += 12;
-  else { m[0x9C2B] = 1; t += 7 + 7 + 13; }
+  else { m[0x9C2B] = 1; t += 7 + 7 + 13; M1.m1 += 2; }
+  M1.m1 += 4 + 1;
   return t + 13 + 7 + 4 + 10 + printNumber(m, m[0x9CA5], 0x0B00) + 10;
 }
 
@@ -1070,100 +1077,103 @@ function soundEffect(m, a, out){
 function hitTest(m, A, V, t){
   const D = m[A + 0x04];
   const tb = base => m[(base & 0xFF00) | ((base + D) & 0xFF)];
-  t += 13 + 4 + 10 + 4 + 4 + 4 + 7 + 4;
+  /* M1: one per instruction, two for SLA A; each RET's own is counted
+     with the test before it */
+  t += 13 + 4 + 10 + 4 + 4 + 4 + 7 + 4; M1.m1 += 9;
   if (!tb(0xA90D)) return t + 11;
-  t += 5 + 17;
+  t += 5 + 17; M1.m1 += 3;
   if (!m[A + 0x13]) return t + 11;
-  t += 5 + 17;
+  t += 5 + 17; M1.m1 += 3;
   if (m[A + 0x16]) return t + 11;
-  t += 5 + 17;
+  t += 5 + 17; M1.m1 += 3;
   if (m[A + 0x09]) return t + 11;
-  t += 5 + 29 + 17;
+  t += 5 + 29 + 17; M1.m1 += 8;
   if (m[A + 0x12] !== tb(0xA971)) return t + 11;
-  t += 5 + 30;
+  t += 5 + 30; M1.m1 += 4;
   const same = m[A + 0x17] === m[V + 0x17];
   const row = (same ? 0xA9BC : 0xA98A) + ((D << 1) & 0xFF);
   m[0xA06F] = m[row]; m[0xA070] = m[(row + 1) & 0xFFFF];
-  t += same ? 12 + 104 : 7 + 106;
+  t += same ? 12 + 104 : 7 + 106; M1.m1 += 14;
   const r = m[((m[0xA06F] | m[0xA070] << 8) + m[V + 0x12]) & 0xFFFF];
-  t += 69;
+  t += 69; M1.m1 += 9;
   if (r === 0x80) return t + 11;
   const E = (r + 0x80) & 0xFF;
   /* the gap's sense: the fall-through takes victim x - attacker x, when
      A+$17 is clear on the $A98A path, when it is set on the $A9BC path */
   const xa = A === 0xAA00 ? 0xA071 : 0xA072, xv = A === 0xAA00 ? 0xA072 : 0xA071;
   const vFirst = !m[A + 0x17] !== same;
-  t += 5 + 11 + (vFirst ? 66 : 59);
+  t += 5 + 11 + (vFirst ? 66 : 59); M1.m1 += vFirst ? 9 : 8;
   const C = ((vFirst ? m[xv] - m[xa] : m[xa] - m[xv]) + 0x80) & 0xFF;
-  t += 44;
+  t += 44; M1.m1 += 8;
   const near = tb(0xB47E) ? same : !same;   // the $9F65/$A000 test, else $9F83/$9FE4
   let pts = 0;
   if (near){
-    t += same ? 12 : 7;
+    t += same ? 12 : 7; M1.m1 += 1;
     if (same){                                // $A000: C = E hits, C > E misses
-      t += 15;
+      t += 15; M1.m1 += 3;
       if (C === E){ pts = 2; t += 5; }
-      else if (C > E) return t + 11;
-      else t += 5;
+      else if (C > E){ M1.m1 += 1; return t + 11; }
+      else { t += 5; M1.m1 += 1; }
     } else {                                  // $9F65: C < E tested, C = E hits
-      t += 8;
+      t += 8; M1.m1 += 3;
       if (C < E) t += 12;
-      else { t += 7; if (C === E){ pts = 2; t += 12; } else return t + 7 + 10; }
+      else { t += 7; M1.m1 += 1; if (C === E){ pts = 2; t += 12; } else { M1.m1 += 1; return t + 7 + 10; } }
     }
     if (!pts){
-      t += 37;
+      t += 37; M1.m1 += 8;
       if (((tb(0xA93F) + C) & 0xFF) >= E){ pts = 2; t += 12; }
       else {
-        t += 7 + 37;
+        t += 7 + 37; M1.m1 += 8;
         if (((tb(0xA958) + C) & 0xFF) >= E){ pts = 1; t += 12; }
-        else return t + 7 + 10;
+        else { M1.m1 += 1; return t + 7 + 10; }
       }
     }
   } else {                                    // $9F83 / $9FE4: C = E hits, C < E misses
     t += same ? 7 : 12;
-    t += 15;
+    t += 15; M1.m1 += 4;
     if (C === E){ pts = 2; t += 5; }
-    else if (C < E) return t + 11;
+    else if (C < E){ M1.m1 += 1; return t + 11; }
     else {
-      t += 5 + 37;
+      t += 5 + 37; M1.m1 += 9;
       if (((C - tb(0xA93F)) & 0xFF) < E){ pts = 2; t += 12; }
       else {
-        t += 7 + 37;
+        t += 7 + 37; M1.m1 += 8;
         if (((C - tb(0xA958)) & 0xFF) < E){ pts = 1; t += 12; }
-        else return t + 7 + 10;
+        else { M1.m1 += 1; return t + 7 + 10; }
       }
     }
   }
   m[A + 0x08] = pts;
-  t += 30 + 69 + 30;
+  t += 30 + 69 + 30; M1.m1 += 3 + 8 + 4;          // with the JR Z
   m[0xAA3F] = D;
   m[0xB150] = m[(0xA073 + D) & 0xFFFF];
   if (m[A + 0x17] !== m[V + 0x17]){
-    t += 7 + 33;
-    if (tb(0xB47E)){ m[V + 0x03] = 0x1A; return t + 12 + 30; }
-    t += 7 + 4 + 7;
+    t += 7 + 33; M1.m1 += 7;
+    if (tb(0xB47E)){ m[V + 0x03] = 0x1A; M1.m1 += 3; return t + 12 + 30; }
+    t += 7 + 4 + 7; M1.m1 += 3;
     if (D === 0x18) t += 12;
     else {
-      t += 7 + 7;
+      t += 7 + 7; M1.m1 += 2;
       if (D === 7) t += 12;
       else {
-        t += 7 + 7;
-        if (D !== 0x0C){ m[V + 0x03] = 0x16; return t + 12 + 30; }
+        t += 7 + 7; M1.m1 += 2;
+        if (D !== 0x0C){ m[V + 0x03] = 0x16; M1.m1 += 3; return t + 12 + 30; }
         t += 7;
       }
     }
-    m[V + 0x03] = 0x1B; m[0xB150] = 4;
+    m[V + 0x03] = 0x1B; m[0xB150] = 4; M1.m1 += 5;
     return t + 50;
   }
-  t += 12 + 33;
-  if (tb(0xB47E)){ m[V + 0x03] = 0x16; return t + 7 + 10 + 30; }
-  m[V + 0x03] = 0x1A;
+  t += 12 + 33; M1.m1 += 7;
+  if (tb(0xB47E)){ m[V + 0x03] = 0x16; M1.m1 += 4; return t + 7 + 10 + 30; }
+  m[V + 0x03] = 0x1A; M1.m1 += 3;
   return t + 12 + 30;
 }
 
 /* p2_hits_p1 $9ED2: the uncontended T from the CALL at $9748 to $974B
    (python tools/callio.py --capture --call 0x9748 0x974B) */
 function p2HitsP1(m){
+  M1.m1 += 1;                                      // the CALL
   return hitTest(m, 0xAA40, 0xAA00, 17);
 }
 
@@ -1172,6 +1182,7 @@ function p2HitsP1(m){
    (python tools/callio.py --capture --call 0x974B 0x974E) */
 function p1HitsP2(m){
   m[0xA071] = m[0xAA19]; m[0xA072] = m[0xAA59];
+  M1.m1 += 1 + 4;                                  // the CALL and the copy
   return hitTest(m, 0xAA00, 0xAA40, 17 + 52);
 }
 
@@ -2069,5 +2080,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, font, fontMiss };
+globalThis.__PORT__ = { Demo, demo, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, font, fontMiss, M1 };
 </script>

@@ -24,18 +24,21 @@ the target).
              tables, the inputs and the return address: every byte written
              and the T must agree, and no byte outside them may be read.
   --paths    with --check: how many cases take each render path.
+  --stamp-r  with --check: write each case's M1 count mod 128 (m1: how far
+             R advanced from $BF13 to $9793) into the fixture; once
+             stamped, --check compares it.
 
 Usage:
     python tools/rendfx.py --capture --state s1 [--frames 600] [--keys D+W]
                            [--per 2] [--near N] [--out build/rendfx_cases.json] [--append]
-    python tools/rendfx.py --check --state s1 [--paths] [--fixture build/rendfx_cases.json]
+    python tools/rendfx.py --check --state s1 [--paths] [--stamp-r] [--fixture build/rendfx_cases.json]
 """
 import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from harness import Harness, Simulator, SP, PC, T                 # noqa: E402,F401
+from harness import Harness, Simulator, SP, PC, T, R              # noqa: E402,F401
 from probeutil import parse_target, boot_target, source_label, TARGET_HELP  # noqa: E402
 from sprdec import runs, unruns                                   # noqa: E402
 
@@ -102,6 +105,7 @@ def run_alone(mem, regs, limit=5_000_000):
     for _ in range(limit):
         pc = r[PC]
         if pc == RET:
+            mem.exit_r = r[R]
             return r[T] - t0, pcs, mg
         if pc == TEST:
             mg = margin(mem.m)
@@ -211,10 +215,12 @@ def capture(args):
 
 def check(args):
     t = parse_target(args)
-    fixture, want_paths = FIXTURE, False
+    fixture, want_paths, stamp = FIXTURE, False, False
     while args:
         if args[0] == '--fixture':
             fixture = args[1]; del args[:2]
+        elif args[0] == '--stamp-r':
+            stamp = True; del args[:1]
         elif args[0] == '--paths':
             want_paths = True; del args[:1]
         else:
@@ -236,14 +242,17 @@ def check(args):
         mem[sp], mem[sp + 1] = RET & 0xFF, RET >> 8
         lm = Logged(mem)
         regs = list(h.regs)
-        regs[PC], regs[SP], regs[T] = ENTRY, sp, 0
+        regs[PC], regs[SP], regs[T], regs[R] = ENTRY, sp, 0, 0
         rt, pcs, mg = run_alone(lm, regs)
         margins.append(mg)
         stack = range(sp - 64, sp + 2)
         want = unruns(c['out'])
         out = {a: lm.m[a] for a in lm.written if a not in stack}
         unread = sorted(a for a in lm.reads if not constant(a) and a not in stack and a not in ins)
-        if out != want or rt != c['t'] or unread:
+        m1 = lm.exit_r & 0x7F                      # R from 0: the M1 count mod 128
+        if stamp:
+            c['m1'] = m1
+        if out != want or rt != c['t'] or unread or c.get('m1', m1) != m1:
             bad += 1
             if bad <= 5:
                 print(f'*** case {i}: T replay {rt} fixture {c["t"]}; writes agree: {out == want}; '
@@ -251,6 +260,10 @@ def check(args):
         for p in c['paths']:
             tally[p] = tally.get(p, 0) + 1
     ts = [c['t'] for c in fx['cases']]
+    if stamp and not bad:
+        with open(fixture, 'w') as f:
+            json.dump(fx, f, separators=(',', ':'))
+        print(f'rendfx: stamped the M1 count mod 128 (m1, R advanced from $BF13 to $9793) on every case')
     print(f'rendfx: {len(fx["cases"])} cases, {bad} disagree; T {min(ts)}-{max(ts)}')
     if want_paths:
         print('paths: ' + ', '.join(f'{k} {tally.get(k, 0)}' for k in PATHS))

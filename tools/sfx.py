@@ -22,7 +22,8 @@ depends on -- so the edge count and the total T are the real machine's.
              cases -- effect 0, Flag_Sound 0, each ROM effect over its
              substitute, and effect 4 from a chain of LFSR states carried
              call to call from s1 plus derived states that reach the
-             BC = 0 wrap (65536 passes) -- each with its uncontended T, the
+             BC = 0 wrap (65536 passes) -- each with its uncontended T, its
+             M1 count mod 128 (m1: how far R advanced), the
              $FE writes as [T from entry, value], and $B150-$B159 after.
 
 Usage:
@@ -34,7 +35,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from harness import Harness, rom48                                  # noqa: E402
+from harness import Harness, rom48, R                               # noqa: E402
 
 ENTRY = 0xB15A
 FLAG_SOUND = 0xB2FA
@@ -118,13 +119,14 @@ def run(h, a, flag=1, lfsr=None):
         h.poke(LFSR, *lfsr)
     h.ports.writes.clear()
     h.ports.record_writes = True
-    t0 = h.tstates()
+    t0, r0 = h.tstates(), h.sim.registers[R]
     ex, t, _ = h.call(ENTRY, {'A': a}, limit=400_000_000)
+    m1 = (h.sim.registers[R] - r0) & 0x7F
     h.ports.record_writes = False
     if ex != 0:
         sys.exit(f'sfx: effect {a} did not return (exit {ex})')
     w = [[tt - t0, v] for tt, p, v in h.ports.writes if p & 0xFF == 0xFE]
-    return t, w, h.peek(0xB150, 10).hex()
+    return t, w, h.peek(0xB150, 10).hex(), m1
 
 
 def twin(state):
@@ -148,12 +150,12 @@ def measure(state):
             print(f"fx{e} segment ${seg['de']:04X}-${seg['hl']:04X} mask ${seg['mask']:02X}: "
                   f"real n={seg['n']} sum={seg['sum']} zeros={seg['zeros']}")
         h.load_state(base)
-        t_real, w_real, _ = run(h, e)
+        t_real, w_real, _, _ = run(h, e)
         h.load_state(base)
         poke_subst(h, e, subst)
-        t_sub, w_sub, _ = run(h, e)
+        t_sub, w_sub, _, _ = run(h, e)
         hc.load_state(cbase)
-        t_cont, _, _ = run(hc, e)
+        t_cont, _, _, _ = run(hc, e)
         ok = t_real == t_sub and len(w_real) == len(w_sub)
         bad += not ok
         print(f"fx{e}: T real ROM {t_real}, substitute {t_sub}, writes {len(w_real)}/{len(w_sub)}"
@@ -178,9 +180,9 @@ def capture(state, out):
         h.poke(0xB150, a)
         lin = h.peek(LFSR, 3).hex() if lfsr is None else bytes(lfsr).hex()
         before = h.peek(0xB150, 10).hex()
-        t, w, after = run(h, a, flag, lfsr)
+        t, w, after, m1 = run(h, a, flag, lfsr)
         cases.append({'kind': kind, 'a': a, 'flag': flag, 'lfsr': lin, 'mem_in': before,
-                      'mem_out': after, 't': t, 'writes': w})
+                      'mem_out': after, 't': t, 'm1': m1, 'writes': w})
         print(f"case {len(cases) - 1}: {kind} A={a} flag={flag} LFSR {lin} -> T {t}, {len(w)} writes")
 
     h.load_state(base)
