@@ -40,3 +40,13 @@ says   = "dead on hardware: $A094 fall ($AA03/$AA43 tested 0 before each AI call
 by     = "python tools/adis.py 0xA090 6 ; python tools/grepbytes.py \"9A A4\" ; python tools/adis.py 0x8B1F 70"
 window = "$97CB-$98BE, $8B1F-$8BD1, $A090-$A5EB"
 n      = 0
+
+[[fact]]
+kind   = "measured"
+says   = "three mutants dropped as equivalent on hardware: $A090 A5F4 test (A5F4 is 0 whenever the AI runs, fact 6), the $98A2 fire fold (bits 0-4 only, fact 6), R bit 7 at $A3FF (no LD R,A ED 4F anywhere in the 64K, so R bit 7 stays 0)"
+by     = "python tools/grepbytes.py \"ED 4F\" ; python tools/adis.py 0xA090 6"
+
+[[fact]]
+kind   = "gated"
+says   = "27 controlPass/AI mutants all killed; 3 derived cases added to kill them (case 1 with R=$0D; $AA19=$5B for d=$D4; Kempston $08 via --derive --port); fixture 673 cases"
+by     = "python tools/mutants.py --affected ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"

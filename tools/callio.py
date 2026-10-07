@@ -59,7 +59,11 @@ how many reads were fetches.
              "derived" with its parent and the bytes set.  The oracle is
              still the machine code; the input is constructed, so say so
              wherever the case is counted.  --r VAL replays it with R at
-             the CALL set to VAL instead (the AI's draws, Q18).
+             the CALL set to VAL instead (the AI's draws, Q18).  --port
+             I=VAL[,...] answers the parent's I-th logged port read (from 0)
+             with VAL: a key or Kempston value on a path driven play already
+             took, which --capture drops as a repeat PC set.  The derived
+             case must read the same ports in the same order.
 
 Usage:
     python tools/callio.py --state NAME --call SITE RET [--frames 1500] [--keys D+W]
@@ -394,7 +398,7 @@ def check(args):
 
 def derive(args):
     t = parse_target(args)
-    fixture, base, sets, rset = None, None, {}, None
+    fixture, base, sets, rset, psets = None, None, {}, None, {}
     while args:
         if args[0] == '--fixture':
             fixture = args[1]; del args[:2]
@@ -407,9 +411,14 @@ def derive(args):
             del args[:2]
         elif args[0] == '--r':
             rset = int(args[1], 0); del args[:2]
+        elif args[0] == '--port':
+            for kv in args[1].split(','):
+                i, v = kv.split('=')
+                psets[int(i, 0)] = int(v, 0)
+            del args[:2]
         else:
             sys.exit(f'callio: unknown argument {args[0]}')
-    if not fixture or base is None or not (sets or rset is not None):
+    if not fixture or base is None or not (sets or psets or rset is not None):
         sys.exit('callio: --derive needs --fixture FILE --case N --set ADDR=VAL[,ADDR=VAL...]')
     h = boot_target(t, 'callio')
     fx = json.load(open(fixture))
@@ -434,7 +443,12 @@ def derive(args):
         if 'r' not in c:
             sys.exit('callio: --r needs a fixture that records R (r, rx)')
         regs[R] = rset
-    pl = PortLog(logged=c.get('ports', []))
+    ports = [list(p) for p in c.get('ports', [])]
+    if any(not 0 <= i < len(ports) for i in psets):
+        sys.exit(f'callio: --port indexes the parent\'s {len(ports)} logged reads')
+    for i, v in psets.items():                     # the value the machine answers; the port stays
+        ports[i][1] = v
+    pl = PortLog(logged=ports)
     dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], ports=pl)
     if pl.bad or pl.left():
         sys.exit('callio: the derived case reads the ports differently from its parent; derive another way')
@@ -448,7 +462,8 @@ def derive(args):
                         **({'r': regs[R], 'rx': lm.exit[R]} if 'r' in c else {}),
                         **({'ports': pl.log} if pl.log else {}), 't': dt, 'sig': sig,
                         'derived': {'from': base, 'set': {f'{a:04x}': v for a, v in sets.items()},
-                                    **({'r': rset} if rset is not None else {})}})
+                                    **({'r': rset} if rset is not None else {}),
+                                    **({'port': {str(i): v for i, v in psets.items()}} if psets else {})}})
     with open(fixture, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
     print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {dt}; PCs no case reached before: '

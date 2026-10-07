@@ -1102,5 +1102,221 @@
   "new": "if (!m[A + 0x0C]) return t + 5;",
   "increment": "95D4-port",
   "kills": "fighterMotion tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "control: keyTest row select one short",
+  "old": "for (let i = 0; i < b; i++){ cy = sel & 1;",
+  "new": "for (let i = 1; i < b; i++){ cy = sel & 1;",
+  "increment": "97CB-mut",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "control: keyTest bit count from code>>4",
+  "old": "c = ((5 - (code >> 3)) & 0xFF) || 256;",
+  "new": "c = ((5 - (code >> 4)) & 0xFF) || 256;",
+  "increment": "97CB-mut",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "control: keyTest T per bit 19",
+  "old": "+ 20 * c - 5 + 10,",
+  "new": "+ 19 * c - 5 + 10,",
+  "increment": "97CB-mut",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "control: quit key 1 tested as 2",
+  "old": "if (keyTest(1)[0]){ k(12, 1); return play(); }",
+  "new": "if (keyTest(2)[0]){ k(12, 1); return play(); }",
+  "increment": "97CB-mut",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "control: quit leaves Num_Players",
+  "old": "    m[0x9C2C] = 0;\n    return out(0x80);",
+  "new": "    return out(0x80);",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: quit returns $00",
+  "old": "    return out(0x80);",
+  "new": "    return out(0);",
+  "increment": "97CB-mut",
+  "kills": "controlPass returns the A the real $97CB returned (the RET M at $975B)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: Kempston fire bit $08",
+  "old": "if (a & 0x10) return notYet(",
+  "new": "if (a & 0x08) return notYet(",
+  "increment": "97CB-mut",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "control: demo flag P2 not set",
+  "old": "m[0xAA46] = 1; m[0xAA06] = 1;",
+  "new": "m[0xAA06] = 1;",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: P1 moving copies AA05 from AA02",
+  "old": "if (m[0xAA03]){ m[0xAA05] = m[0xAA03];",
+  "new": "if (m[0xAA03]){ m[0xAA05] = m[0xAA02];",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: P2 table from P1 pointer",
+  "old": "else { hl = m[0x8BE6] | m[0x8BE7] << 8;",
+  "new": "else { hl = m[0x8BD2] | m[0x8BD3] << 8;",
+  "increment": "97CB-mut",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "control: Kempston table address",
+  "old": "if (hl === 0x8C42){ m[0x900D] = 1;",
+  "new": "if (hl === 0x8C44){ m[0x900D] = 1;",
+  "increment": "97CB-mut",
+  "kills": "controlPass reads the same ports in the same order as the real $97CB"
+ },
+ {
+  "file": "template.html",
+  "label": "control: Kempston read not inverted",
+  "old": "if (m[0x900D]){ v = io.in(0x001F);",
+  "new": "if (m[0x900D]){ v = ~io.in(0x001F) & 0xFF;",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: control bits 7 and 8 swapped",
+  "old": "const bits = [0x01, 0x09, 0x08, 0x0A, 0x02, 0x06, 0x04, 0x05, 0x10];",
+  "new": "const bits = [0x01, 0x09, 0x08, 0x0A, 0x02, 0x06, 0x05, 0x04, 0x10];",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: facing row offset $20",
+  "old": "return hl + 0x21;",
+  "new": "return hl + 0x20;",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: P2 return value from P1",
+  "old": "    m[0xAA45] = v;\n    k(30, 3);\n    return out(v);",
+  "new": "    m[0xAA45] = v;\n    k(30, 3);\n    return out(m[0xAA05]);",
+  "increment": "97CB-mut",
+  "kills": "controlPass returns the A the real $97CB returned (the RET M at $975B)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: LDIR last byte not 5 short",
+  "old": "k(30 + 21 * len - 5, 3 + 2 * len)",
+  "new": "k(30 + 21 * len, 3 + 2 * len)",
+  "increment": "97CB-mut",
+  "kills": "controlPass tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "control: aux copy $11 bytes",
+  "old": "function aux(s){ copy(s, 0xA60B, 0x12);",
+  "new": "function aux(s){ copy(s, 0xA60B, 0x11);",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "control: rnd M1 count 1",
+  "old": "  function rnd(){                                  // $A3FF Random_Number, CALL not counted\n    k(9, 2);",
+  "new": "  function rnd(){                                  // $A3FF Random_Number, CALL not counted\n    k(9, 1);",
+  "increment": "97CB-mut",
+  "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: draw masked by A60A",
+  "old": "const a = rnd() & m[0xA646];",
+  "new": "const a = rnd() & m[0xA60A];",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: draw sign test $40",
+  "old": "if (v & 0x80){ b = 9; k(7, 1); }",
+  "new": "if (v & 0x40){ b = 9; k(7, 1); }",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: A610 mask A619 as A61A",
+  "old": "m[0xA610] = rnd() & m[0xA619];",
+  "new": "m[0xA610] = rnd() & m[0xA61A];",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: A611 mask A617 as A619",
+  "old": "m[0xA611] = rnd() & m[0xA617];",
+  "new": "m[0xA611] = rnd() & m[0xA619];",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: A61C mask A60F as A610",
+  "old": "m[0xA61C] = rnd() & m[0xA60F];",
+  "new": "m[0xA61C] = rnd() & m[0xA610];",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: A616 countdown ignored",
+  "old": "if (--m[0xA616]){ k(32, 3); return; }",
+  "new": "if (m[0xA616]){ k(32, 3); return; }",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: range edge $D5 as $D4",
+  "old": "if (d >= 0xD5){ k(32, 3); return a2c7(); }",
+  "new": "if (d >= 0xD4){ k(32, 3); return a2c7(); }",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: range edge $15 as $16",
+  "old": "if (d < 0x15){ k(19, 2); return a2c7(); }",
+  "new": "if (d < 0x16){ k(19, 2); return a2c7(); }",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai: a292 forgets A60E",
+  "old": "m[0xA5F6] = 0x12; m[0xA60E] = 1; k(63, 6); }",
+  "new": "m[0xA5F6] = 0x12; k(63, 6); }",
+  "increment": "97CB-mut",
+  "kills": "controlPass writes every byte the real $97CB wrote (callio cases)"
  }
 ]
