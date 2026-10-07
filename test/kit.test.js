@@ -1739,6 +1739,67 @@ liveGate(P.assets.live, 'P2', 'lost');
 liveGate(P.assets.live_p1w, 'P1', 'won');
 liveGate(P.assets.live_time, 'time', 'draw');
 
+/* bouts at dans 2-8, from the user's snapshots (in the new stage's tune
+   after a won bout; optional fixtures, absent from a fresh clone): the
+   machine's samples followed row for row as liveGate's, through whatever
+   the bout reaches in 400 passes -- points, P2's win into the demo (dan
+   6) -- and the 7.2 charge within 0.5% of the contended machine.  The AI
+   at Also_Rank 2-8, never sampled from the tape's state */
+function followGate(L, who){
+  const fnv = (m, lo, hi) => { let h = 0x811C9DC5;
+    for (let a = lo; a <= hi; a++){
+      if (L.skip.some(([s, e]) => s <= a && a <= e)) continue;
+      h = Math.imul(h ^ m[a], 0x01000193) >>> 0;
+    } return h; };
+  const plan = [];
+  for (const seg of (L.script || '').split(',')){
+    const [n, keys] = seg.split(':');
+    for (let i = 0; i < +n; i++) plan.push(keys ? keys.split('+') : []);
+  }
+  const row = (m, r) => [...L.vars.map(([, a, n]) => n > 1
+      ? Buffer.from(m.subarray(a, a + n)).toString('hex').toUpperCase()
+      : m[a].toString(16).toUpperCase().padStart(2, '0')), r, ...L.hash.map(([lo, hi]) => fnv(m, lo, hi))];
+  const want = r => [...r.v, r.r, ...r.h];
+  const names = ['PC', ...L.vars.map(v => v[0]), 'R', ...L.hash.map(([lo, hi]) => `hash $${lo.toString(16)}-$${hi.toString(16)}`)];
+  const seq = [];                                  // as liveGate's: $AD18 kept only after the setup
+  L.rows.slice(1).forEach((r, i) => {
+    let carry = 0;
+    (r.s || []).forEach(x => {
+      if (x.pc === 0xAD18 && !r.m.includes(0xACA6)){ carry += x.t; return; }
+      seq.push({ ...x, t: x.t + carry, p: i + 1, sub: true }); carry = 0;
+    });
+    seq.push({ ...r, t: r.t + carry, pc: L.at, p: i + 1 });
+  });
+  const g = new P.Fist(L.start), kb = new S.Keyboard();
+  const pcNow = () => g.exit ? g.exit.at : g.enter ? 0xAD18 : g.demoAt ? 0xAC3C : g.demoNext !== null ? 0xABB9 : g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
+  const disp = L.hash.findIndex(([lo]) => lo === 0x4000);
+  let first = '', k = 0, round = 0, blind = false, sum = 0;
+  check(`${who}: the engine starts from the first row the machine sampled`, row(g.m, g.r), want(L.rows[0]));
+  for (; k < seq.length; k++){
+    if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt && g.demoNext === null){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
+    let cost = g.pass(kb);
+    if (g.setup) cost += g.pass(kb);
+    if (g.exit && g.exit.at !== seq[k].pc){ first = `row ${seq[k].p}: the engine stopped (${g.exit.exit} at $${g.exit.at.toString(16)})`; break; }
+    sum += cost / seq[k].t;
+    const got = [pcNow(), ...row(g.m, g.r)], w = [seq[k].pc, ...want(seq[k])];
+    if (g.stage) blind = true;                     // a new stage's text rows stay in the font (D5)
+    if (blind) got[1 + L.vars.length + 1 + disp] = w[1 + L.vars.length + 1 + disp];
+    if (JSON.stringify(got) !== JSON.stringify(w)){
+      const j = got.findIndex((x, i) => x !== w[i]);
+      first = `${seq[k].sub ? `sub-row ($${seq[k].pc.toString(16).toUpperCase()}) of ` : ''}row ${seq[k].p}: ${names[j]} ${got[j]} want ${w[j]}`; break;
+    }
+  }
+  const pts = L.rows.filter(r => r.m.includes(0xAD1B)).length;
+  check(`${who}: the engine follows the machine sample for sample over keyed 1P play to the fixture's last row (${pts} point(s) played${L.rows.some(r => r.m.includes(0xAC09)) ? ', P2 wins into the demo' : ''})`,
+        [first, k], ['', seq.length]);
+  checkTrue(`${who}: ...and the 7.2 charge is within 0.5% of the contended machine`, Math.abs(sum / k - 1) < 0.005, `mean ${(sum / k).toFixed(5)}`);
+}
+for (let n = 2; n <= 8; n++){
+  const L = P.assets[`live_dan${n}`];
+  if (L) followGate(L, `dan ${n}`);
+  else console.log(`  note  live_dan${n} absent (the user's snapshot, not in the repository): its gate not run`);
+}
+
 /* the demo's ways on that live play has not reached yet (its bouts so far
    end by a pose): time up and the quit to $ABB9 with A = 0 / negative, the
    round end into $ACF0's loop at endStart's T.  Wiring only: demoPoint and

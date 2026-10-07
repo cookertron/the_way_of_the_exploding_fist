@@ -175,6 +175,48 @@
       "note": "oracle for the demo's ways on $ABB9 to the next stage's $AE29 or the RET to $AC27: python tools/callio.py --capture --state p1 --call 0xABB9 0xAE29,0xAC27 --frames 9000 --per 3 with demo_ac3c's blinds (the text cells, D5), then --derive case 0 --up 0xAC27 with --set 0xB05F=3 / --reg 0=0x80 / --set 0xB05F=3,0xAF34=3"
     },
     {
+      "key": "live_dan2",
+      "file": "build/live_dan2.json",
+      "required": false,
+      "note": "live rows for a bout at dan 2, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/1st_dan_to_2nd_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan2; then python tools/sample.py --state dan2 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_dan3",
+      "file": "build/live_dan3.json",
+      "required": false,
+      "note": "live rows for a bout at dan 3, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/2nd_dan_to_3rd_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan3; then python tools/sample.py --state dan3 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_dan4",
+      "file": "build/live_dan4.json",
+      "required": false,
+      "note": "live rows for a bout at dan 4, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/3rd_dan_to_4th_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan4; then python tools/sample.py --state dan4 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_dan5",
+      "file": "build/live_dan5.json",
+      "required": false,
+      "note": "live rows for a bout at dan 5, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/4th_dan_to_5th_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan5; then python tools/sample.py --state dan5 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_dan6",
+      "file": "build/live_dan6.json",
+      "required": false,
+      "note": "live rows for a bout at dan 6, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/5th_dan_to_6th_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan6; then python tools/sample.py --state dan6 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_dan7",
+      "file": "build/live_dan7.json",
+      "required": false,
+      "note": "live rows for a bout at dan 7, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/6th_dan_to_7th_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan7; then python tools/sample.py --state dan7 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_dan8",
+      "file": "build/live_dan8.json",
+      "required": false,
+      "note": "live rows for a bout at dan 8, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/7th_dan_to_8th_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan8; then python tools/sample.py --state dan8 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
       "key": "live",
       "file": "build/live_p1.json",
       "required": true,

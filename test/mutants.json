@@ -4211,5 +4211,21 @@
   "old": "  const q = (demo ? demoPoint : pointPath)(m, b.a, b.r);",
   "new": "  const q = pointPath(m, b.a, b.r);",
   "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "DAN: a402: the AI's tables indexed by $A614 AND 3 (the higher ranks' rows lost)",
+  "old": "  const b = m[0xA614], at = base =>",
+  "new": "  const b = m[0xA614] & 3, at = base =>",
+  "increment": "DAN",
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "DAN: a402: the AI's tables indexed one row down",
+  "old": "  const b = m[0xA614], at = base =>",
+  "new": "  const b = m[0xA614] ? m[0xA614] - 1 : 0, at = base =>",
+  "increment": "DAN",
+  "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  }
 ]
