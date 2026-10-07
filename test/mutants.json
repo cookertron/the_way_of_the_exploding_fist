@@ -3074,8 +3074,8 @@
  {
   "file": "template.html",
   "label": "AD94 win: Fist: P2 win stops the engine",
-  "old": "    if (res.exit === 'p2' || res.exit === 'p1'){",
-  "new": "    if (res.exit === 'p1'){",
+  "old": "    if (res.exit !== 'time' && res.exit !== 'p1' && res.exit !== 'p2') return 0;",
+  "new": "    if (res.exit !== 'time' && res.exit !== 'p1') return 0;",
   "increment": "AD94-win",
   "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3294,5 +3294,125 @@
   "new": "        t += b.t;",
   "increment": "AD5F-bonus",
   "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won)"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: timeUp: a level count goes to P2",
+  "old": "  if (m[0xAA01] < m[0xAA41]) return { t: t + 12, exit: 'p2' };",
+  "new": "  if (m[0xAA01] <= m[0xAA41]) return { t: t + 12, exit: 'p2' };",
+  "increment": "AD44-time",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: timeUp: the tally's P2 arm wins for P1",
+  "old": "  if (m[0xAA02] < m[0xAA42]) return (t += 12, call('p2'));",
+  "new": "  if (m[0xAA02] < m[0xAA42]) return (t += 12, call('p1'));",
+  "increment": "AD44-time",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: timeUp: the draw's RET uncharged",
+  "old": "{ t: t + 12 + 7 + 10, exit: 'draw' }",
+  "new": "{ t: t + 12 + 7, exit: 'draw' }",
+  "increment": "AD44-time",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: timeUp: the draw one M1 short",
+  "old": "(M1.m1 += 2, { t: t + 12 + 7 + 10, exit: 'draw' })",
+  "new": "(M1.m1 += 1, { t: t + 12 + 7 + 10, exit: 'draw' })",
+  "increment": "AD44-time",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: timeUp: the stub CALL's RET uncharged",
+  "old": "{ t: t + 17 + 10, exit }",
+  "new": "{ t: t + 17, exit }",
+  "increment": "AD44-time",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: endStart: the draw's script $19",
+  "old": "return poseBoth(m, 0x1C) + 17; }",
+  "new": "return poseBoth(m, 0x19) + 17; }",
+  "increment": "AD44-time",
+  "kills": "endStart, winPass on $AA0D and endTail match the real $AE67 to $AD1B (time up, the round end): bytes, T, R and A = (IX) exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: drawPose: the round end's script $1C",
+  "old": "function drawPose(m){ M1.m1 += 1; return poseBoth(m, 0x19) + 17; }",
+  "new": "function drawPose(m){ M1.m1 += 1; return poseBoth(m, 0x1C) + 17; }",
+  "increment": "AD44-time",
+  "kills": "timeUp, drawStart and winPass on $AA0D match the real $AD44 to the return of the CALL $ACE8 at $ACD3 (the draw: both to script $19): bytes, T and R exactly, 66 passes"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: endTail: A the low byte of IX, not (IX)",
+  "old": "a: m[m[0xC428] | m[0xC429] << 8] }",
+  "new": "a: m[0xC428] }",
+  "increment": "AD44-time",
+  "kills": "endStart, winPass on $AA0D and endTail match the real $AE67 to $AD1B (time up, the round end): bytes, T, R and A = (IX) exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: endTail: one delay's M1 (the slip this unit found)",
+  "old": "const t = 17 + 10 + delayLoop(0, 0) + 17 + 10 + delayLoop(0, 0) + 10;",
+  "new": "const t = 2 * (17 + 10 + delayLoop(0, 0)) + 10;",
+  "increment": "AD44-time",
+  "kills": "endStart, winPass on $AA0D and endTail match the real $AE67 to $AD1B (time up, the round end): bytes, T, R and A = (IX) exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: poseBoth: P1's facing kept",
+  "old": "for (const z of [0xAA0D, 0xAA0B, 0xAA4B, 0xAA16, 0xAA56]) m[z] = 0;",
+  "new": "for (const z of [0xAA0D, 0xAA0B, 0xAA4B, 0xAA56]) m[z] = 0;",
+  "increment": "AD44-time",
+  "kills": "endStart, winPass on $AA0D and endTail match the real $AE67 to $AD1B (time up, the round end): bytes, T, R and A = (IX) exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: Fist: the draw's pose one CALL deeper",
+  "old": "(this.sp + (this.both === 'draw' ? 2 : -2))",
+  "new": "(this.sp + (this.both === 'draw' ? -2 : -2))",
+  "increment": "AD44-time",
+  "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: Fist: time up posed as the draw",
+  "old": "res.exit = null; this.both = 'end';",
+  "new": "res.exit = null; this.both = 'draw';",
+  "increment": "AD44-time",
+  "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: drawStart: $ACA6-$ACD1 uncharged",
+  "old": "  return 4 + 10 + 7 + 7 + drawPose(m);",
+  "new": "  return drawPose(m);",
+  "increment": "AD44-time",
+  "kills": "timeUp, drawStart and winPass on $AA0D match the real $AD44 to the return of the CALL $ACE8 at $ACD3 (the draw: both to script $19): bytes, T and R exactly, 66 passes"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: drawStart: one M1 short",
+  "old": "  M1.m1 += 4;\n  return 4 + 10 + 7 + 7 + drawPose(m);",
+  "new": "  M1.m1 += 3;\n  return 4 + 10 + 7 + 7 + drawPose(m);",
+  "increment": "AD44-time",
+  "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44 time: Fist: the round end returns A = $80 (quit)",
+  "old": "res = pointPath(this.m, e.a, this.r);",
+  "new": "res = pointPath(this.m, 0x80, this.r);",
+  "increment": "AD44-time",
+  "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
  }
 ]

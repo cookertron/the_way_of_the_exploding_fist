@@ -1,0 +1,30 @@
+# ledger/AD44.toml -- current truth about time_up (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "time_up"
+entries  = ["$AD44", "$AE67", "$ACCF"]
+oracle   = "tools/callio.py"
+fixtures = ["end_ae67", "time_ad44", "draw_ad44", "live_time"]
+port     = "timeUp"
+manual   = ["7.2", "Q11"]
+
+[[fact]]
+kind   = "insn"
+at     = "$AD44"
+says   = "time up: $AE67 poses both ($1C, loop $AD0B), two $AF1A, RET to $AD1B with A = (IX), IX = word $C428; $AD44 compares $AA01/$AA41 then $AA02/$AA42: $AD5F, $AD94, or the draw A=$81: $ACCF CALL $ACE8 (both $19), JP $AC5F"
+by     = "python tools/adis.py 0xAE5C 12 ; python tools/adis.py 0xAD18 50 ; python tools/adis.py 0xACC6 12 ; python tools/grepbytes.py \"DD 2A\" --range 0x8000 0xFFFF"
+
+[[fact]]
+kind   = "measured"
+says   = "endStart, endTail, timeUp, drawStart and winPass match the machine on $AE67-$AD1B (1 case), $AD44-$ACA6 (5: draw, by count, by tally) and $AD44-$ACD6 (the draw pose): bytes, T, R; starts constructed"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ad44.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "Fist follows live_time (Time poked to 1) sample for sample: 34 round passes, 3 round-end passes at $AD0B, the draw, 66 pose passes, out at $AC5F on the machine's row; drawStart's charge only to the 0.5% mean"
+by     = "node test/kit.test.js (live block, time)"
+
+[[open]]
+ask    = "is (IX) at $AE78 -- the first byte of the frame at word $C428 -- ever >= $80, taking the RET M at $AD1C after time up (pointPath quit)?"
+tried  = "one played case: $C428 = $F3D4, ($F3D4) = 1"
+settle = "list the first byte of every frame reachable through $C440 + 2*$C423 and $44CC (renderFighters), or capture $AE67 cases from other poses"

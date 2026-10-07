@@ -109,6 +109,30 @@
       "note": "oracle for P1 winning the 1UP bout, $AD5F through the pose $AE7A and the time bonus to $ACA6, the start constructed (P1's count poked to 4, so the script's first point wins): python tools/callio.py --capture --state p1 --poke 0xAA01=4 --call 0xAD5F 0xACA6 --frames 3000 --blind 0x4000-0x471F, then --derive case 0 --set 0x9CA5=0 (no time left)"
     },
     {
+      "key": "end_ae67",
+      "file": "build/callio_ae67.json",
+      "required": true,
+      "note": "oracle for the round end at time up, $AE67 through the loop $AD0B and two delays $AF1A to the RET at $AD1B, the start constructed (Time poked to 1, so the clock runs out unpointed): python tools/callio.py --capture --state p1 --poke 0x9CA5=1 --call 0xAE67 0xAD1B --frames 3000 --blind 0x4000-0x471F"
+    },
+    {
+      "key": "time_ad44",
+      "file": "build/callio_ad44.json",
+      "required": true,
+      "note": "oracle for the time-up decision $AD44 to $ACA6, each start constructed and played, not derived (derive reads Time from the image, not the machine's 0): python tools/callio.py --capture --state p1 --call 0xAD44 0xACA6 --frames 3000 --blind 0x4000-0x471F --poke 0x9CA5=1 (the draw), then --append with 0x9CA5=1 and 0xAA01=1 / 0xAA41=1 / 0xAA02=5 / 0xAA42=5"
+    },
+    {
+      "key": "draw_ad44",
+      "file": "build/callio_ad44d.json",
+      "required": true,
+      "note": "oracle for the draw, $AD44 through $ACA6, $ACCF and the pose CALL $ACE8 (both fighters to script $19 in $ACF0's loop) to its return at $ACD6, the start constructed (Time poked to 1, counts level): python tools/callio.py --capture --state p1 --poke 0x9CA5=1 --call 0xAD44 0xACD6 --frames 3000 --blind 0x4000-0x471F"
+    },
+    {
+      "key": "live_time",
+      "file": "build/live_time.json",
+      "required": true,
+      "note": "live rows for time up and the draw, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0x9CA5=1 --passes 200 --also 0xAD0B --also 0xAE8E --also 0xAEB2 --also 0xAD6E --json build/live_time.json with live_p1w's script, vars, marks, hashes and skips"
+    },
+    {
       "key": "live_p1w",
       "file": "build/live_p1w.json",
       "required": true,

@@ -2314,6 +2314,58 @@ function bonusPass(m){
   return { t: t + bonusOut(m), out: true };
 }
 
+/* ---- time up: the round end $AE67-$AE78 and the decision $AD44-$AD9B ---
+   (python tools/adis.py 0xAE5C 12 ; python tools/adis.py 0xACE8 20 ;
+   python tools/adis.py 0xAD18 50.)  With $9C2B set and no point, round_loop
+   leaves at $AE67: both fighters to script $1C, CALL $ACF0 (A+$0B, A+$0D,
+   the facings cleared, both heights $7A), whose loop at $AD0B is winPass's
+   shape on P1's done flag $AA0D; then two long delays $AF1A and the RET to
+   $AD1B with A = (IX), IX the word at $C428 that $BF13 last loaded at
+   $BF82.  endStart: $AE67 to the loop top; the loop: winPass(m, $AA00, sp
+   - 2), one CALL deeper than the pose; endTail: $AE72 to the RET, and A.
+   pointPath then leaves by 'time' to $AD44, where timeUp compares the
+   counts $AA01/$AA41, then the tallies $AA02/$AA42: 'p1' (on at $AD5F, by
+   $AD5C's CALL to a RET when the tallies decide), 'p2' (at $AD94, by
+   $AD91's) or 'draw' ($AD99: A = $81 to $ACA6).  The draw: $ACA6 to
+   $ACCF, CALL $ACE8, both fighters to script $19 in the same loop, its RET
+   and JP $AC5F, the next bout (drawStart, then winPass as the round end's,
+   then 10 T; timeUp to the draw, drawStart and the loop gated against
+   --call 0xAD44 0xACD6, build/callio_ad44d.json).  Gated whole against
+   python tools/callio.py --capture --call 0xAE67 0xAD1B and --call 0xAD44
+   0xACA6, the start constructed (Time poked to 1, the counts poked;
+   build/callio_ae67.json, build/callio_ad44.json), and live. */
+function poseBoth(m, s){                          // LD A,s: LD ($AA0C),A: LD ($AA4C),A, then $ACF0 to the loop top $AD0B
+  m[0xAA0C] = m[0xAA4C] = s;
+  for (const z of [0xAA0D, 0xAA0B, 0xAA4B, 0xAA16, 0xAA56]) m[z] = 0;
+  m[0xAA18] = m[0xAA58] = 0x7A;
+  M1.m1 += 3 + 10;                                 // XOR A, LD (nn),A x6, LD A,n, LD (nn),A x2
+  return 7 + 13 + 13 + 4 + 6 * 13 + 7 + 2 * 13;
+}
+function endStart(m){ M1.m1 += 1; return poseBoth(m, 0x1C) + 17; }   // $AE67, its CALL $ACF0
+function drawPose(m){ M1.m1 += 1; return poseBoth(m, 0x19) + 17; }   // CALL $ACE8: both to script $19
+function drawStart(m){                             // $ACA6 AND A: JP M; $ACCF CP $81: JR NZ, then drawPose
+  M1.m1 += 4;
+  return 4 + 10 + 7 + 7 + drawPose(m);
+}
+function endTail(m){
+  M1.m1 += 2 * 2 + 1;                              // CALL $AF1A: LD BC,0, twice; RET
+  const t = 17 + 10 + delayLoop(0, 0) + 17 + 10 + delayLoop(0, 0) + 10;   // each delay counts its own M1
+  return { t, a: m[m[0xC428] | m[0xC429] << 8] };  // LD A,(IX) last in $AF1D
+}
+function timeUp(m){
+  let t = 13 + 10 + 7; M1.m1 += 3;                 // LD A,($AA01): LD HL,$AA41: CP (HL)
+  const call = exit => (M1.m1 += 2, { t: t + 17 + 10, exit });   // CALL $AE78 / $AE9B, to a RET
+  M1.m1 += 1;
+  if (m[0xAA01] < m[0xAA41]) return { t: t + 12, exit: 'p2' };   // JR C
+  t += 7; M1.m1 += 1;
+  if (m[0xAA01] > m[0xAA41]) return (M1.m1 += 1, { t: t + 7 + 12, exit: 'p1' });   // JR Z: JR $AD5F
+  t += 12 + 13 + 10 + 7; M1.m1 += 4;               // JR Z taken: LD A,($AA02): LD HL,$AA42: CP (HL): JR C
+  if (m[0xAA02] < m[0xAA42]) return (t += 12, call('p2'));
+  t += 7; M1.m1 += 1;
+  if (m[0xAA02] === m[0xAA42]) return (M1.m1 += 2, { t: t + 12 + 7 + 10, exit: 'draw' });   // JR Z: LD A,$81: RET
+  return (t += 7, call('p1'));
+}
+
 /* ---- the live game: round_loop on the 7.2 accumulator ------------------
    Starts from the machine at the CALL at $AE29 (build/live_p1.json, from
    python tools/sample.py --json: a mid-bout state, scaffolding until the
@@ -2335,6 +2387,7 @@ class Fist {
     this.passes = 0; this.simT = 0; this.acc = 0; this.exit = null;
     this.win = 0;                                  // the winner's base while the victory pose loops, else 0
     this.bonus = false;                            // P1's time bonus counting ($AD6E), after the pose
+    this.both = null;                              // both fighters posing in $ACF0's loop $AD0B: 'end' (time up) or 'draw'
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();
@@ -2344,14 +2397,15 @@ class Fist {
   /* one pass with these keys; returns its charged T */
   pass(kb){
     if (this.win || this.bonus) return this.winPass();
+    if (this.both) return this.endPass();
     const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
     const res = roundPass(this.m, io, this.sp);
     let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
-    if (res.exit === 'p2' || res.exit === 'p1'){   // $AD94 / $AD5F: on into the victory pose, to its loop top
-      const A = res.exit === 'p1' ? 0xAA00 : 0xAA40;
-      M1.m1 = 0; cost += winStart(this.m, A);
-      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null; this.win = A;
+    if (res.exit === 'end'){                       // $AE67: time up, on into the round end's loop top $AD0B
+      M1.m1 = 0; cost += endStart(this.m);
+      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null; this.both = 'end';
     }
+    cost += this.onward(res);
     for (const [t, v] of io.out){
       this.border = v & 7;
       const lv = (v >> 4) & 1;
@@ -2360,6 +2414,46 @@ class Fist {
     this.simT += cost; this.r = res.r; this.passes++;
     if (res.exit) this.exit = res;
     return cost;
+  }
+  /* the way on from pointPath's exit in res: 'time' decided by timeUp, then
+     'p1' / 'p2' into the victory pose to its loop top, 'draw' out to $ACA6;
+     res.r and res.exit updated, the T added returned */
+  onward(res){
+    if (res.exit !== 'time' && res.exit !== 'p1' && res.exit !== 'p2') return 0;
+    M1.m1 = 0;
+    let t = 0;
+    if (res.exit === 'time'){ const u = timeUp(this.m); t += u.t; res.exit = u.exit; }
+    if (res.exit === 'draw'){ t += drawStart(this.m); res.exit = null; this.both = 'draw'; }
+    else {                                         // $AD94 / $AD5F
+      const A = res.exit === 'p1' ? 0xAA00 : 0xAA40;
+      t += winStart(this.m, A); res.exit = null; this.win = A;
+    }
+    res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F);
+    return t;
+  }
+  /* one iteration of $ACF0's loop $AD0B; out by its RET: at the round end
+     the delays, pointPath (time up: 'time') and onward; after the draw the
+     JP $AC5F to the next bout, not ported (D7) */
+  endPass(){
+    const cost = { dec: 0, copy: 0, ldir: 0 };
+    M1.m1 = 0;
+    const w = winPass(this.m, 0xAA00, (this.sp + (this.both === 'draw' ? 2 : -2)) & 0xFFFF, cost);   // $ACE8 from $ACD3, $ACF0 from $AE6F
+    let t = w.t + rfPlayT(cost.t, cost) - cost.t;
+    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
+    let res = null;
+    if (w.out && this.both === 'draw'){            // JP $AC5F
+      t += 10; this.r = (this.r & 0x80) | ((this.r + 1) & 0x7F); res = { exit: 'draw', r: this.r }; this.both = null;
+    }
+    else if (w.out){
+      M1.m1 = 0;
+      const e = endTail(this.m);
+      t += e.t; this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F); this.both = null;
+      res = pointPath(this.m, e.a, this.r);        // the RET to $AD1B
+      t += res.t + this.onward(res); this.r = res.r;
+    }
+    this.simT += t; this.passes++;
+    if (res && res.exit) this.exit = res;
+    return t;
   }
   /* one iteration of the victory pose, or one second of P1's time bonus;
      out by the pose's RET, the 1UP bout is lost (P2) or the bonus counts
@@ -2481,5 +2575,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, bonusStart, bonusPass, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>
