@@ -1,0 +1,5 @@
+# ledger/AC27.toml -- current truth about main_game_dispatch (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "main_game_dispatch"
+entries  = ["$AC27"]

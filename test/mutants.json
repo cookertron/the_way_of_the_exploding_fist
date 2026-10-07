@@ -2962,8 +2962,8 @@
  {
   "file": "template.html",
   "label": "AD1B point: round: a point stops the engine again",
-  "old": "  if (b.exit !== 'ret') return b;",
-  "new": "  if (b.exit !== 'ret' || 1) return b;",
+  "old": "  if (b.exit !== 'ret' && !(demo && b.exit === 'quit')) return b;",
+  "new": "  if (1) return b;",
   "increment": "AD1B-point",
   "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3250,8 +3250,8 @@
  {
   "file": "template.html",
   "label": "AD5F bonus: Fist: P1's pose out loses the bout",
-  "old": "      if (w.out && this.win === 0xAA40){",
-  "new": "      if (w.out){",
+  "old": "      else if (w.out && this.win === 0xAA40){",
+  "new": "      else if (w.out){",
   "increment": "AD5F-bonus",
   "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3402,8 +3402,8 @@
  {
   "file": "template.html",
   "label": "AD44 time: Fist: the round end returns A = $80 (quit)",
-  "old": "res = pointPath(this.m, e.a, this.r);",
-  "new": "res = pointPath(this.m, 0x80, this.r);",
+  "old": "res = (this.demo ? demoPoint : pointPath)(this.m, e.a, this.r);",
+  "new": "res = (this.demo ? demoPoint : pointPath)(this.m, 0x80, this.r);",
   "increment": "AD44-time",
   "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3705,9 +3705,9 @@
  },
  {
   "file": "template.html",
-  "label": "AC5F live: SETUP_K: the scenery charged at the rest's factor",
-  "old": "scen: 2038943 / 1670337,",
-  "new": "scen: 275349 / 260490,",
+  "label": "AC5F live: SCEN_K: stage 3's scenery charged at the rest's factor",
+  "old": "679719 / 556840, 685206 / 557964];",
+  "new": "679719 / 556840, 275349 / 260490];",
   "increment": "AC5F-live",
   "kills": "P1: ...and the pass to $AC5F with the tune (a new stage: the scenery after) and the setup's rest are charged within 0.05% of the contended machine, the tune's edges inside the first, its last at the end of the pass"
  },
@@ -3754,8 +3754,8 @@
  {
   "file": "template.html",
   "label": "AC5F live: Fist.setupPass: R not advanced by the rest's M1",
-  "old": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
-  "new": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;",
+  "old": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
+  "new": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];",
   "increment": "AC5F-live",
   "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -4127,5 +4127,89 @@
   "old": "  t += 5 + roundIn(m, r);                          // JR Z taken, to $ABC8",
   "new": "  t += roundIn(m, r);",
   "increment": "ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: demoOn: the quit's RET M charged as not taken",
+  "old": "  if (a & 0x80) return { t: t + 11, at: 0xAC27 };",
+  "new": "  if (a & 0x80) return { t: t + 5, at: 0xAC27 };",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: demoOn: the stage wraps to 2",
+  "old": "if (++m[0xAF34] === 4){ m[0xAF34] = 1;",
+  "new": "if (++m[0xAF34] === 4){ m[0xAF34] = 2;",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: demoOn: rank 4 plays on",
+  "old": "  if (m[0xB05F] === 4) return (M1.m1 += 1,",
+  "new": "  if (m[0xB05F] === 5) return (M1.m1 += 1,",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: demoOn: the JR NZ to $AB97 charged as not taken",
+  "old": "  return { t: t + 12 + demoStage(m, r, cost), at: 0xAE29 };",
+  "new": "  return { t: t + 7 + demoStage(m, r, cost), at: 0xAE29 };",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: demoStage: LD A,($AF34)'s M1 dropped",
+  "old": "  let t = 13; M1.m1 += 1;                          // LD A,($AF34)",
+  "new": "  let t = 13;",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: Fist.demoOut: the poses swapped",
+  "old": "{ const A = res.exit === 'p1' ? 0xAA00 : 0xAA40; t += winStart(this.m, A); this.win = A; }",
+  "new": "{ const A = res.exit === 'p1' ? 0xAA40 : 0xAA00; t += winStart(this.m, A); this.win = A; }",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: Fist.demoOut: time up taken as the quit",
+  "old": "    else this.demoNext = res.exit === 'quit' ? 0x80 : 0;",
+  "new": "    else this.demoNext = 0x80;",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: Fist.demoOut: the round end not into $ACF0's loop",
+  "old": "    if (res.exit === 'end'){ t += endStart(this.m); this.both = 'end'; }",
+  "new": "    if (res.exit === 'end'){ t += endStart(this.m); }",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: Fist.winPass: the demo's pose ends without XOR A: RET",
+  "old": "      if (w.out && this.demo){ t += winEnd(); this.win = 0; this.demoNext = 0; }",
+  "new": "      if (w.out && this.demo){ this.win = 0; this.demoNext = 0; }",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: Fist.demoNextPass: the scenery at stage 2's factor",
+  "old": "(u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];",
+  "new": "(u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[2];",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: Fist.pass: the demo's exits go the game's way (ABCB's dropped guard)",
+  "old": "    if (this.demo) cost += this.demoOut(res);       // the demo's ways on",
+  "new": "    if (false) cost += this.demoOut(res);",
+  "increment": "ABB9"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: roundPass: the demo's points by pointPath (ABCB's dropped choice)",
+  "old": "  const q = (demo ? demoPoint : pointPath)(m, b.a, b.r);",
+  "new": "  const q = pointPath(m, b.a, b.r);",
+  "increment": "ABB9"
  }
 ]

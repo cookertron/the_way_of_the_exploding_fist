@@ -2077,17 +2077,18 @@ function playPass(m, io, sp){
    at $A900, and the two ways out.  Per instruction T and one M1 each (no
    prefixes).  io as playPass.  Returns T from $AE29 to the next $AE29 (or
    to the way out), R there, and exit: null to loop, 'quit' (the RET M at
-   $AE2D), 'end' (the round end at $AE67: $ACF0 and $AF1A, not ported yet)
-   or, after a point (the RET NZ at $AE60 on $9C28), pointPath's own: the
-   point is played on into the next $AE29 in the same pass -- by demoPoint
-   when the CALL was the demo's at $ABC8 (demo set).  roundTail is
+   $AE2D), 'end' (the round end at $AE67: endStart, the Fist's) or, after
+   a point (the RET NZ at $AE60 on $9C28), pointPath's own: the point is
+   played on into the next $AE29 in the same pass -- by demoPoint when the
+   CALL was the demo's at $ABC8 (demo set), which takes the quit on through
+   $ABCB to $ABB9 too.  roundTail is
    the body from $AE2C alone, A and R there, gated exactly against python
    tools/callio.py --capture --call 0xAE2C 0xAE29 (build/callio_ae2c.json). */
 function roundPass(m, io, sp, demo){
   const p = playPass(m, io, sp), b = roundTail(m, p.a, p.r);
   b.t += p.t;
-  if (b.exit !== 'ret') return b;
-  const q = (demo ? demoPoint : pointPath)(m, b.a, b.r);   // a point: on to the next $AE29, or out
+  if (b.exit !== 'ret' && !(demo && b.exit === 'quit')) return b;
+  const q = (demo ? demoPoint : pointPath)(m, b.a, b.r);   // a point (or the demo's quit): on to the next $AE29, or out
   q.t += b.t;
   return q;
 }
@@ -2268,6 +2269,28 @@ function demoPoint(m, a, r){
   if (m[0x9C2B]) return (t += 4 + 10, M1.m1 += 2, out('time'));   // XOR A: RET
   t += 5 + roundIn(m, r);                          // JR Z taken, to $ABC8
   return out(null);
+}
+
+/* ---- the demo's ways on: $ABB9-$ABC7, from the listing -----------------
+   (python tools/adis.py 0xAB97 25.)  Where demoPoint's RETs land, A = 0
+   after a pose ($AC00 / $ABE5, XOR A) or time up, negative for the quit.
+   AND A: RET M -- the quit, out to Demo_Mode's caller $AC27.  Else the
+   stage steps 1-3 ($AF27, as boutNext's), Current_Rank $B05F counts the
+   demo's stages, and below 4 the JR to $AB97 (demoStage) plays the next
+   one from its first $AE29; at 4 the RET, to $AC27.  r is R where M1.m1
+   was zero.  Returns T and at: 0xAE29 or 0xAC27.  Gated against python
+   tools/callio.py --capture --call 0xABB9 0xAE29,0xAC27 (build/
+   callio_abb9.json).  cost.scen as demoIn's. */
+function demoOn(m, a, r, cost){
+  let t = 4; M1.m1 += 2;                           // AND A: RET M
+  if (a & 0x80) return { t: t + 11, at: 0xAC27 };
+  t += 5 + 17 + 10 + 11 + 7 + 7; M1.m1 += 6;       // CALL $AF27: LD HL: INC (HL): LD A,(HL): CP 4: RET NZ
+  if (++m[0xAF34] === 4){ m[0xAF34] = 1; t += 5 + 7 + 7 + 10; M1.m1 += 3; }   // LD A,1: LD (HL),A: RET
+  else t += 11;
+  t += 10 + 11 + 7 + 7; M1.m1 += 5;                // LD HL,Current_Rank: INC (HL): LD A,(HL): CP 4: JR NZ
+  m[0xB05F] = (m[0xB05F] + 1) & 0xFF;
+  if (m[0xB05F] === 4) return (M1.m1 += 1, { t: t + 7 + 10, at: 0xAC27 });   // RET
+  return { t: t + 12 + demoStage(m, r, cost), at: 0xAE29 };
 }
 
 /* $AD18 to $AE29: CALL $AE26, CALL $9CA8 (the fighters reset), falling
@@ -2525,10 +2548,17 @@ function checkHighScore(m){
    Live, contention is charged as measured means (D4): sample.py --also
    0xAC5F --also 0xAC6C --also 0xAC72 --also 0xAD18 over live_p1w's play
    (--poke 0xAA3C=1, and 0xAF34=1, 3), and live_time's: the tune 3 runs,
-   36842904 T contended over 36780114 (the OUTs); the scenery stages 2, 1,
-   3: 2038943 over 1670337 (its code at $5F22 and its writes in contended
-   RAM); the rest 4 runs, the draw's among them, 275349 over 260490. */
-const SETUP_K = { tune: 36842904 / 36780114, scen: 2038943 / 1670337, rest: 275349 / 260490 };
+   36842904 T contended over 36780114 (the OUTs); the rest 4 runs, the
+   draw's among them, 275349 over 260490.  The scenery (its code at $5F22
+   and its writes in contended RAM) is charged by stage, SCEN_K: the mean
+   there, stages 2, 1, 3, 2038943 over 1670337, left stage 3 0.6% short. */
+const SETUP_K = { tune: 36842904 / 36780114, rest: 275349 / 260490 };
+/* the scenery by stage: its contended T, CALL $9200 to its return, over
+   scenery()'s uncontended T, sampled in the demo (sample.py with live's
+   arguments and --also 0xAB9A --also 0xAB9D, 1500 passes: stages 2, 3, 1
+   on rows 336, 801, 1407); the demo's stage passes then 0.08% and 0.16%
+   over the machine */
+const SCEN_K = [0, 677772 / 555494, 679719 / 556840, 685206 / 557964];
 function introMusic(m, outs, t0){                  // Intro_Music $90D1 with its CALL, t0 the T at the CALL
   let t = 17 + 4 + 13 + 4; M1.m1 += 4;             // CALL: DI: LD A,(Flag_Sound): AND A
   if (!m[0xB2FA]){ M1.m1 += 1; return t + 11; }
@@ -2718,7 +2748,12 @@ function demoIn(m, r, cost){
     t += 17 + 9 + 10 + 7 + 7 + 13; M1.m1 += 4;
   }
   m[0xAA46] = 1; m[0xAA06] = 1; m[0xAF34] = 2;
-  t += 7 + 13 + 13 + 4 + 13 + 13; M1.m1 += 6;      // LD A,1 .. LD ($AF34),A: LD A,($AF34)
+  t += 7 + 13 + 13 + 4 + 13; M1.m1 += 5;           // LD A,1 .. LD ($AF34),A
+  return t + demoStage(m, r, cost);
+}
+/* $AB97, a demo stage to its first $AE29: LD A,($AF34) and on, as above */
+function demoStage(m, r, cost){
+  let t = 13; M1.m1 += 1;                          // LD A,($AF34)
   const sc = scenery(m, m[0xAF34]);
   if (cost) cost.scen = sc;
   t += sc + 20 + printString(m, 0x0222, 0xB039, M1); M1.m1 += 2;
@@ -2740,7 +2775,6 @@ function demoIn(m, r, cost){
    $FE writes go to the beeper log at their T.  A way out of the loop that
    is not ported stops the engine and says so in .exit. */
 const T_FRAME = 69888;                             // 48K: 224 T x 312 lines
-const DEMO_OUT = { end: 0xAE67, quit: 0xABB9, time: 0xABB9, p1: 0xAC00, p2: 0xABE5 };   // where each stops the engine
 const fromHex = h => Uint8Array.from(h.match(/../g), x => parseInt(x, 16));
 function specPort(kb, p){                          // IN as the machine answers
   if ((p & 0xFF) === 0x1F) return kb.kempston;     // Kempston, active high
@@ -2759,6 +2793,7 @@ class Fist {
     this.stage = false;                            // ...with a new stage's text rows drawn (D5)
     this.demoAt = false;                           // at $AC3C after a lost bout: demoIn the next pass, to $AE29
     this.demo = false;                             // round_loop called by the demo's $ABC8: its points played by demoPoint
+    this.demoNext = null;                          // at $ABB9 with this A: demoOn the next pass, a new stage or out to $AC27
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();
@@ -2770,13 +2805,14 @@ class Fist {
     if (this.setup) return this.setupPass();
     if (this.enter) return this.enterPass();
     if (this.demoAt) return this.demoPass();
+    if (this.demoNext !== null) return this.demoNextPass();
     if (this.win || this.bonus) return this.winPass();
     if (this.both) return this.endPass();
     this.stage = false;
     const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
     const res = roundPass(this.m, io, this.sp, this.demo);
     let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
-    if (this.demo && res.exit) res.at = DEMO_OUT[res.exit];   // the demo's ways out: not ported yet
+    if (this.demo) cost += this.demoOut(res);       // the demo's ways on
     else if (res.exit === 'end'){                      // $AE67: time up, on into the round end's loop top $AD0B
       M1.m1 = 0; cost += endStart(this.m);
       res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null; this.both = 'end';
@@ -2807,6 +2843,32 @@ class Fist {
     res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F);
     return t;
   }
+  /* the demo's way on from roundPass's or demoPoint's exit in res: the
+     round end into $ACF0's loop top, a pose into its loop, time up or the
+     quit to $ABB9 (demoNext); res.r and res.exit updated, the T returned */
+  demoOut(res){
+    if (!res.exit) return 0;
+    M1.m1 = 0;
+    let t = 0;
+    if (res.exit === 'end'){ t += endStart(this.m); this.both = 'end'; }
+    else if (res.exit === 'p1' || res.exit === 'p2'){ const A = res.exit === 'p1' ? 0xAA00 : 0xAA40; t += winStart(this.m, A); this.win = A; }
+    else this.demoNext = res.exit === 'quit' ? 0x80 : 0;   // 'time': XOR A; 'quit': A negative
+    res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null;
+    return t;
+  }
+  /* $ABB9 on: demoOn, the next demo stage charged as demoPass, or out to
+     $AC27 (Main_Game_Loop's dispatch, not ported yet: D7) */
+  demoNextPass(){
+    M1.m1 = 0;
+    const cost = { scen: 0 }, a = this.demoNext, u = demoOn(this.m, a, this.r, cost);
+    const t = u.at === 0xAC27 ? u.t : (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];
+    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
+    this.demoNext = null;
+    if (u.at === 0xAC27) this.exit = { exit: a & 0x80 ? 'quit' : 'over', at: 0xAC27, r: this.r, t };
+    else this.stage = true;
+    this.simT += t; this.passes++;
+    return t;
+  }
   /* one iteration of $ACF0's loop $AD0B; out by its RET: at the round end
      the delays, pointPath (time up: 'time') and onward; after the draw the
      JP $AC5F to the next bout's setup */
@@ -2826,8 +2888,8 @@ class Fist {
       M1.m1 = 0;
       const e = endTail(this.m);
       t += e.t; this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F); this.both = null;
-      res = pointPath(this.m, e.a, this.r);        // the RET to $AD1B
-      t += res.t + this.onward(res); this.r = res.r;
+      res = (this.demo ? demoPoint : pointPath)(this.m, e.a, this.r);   // the RET to $AD1B (the demo's $ABCB)
+      t += res.t + (this.demo ? this.demoOut(res) : this.onward(res)); this.r = res.r;
     }
     this.simT += t; this.passes++;
     if (res && res.exit) this.exit = res;
@@ -2848,7 +2910,8 @@ class Fist {
     } else {
       const w = winPass(this.m, this.win, this.sp, cost);
       t = w.t + rfPlayT(cost.t, cost) - cost.t;
-      if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); this.win = 0; }
+      if (w.out && this.demo){ t += winEnd(); this.win = 0; this.demoNext = 0; }   // $AC03 / $ABE8 XOR A: RET, to $ABB9
+      else if (w.out && this.win === 0xAA40){ t += winEnd(); t += this.next(0, t); this.win = 0; }
       else if (w.out){                             // $AD62: the clock counted down from here, or out at once
         const b = bonusStart(this.m);
         t += b.t; this.win = 0;
@@ -2890,7 +2953,7 @@ class Fist {
   setupPass(){
     M1.m1 = 0;
     const cost = { scen: 0 }, u = setupRest(this.m, this.setup.stage, cost);
-    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;
+    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.stage = this.setup.stage; this.setup = null; this.enter = true;
     this.simT += t; this.passes++;
@@ -2907,12 +2970,12 @@ class Fist {
     return t;
   }
   /* $AC3C to the demo's first $AE29: demoIn, charged as setupPass (the
-     scenery at SETUP_K.scen, the rest at .rest); its text rows are in the
+     scenery at SCEN_K, the rest at SETUP_K.rest); its text rows are in the
      font (D5), .stage says so; round_loop is then the demo's */
   demoPass(){
     M1.m1 = 0;
     const cost = { scen: 0 }, u = demoIn(this.m, this.r, cost);
-    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;
+    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.demoAt = false; this.demo = true; this.stage = true;
     this.simT += t; this.passes++;
@@ -3012,5 +3075,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, demoIn, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, demoOn, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, demoIn, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

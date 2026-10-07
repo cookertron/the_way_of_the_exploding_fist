@@ -1192,6 +1192,46 @@ const mockCtx = (state) => ({
         fx.cases.filter(c => set(c).aa03 === 1).map(c => c.xpc), [0xAE29]);
 }
 
+/* ---- the demo's ways on $ABB9, against its oracle ----------------------
+   python tools/callio.py --capture --call 0xABB9 0xAE29,0xAC27 (p1, the
+   demo's three stage changes after the lost bout; the RET at rank 4, the
+   stage's wrap with it and the quit derived with --up 0xAC27, port.json).
+   Every byte outside the text cells (D5), the cells written, T, R, and
+   where it left. */
+{
+  const fx = P.assets.demo_abb9;
+  const iA = fx.regs.indexOf(0);
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '';
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    P.M1.m1 = 0;
+    let res;
+    try { res = P.demoOn(m, c.regs[iA], c.r); }
+    catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
+      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
+    }
+    const wrote = [], blind = [];
+    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
+    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
+    const got = [res.at, res.t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, wrote.join() === blind.join()];
+    const w = [c.xpc, c.t, c.rx, -1, true];
+    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
+      first = `case ${i}: at, T, R, first bad byte, text cells ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
+  }
+  check("demoOn matches the real $ABB9 to the next stage's $AE29 or $AC27 on every case: bytes, text cells, at, T and R exactly", [bad, first], [0, '']);
+  const set = c => (c.derived || {}).set || {};
+  check('...and the cases take every way: each stage 1-3 next, the RET at rank 4 (with and without the stage wrap), the quit',
+        [fx.cases.filter(c => c.xpc === 0xAE29).length, fx.cases.filter(c => c.xpc === 0xAC27).map(c => [set(c).b05f, set(c).af34, ((c.derived || {}).reg || {})[0]])],
+        [3, [[3, undefined, undefined], [undefined, undefined, 128], [3, 3, undefined]]]);
+}
+
 /* ---- P2 wins the 1UP bout: $AD94, the victory pose $AE9D, to $ACA6 -----
    python tools/callio.py --capture --state p1 --call 0xAD94 0xACA6 (the
    call the live script makes, 66 passes of the pose).  winStart, winPass
@@ -1607,7 +1647,7 @@ function liveGate(L, who, how){
   const out = bout ?? marked[marked.length - 1] ?? -1;
   const outKind = out < 0 ? null : L.rows[out].m.includes(0xACA6) ? how
     : L.rows[out].m.includes(0xAE67) ? 'end' : 'point';
-  const pcNow = () => g.exit ? g.exit.at : g.enter ? 0xAD18 : g.demoAt ? 0xAC3C : g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
+  const pcNow = () => g.exit ? g.exit.at : g.enter ? 0xAD18 : g.demoAt ? 0xAC3C : g.demoNext !== null ? 0xABB9 : g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
   /* won and drawn bouts go on through the setup's tune (charged in the
      pass that reaches $AC5F) and its rest (a pass of its own) to the CALL
      $AD18, sampled there; with a new stage the text rows are in the font
@@ -1615,9 +1655,9 @@ function liveGate(L, who, how){
      pass of its own then enters the next bout's round_loop at $AE29, and
      the gate follows that bout to the fixture's last row */
   const disp = L.hash.findIndex(([lo, hi]) => lo === 0x4000);
-  let at = -1, k = 0, round = 0, subs = 0, setupT = 0, setupM = 0, edges = -1, logN = 0, tail = -1, enters = [], enterT = [], blind = false, demoP = -1, demoT = 0;
+  let at = -1, k = 0, round = 0, subs = 0, setupT = 0, setupM = 0, edges = -1, logN = 0, tail = -1, enters = [], enterT = [], blind = false, demoP = -1, demoT = 0, stageAt = [], stageT = [];
   for (; k < seq.length; k++){
-    if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
+    if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt && g.demoNext === null){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
     logN = g.sound.log.length;
     let cost = g.pass(kb);
     if (g.setup){
@@ -1630,6 +1670,7 @@ function liveGate(L, who, how){
     if (g.enter) enters.push(seq[k].p);
     if (g.demo && demoP < 0){ demoP = seq[k].p; demoT = cost / seq[k].t; }
     else if (seq[k - 1] && seq[k - 1].pc === 0xAD18) enterT.push(cost / seq[k].t);
+    if (seq[k - 1] && seq[k - 1].pc === 0xABB9){ stageAt.push(seq[k].p); stageT.push(cost / seq[k].t); }
     ratio.push(cost / seq[k].t);
     const got = [pcNow(), ...row(g.m, g.r)], w = [seq[k].pc, ...want(seq[k])];
     if (g.stage) blind = true;                     // the new stage's text rows stay on screen
@@ -1646,7 +1687,8 @@ function liveGate(L, who, how){
   /* lost: the high score checked, sampled at $AC3C; Main_Game_Loop's rows
      and Demo_Mode (demoIn, a pass of its own) into the demo's $AE29, the
      row of the bout's end; the demo played on, its points by demoPoint
-     (the machine's returns from $AE26 to $ABCB), to the fixture's last row */
+     (the machine's returns from $AE26 to $ABCB), its poses to $ABB9 and
+     on into the next stage by demoOn, to the fixture's last row */
   const demoRet = L.rows.map((r, i) => i > out && r.m.includes(0xABCB) ? i : -1).filter(i => i >= 0);
   if (how === 'lost'){
     check(`${who}: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo through its points (returns to $ABCB on rows ${demoRet.join(', ')}) to the fixture's last row with no way out`,
@@ -1655,6 +1697,14 @@ function liveGate(L, who, how){
     /* the demo's pass is mostly the scenery: 640994 T uncontended
        (build/callio_ac3c.json), 768438 on the machine */
     check(`${who}: ...and the pass from $AC3C into the demo's $AE29 is charged within 0.2% of the contended machine`, Math.abs(demoT - 1) < 0.002, true);
+    /* the machine's samples at $ABB9: P2's pose (row 801) and P1's (1407),
+       each on into the next stage (demoOn, a pass of its own, mostly the
+       scenery: charged as demoPass) */
+    const wantStage = L.rows.map((r, i) => (r.s || []).some(x => x.pc === 0xABB9) ? i : -1).filter(i => i >= 0);
+    const poses = wantStage.map(i => [...new Set(L.rows[i].s.map(x => x.pc))].filter(x => x !== 0xABB9));
+    check(`${who}: ...and leave the demo's bouts by both poses (sampled at $ABB9 on rows ${wantStage.join(', ')}) on into the next demo stage at $AE29, the stage pass charged within 0.2% of the contended machine`,
+          [stageAt, poses, stageT.map(x => Math.abs(x - 1) < 0.002)],
+          [wantStage, [[0xAEB2], [0xAE8E]], [true, true]]);
   }
   else {
     /* the machine's samples at the CALL $AD18: the setup's ends */
@@ -1688,5 +1738,21 @@ function liveGate(L, who, how){
 liveGate(P.assets.live, 'P2', 'lost');
 liveGate(P.assets.live_p1w, 'P1', 'won');
 liveGate(P.assets.live_time, 'time', 'draw');
+
+/* the demo's ways on that live play has not reached yet (its bouts so far
+   end by a pose): time up and the quit to $ABB9 with A = 0 / negative, the
+   round end into $ACF0's loop at endStart's T.  Wiring only: demoPoint and
+   demoOn are each gated against the machine above */
+{
+  const ways = ['time', 'quit', 'end'].map(e => {
+    const g = new P.Fist(P.assets.live.start), res = { exit: e, r: 0 };
+    g.demo = true;
+    const t = g.demoOut(res);
+    P.M1.m1 = 0;
+    return [res.exit, g.demoNext, g.both, t === (e === 'end' ? P.endStart(new Uint8Array(0x10000)) : 0)];
+  });
+  check("Fist.demoOut: the demo's time up and quit go to $ABB9 (A = 0, $80), its round end into $ACF0's loop",
+        ways, [[null, 0, null, true], [null, 0x80, null, true], [null, null, 'end', true]]);
+}
 
 rig.done();

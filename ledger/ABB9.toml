@@ -1,0 +1,35 @@
+# ledger/ABB9.toml -- current truth about demo_ways_on (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "demo_ways_on"
+entries  = ["$ABB9"]
+oracle   = "tools/callio.py"
+fixtures = ["demo_abb9"]
+port     = "demoOn"
+manual   = ["7.2"]
+
+[[fact]]
+kind   = "insn"
+at     = "$ABB9"
+says   = "AND A: RET M (the quit, to Demo_Mode's caller $AC27); CALL $AF27 (stage 1-3); INC Current_Rank $B05F; below 4 JR $AB97 (scenery, DEMO, high score, New_Round, Init_Time, $9C2B cleared, CALL $ABC8); at 4 RET to $AC27"
+by     = "python tools/adis.py 0xAB97 25"
+
+[[fact]]
+kind   = "measured"
+says   = "demoOn matches the machine $ABB9 to $AE29 or $AC27 on 6 cases (3 played stage changes; 3 derived --up 0xAC27: rank 4, with the stage wrap, the quit): bytes outside the text cells (D5), at, T 15-614767, R exactly"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_abb9.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "live (P2 lost, 1500 rows) follows the demo through P2's pose (row 801) and P1's (1407), each to $ABB9 and on by demoOn into the next stage, to the fixture's last row; stage passes 0.08% and 0.16% over the machine"
+by     = "node test/kit.test.js (live block, P2 both poses row)"
+
+[[fact]]
+kind   = "measured"
+says   = "the scenery's contention differs by stage: CALL $9200 to its return 677772/555494 (stage 1), 679719/556840 (2), 685206/557964 (3) T; the old mean left stage 3 0.6% short -- now SCEN_K"
+by     = "python tools/sample.py (live's arguments, --also 0xAB9A --also 0xAB9D, 1500 passes) ; scenery() per stage"
+
+[[open]]
+ask    = "the demo's time up, round end ($AE67 into $ACF0, endPass by demoPoint) and the quit through roundPass -- not yet reached by live play"
+tried  = "live_p1's 1500 rows end both demo bouts by a pose; Fist.demoOut is wiring-checked only"
+settle = "a live sample whose demo bout runs out of time (a later demo stage, or --passes past the next), and the quit with a key held in the demo (the $AC27 dispatch unit)"

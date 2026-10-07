@@ -24,7 +24,7 @@ kind   = "gated"
 says   = "live (P2 lost) follows the demo through its point at row 418 to the fixture's last row (499), no way out; the demo's p1/p2/time/quit/end exits stop the engine at DEMO_OUT"
 by     = "node test/kit.test.js (live block, P2 leave row)"
 
-[[open]]
-ask    = "the demo's ways on from demoPoint -- the poses at $AC00/$ABE5 then XOR A RET, time up, the round end $AE67 -- to $ABB9: $AF27 stage up, rank up, $AB97 the next demo stage or RET to $AC27"
-tried  = "live_p1 ends at row 499 with no further mark; none of these is reached by the fixture"
-settle = "port $ABB9-$ABC7 with the poses (winStart/winPass) and gate on a longer live sample (--passes past the demo's first pose) or callio --call 0xABB9 0xAE29,0xAC27"
+[[fact]]
+kind   = "gated"
+says   = "the demo's poses, time up and the RET M lead to $ABB9; ported as demoOn (ledger ABB9), live through both poses"
+by     = "node test/kit.test.js (demo_abb9 block ; live block, P2 both poses row)"

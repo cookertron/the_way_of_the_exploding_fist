@@ -169,10 +169,16 @@
       "note": "oracle for the demo's point path $ABCB back to $AE29 (or out at $AC00, $ABE5, or by its RET to $ABB9): python tools/callio.py --capture --state p1 --call 0xABCB 0xAE29,0xABB9,0xAC00,0xABE5 --frames 6000 --per 3 --blind 0x4000-0x47FF (the demo after the lost bout), then --derive case 3 --set 0xAA41=3 / 0xAA41=2 / 0xAA03=0, case 4 --set 0xAA03=1, case 2 --set 0xAA01=3,0xAA41=1, and with --up 0xABB9 (the return of the CALL at $ABB6) case 3 --set 0x9C2B=1 / 0xAA03=0,0x9C2B=1 / --reg 0=0x80"
     },
     {
+      "key": "demo_abb9",
+      "file": "build/callio_abb9.json",
+      "required": true,
+      "note": "oracle for the demo's ways on $ABB9 to the next stage's $AE29 or the RET to $AC27: python tools/callio.py --capture --state p1 --call 0xABB9 0xAE29,0xAC27 --frames 9000 --per 3 with demo_ac3c's blinds (the text cells, D5), then --derive case 0 --up 0xAC27 with --set 0xB05F=3 / --reg 0=0x80 / --set 0xB05F=3,0xAF34=3"
+    },
+    {
       "key": "live",
       "file": "build/live_p1.json",
       "required": true,
-      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --also 0xAC3C --mark 0xAC09 --passes 500 --hash 0x4800-0x5AFF --json build/live_p1.json (the script, vars, marks and ranges are stored in the file; $4800- is below the demo's text rows, D5)"
+      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --also 0xAC3C --also 0xAE8E --also 0xAD0B --also 0xABB9 --mark 0xAC09 --mark 0xAC27 --passes 1500 --hash 0x4800-0x5AFF --json build/live_p1.json (the script, vars, marks and ranges are stored in the file; $4800- is below the demo's text rows, D5)"
     }
   ],
   "tape": {
