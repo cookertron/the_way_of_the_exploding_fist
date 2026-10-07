@@ -1,0 +1,24 @@
+# ledger/AD18.toml -- current truth about bout_loop_in (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "bout_loop_in"
+entries  = ["$AD18"]
+fixtures = ["live_p1w", "live_time"]
+port     = "roundIn"
+manual   = ["7.2"]
+
+[[fact]]
+kind   = "insn"
+at     = "$AD18"
+says   = "$AD18 is the bout's loop top: CALL $AE26 (round_loop: CALL $9CA8 resets, falling into $9D29, whose RET is to $AE29); reached by the setup's CALL $AD18 ($AC5F) and by $AD42 JR Z after every point -- one body, roundIn, shared with pointPath"
+by     = "python tools/adis.py 0xAD18 12 ; python tools/adis.py 0xAE26 4 ; python tools/adis.py 0x9CA8 30"
+
+[[fact]]
+kind   = "measured"
+says   = "$AD18 to $AE29 on the machine: 8080 T after the won bout's setup, 8020 after the draw's; roundIn's uncontended T (exact in pointPath, build/callio_ad1b.json) is 0.74% under and equal"
+by     = "python tools/sample.py rows 169 (build/live_p1w.json) and 35 (build/live_time.json) ; node test/kit.test.js (the pass from the CALL $AD18 check)"
+
+[[fact]]
+kind   = "gated"
+says   = "live: after a won bout (live_p1w) and a draw (live_time), setupPass then enterPass (roundIn, its own pass) reach $AE29 and roundPass follows the next bout row for row to the fixture's end; display blinded from a new stage's text on (D5)"
+by     = "node test/kit.test.js (liveGate P1, time) ; python tools/mutants.py --affected"

@@ -3285,7 +3285,7 @@
   "old": "      if (b.out){ this.bonus = false; t += this.next(1, t); }",
   "new": "      if (b.out){ t += this.next(1, t); }",
   "increment": "AD5F-bonus",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F, the setup run to the CALL $AD18)"
+  "kills": "P1: ...and P1 wins, out to $ACA6 won, on to $AC5F, the setup to the CALL $AD18 and on into the next bout at $AE29, to the fixture's last row with no way out (CALL $AD18 sampled on rows 169)"
  },
  {
   "file": "template.html",
@@ -3293,7 +3293,7 @@
   "old": "        t += b.t; this.win = 0;",
   "new": "        t += b.t;",
   "increment": "AD5F-bonus",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F)"
+  "kills": "P1: ...and P1 wins, out to $ACA6 won, on to $AC5F, the setup to the CALL $AD18 and on into the next bout at $AE29, to the fixture's last row with no way out (CALL $AD18 sampled on rows 169)"
  },
  {
   "file": "template.html",
@@ -3541,7 +3541,7 @@
   "old": "if (b.out){ this.bonus = false; t += this.next(1, t); }",
   "new": "if (b.out){ this.bonus = false; this.exit = { exit: 'won' }; }",
   "increment": "ACA6-next",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F, the setup run to the CALL $AD18)"
+  "kills": "P1: ...and P1 wins, out to $ACA6 won, on to $AC5F, the setup to the CALL $AD18 and on into the next bout at $AE29, to the fixture's last row with no way out (CALL $AD18 sampled on rows 169)"
  },
  {
   "file": "template.html",
@@ -3781,7 +3781,7 @@
   "old": "    return b.t + this.music('won', t + b.t);",
   "new": "    this.exit = { exit: 'won', at: b.at }; return b.t;",
   "increment": "AC5F-live",
-  "kills": "P1: ...and leave on the sample the machine left, the same way (P1 wins, out to $ACA6 won, on to $AC5F, the setup run to the CALL $AD18)"
+  "kills": "P1: ...and P1 wins, out to $ACA6 won, on to $AC5F, the setup to the CALL $AD18 and on into the next bout at $AE29, to the fixture's last row with no way out (CALL $AD18 sampled on rows 169)"
  },
  {
   "file": "template.html",
@@ -3797,6 +3797,53 @@
   "old": "    if (this.setup) return this.setupPass();\n",
   "new": "",
   "increment": "AC5F-live",
-  "kills": "time: ...and leave on the sample the machine left, the same way (out at $AC5F drawn, the setup run to the CALL $AD18)"
+  "kills": "time: ...and out at $AC5F drawn, the setup to the CALL $AD18 and on into the next bout at $AE29, to the fixture's last row with no way out (CALL $AD18 sampled on rows 35, 175)"
+ },
+ {
+  "file": "template.html",
+  "label": "AD18 in: Fist.enterPass: R not advanced by roundIn's M1",
+  "old": "    const t = roundIn(this.m, this.r);\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
+  "new": "    const t = roundIn(this.m, this.r);",
+  "increment": "AD18-in",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD18 in: Fist.pass: the entry pass skipped",
+  "old": "    if (this.enter) return this.enterPass();\n",
+  "new": "",
+  "increment": "AD18-in",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD18 in: Fist.setupPass: round_loop not entered after the setup",
+  "old": "this.stage = this.setup.stage; this.setup = null; this.enter = true;",
+  "new": "this.stage = this.setup.stage; this.setup = null;",
+  "increment": "AD18-in",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD18 in: Fist.enterPass: $A645 seeded from R = 0",
+  "old": "    const t = roundIn(this.m, this.r);",
+  "new": "    const t = roundIn(this.m, 0);",
+  "increment": "AD18-in",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD18 in: Fist.enterPass: the entry left pending",
+  "old": "    this.enter = false; this.stage = false;",
+  "new": "    this.stage = false;",
+  "increment": "AD18-in",
+  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "AD18 in: roundIn: CALL $AE26 not costed",
+  "old": "  let t = 17 + 17 + 9; M1.m1 += 1 + 1 + 2;         // CALL $AE26: CALL $9CA8: LD A,R",
+  "new": "  let t = 17 + 9; M1.m1 += 1 + 1 + 2;         // CALL $AE26: CALL $9CA8: LD A,R",
+  "increment": "AD18-in"
  }
 ]

@@ -2232,7 +2232,13 @@ function pointPath(m, a, r){
   m[0xAA08] = 0; m[0xAA48] = 0;
   t += 4 + 13 + 13 + 13 + 4 + 7; M1.m1 += 6;       // XOR A .. AND A: JR Z
   if (m[0x9C2B]) return out('time');
-  t += 5 + 17 + 17 + 9; M1.m1 += 1 + 1 + 2;        // CALL $AE26: CALL $9CA8: LD A,R
+  t += 5 + roundIn(m, r);                          // JR Z taken, to $AD18
+  return out(null);
+}
+/* $AD18 to $AE29: CALL $AE26, CALL $9CA8 (the fighters reset), falling
+   into $9D29, whose RET is to $AE29.  r is R where M1.m1 was zero: the T */
+function roundIn(m, r){
+  let t = 17 + 17 + 9; M1.m1 += 1 + 1 + 2;         // CALL $AE26: CALL $9CA8: LD A,R
   m[0xA645] = (r & 0x80) | ((r + M1.m1) & 0x7F);
   for (const z of [0x9C2B, 0x9CA7, 0xAA4D, 0xAA0D, 0xAA03, 0xAA43, 0xAA16, 0xAA56, 0xAA17,
                    0xAA0B, 0xAA4B, 0xAA09, 0xAA49, 0x9C28]) m[z] = 0;
@@ -2247,7 +2253,7 @@ function pointPath(m, a, r){
   t += swap(0xAA40, 0xAA00) + aux(0xAA77) + a402(m) + back(0xAA40, 0xAA00) + unaux(0xAA77);   // $AB22 $AB50 $A402 $AB39 $AB5C
   M1.m1 += 8 * 2;                                  // the eight CALLs and RETs of the copies
   t += p1HitsP2(m) - 17; M1.m1 -= 1;               // $9D29 fallen into, not called
-  return out(null);
+  return t;
 }
 
 /* ---- the victory pose: $AE7A (P1) / $AE9D (P2), from the listing -------
@@ -2624,6 +2630,8 @@ class Fist {
     this.bonus = false;                            // P1's time bonus counting ($AD6E), after the pose
     this.both = null;                              // both fighters posing in $ACF0's loop $AD0B: 'end' (time up) or 'draw'
     this.setup = null;                             // the next bout's setup after the tune: { how, stage } to setupRest
+    this.enter = false;                            // at the setup's CALL $AD18: roundIn the next pass, to $AE29
+    this.stage = false;                            // ...with a new stage's text rows drawn (D5)
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();
@@ -2633,6 +2641,7 @@ class Fist {
   /* one pass with these keys; returns its charged T */
   pass(kb){
     if (this.setup) return this.setupPass();
+    if (this.enter) return this.enterPass();
     if (this.win || this.bonus) return this.winPass();
     if (this.both) return this.endPass();
     const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
@@ -2745,15 +2754,24 @@ class Fist {
     return s.t * SETUP_K.tune;                     // with no tune its 29 T: the factor below measurement
   }
   /* the setup after the tune: the scenery and text rows (a new stage), New_
-     Round, Init_Time, out at the CALL $AD18 -- round_loop's way in is not
-     ported yet (D7), so .exit is set there */
+     Round, Init_Time, to the CALL $AD18; .stage says a new stage's text
+     rows were drawn there (D5) */
   setupPass(){
     M1.m1 = 0;
     const cost = { scen: 0 }, u = setupRest(this.m, this.setup.stage, cost);
     const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SETUP_K.scen;
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
-    this.exit = { exit: this.setup.how, at: 0xAD18, stage: this.setup.stage, r: this.r };
-    this.setup = null;
+    this.stage = this.setup.stage; this.setup = null; this.enter = true;
+    this.simT += t; this.passes++;
+    return t;
+  }
+  /* $AD18 to $AE29, the next bout's round_loop entered: roundIn, then
+     roundPass from the next pass */
+  enterPass(){
+    M1.m1 = 0;
+    const t = roundIn(this.m, this.r);
+    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
+    this.enter = false; this.stage = false;
     this.simT += t; this.passes++;
     return t;
   }
@@ -2851,5 +2869,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, winStart, winPass, winEnd, boutNext, setupMusic, setupRest, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, roundIn, winStart, winPass, winEnd, boutNext, setupMusic, setupRest, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>
