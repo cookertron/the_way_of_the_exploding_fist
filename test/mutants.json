@@ -4829,5 +4829,77 @@
   "new": "return values.length;",
   "increment": "gate-helpers",
   "kills": "distinct counts a uniform table as one value"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: blind values compared",
+  "old": "      if (blind && blind[a]) continue;\n",
+  "new": "",
+  "increment": "gate-helpers-2",
+  "kills": "replay with a blind range ignores the values written there"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: blind set never checked",
+  "old": "      if (odd >= 0) {",
+  "new": "      if (odd >= 0 && false) {",
+  "increment": "gate-helpers-2",
+  "kills": "replay with a blind range sees a blind byte missed, and one too many"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: blind set ignores the poison",
+  "old": "const w = blind[a] && m[a] !== fill ? 1 : 0;",
+  "new": "const w = blind[a] ? 1 : 0;",
+  "increment": "gate-helpers-2",
+  "kills": "replay with a blind range sees a blind byte missed, and one too many"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: a throw ends the replay",
+  "old": "      if (opts.stop) break; else continue;",
+  "new": "      break;",
+  "increment": "gate-helpers-2",
+  "kills": "replay counts a run that throws as a bad case and goes on to the next"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: a throw not counted",
+  "old": "      if (!res.bytes[0]++) res.bytes[1] = `${name(i, c)}: threw",
+  "new": "      if (!res.bytes[0]) res.bytes[1] = `${name(i, c)}: threw",
+  "increment": "gate-helpers-2",
+  "kills": "replay counts a run that throws as a bad case and goes on to the next"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate failed: the blind set skipped",
+  "old": "for (const k of ['bytes', 'screen', ...keys])",
+  "new": "for (const k of ['bytes', ...keys])",
+  "increment": "gate-helpers-2",
+  "kills": "failed folds a replay into its first failure, the bytes first, and none to [0, '']"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate failed: a missing observation passes",
+  "old": "    if (k !== 'screen' && !r[k]) throw",
+  "new": "    if (false) throw",
+  "increment": "gate-helpers-2",
+  "kills": "failed folds a replay into its first failure, the bytes first, and none to [0, '']"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate frames: one byte short",
+  "old": "return a === c.sp - 128 ? c.sp + 2 : a;",
+  "new": "return a === c.sp - 128 ? c.sp + 1 : a;",
+  "increment": "gate-helpers-2",
+  "kills": "frames steps over the 130 bytes of the call's stack frames, and only those"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate negative: a throw read as a pass",
+  "old": "  catch (e) { return e.message; }\n}",
+  "new": "  catch (e) { return 1; }\n}",
+  "increment": "gate-helpers-2",
+  "kills": "negative is the corrupt replay's count, and a throw's message rather than a crash"
  }
 ]

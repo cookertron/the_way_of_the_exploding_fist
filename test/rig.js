@@ -159,8 +159,14 @@ const hex = v => '$' + v.toString(16);
      opts.skip      a => next address to compare (the call's own stack, a
                     scratch range); return a unchanged to compare it
      opts.base      (m, c) => seeds shared tables before the case's bytes
+     opts.blind     [[lo, hi], ...] a blind range (D5: ROM glyphs on the
+                    screen): its values are not compared; instead the SET
+                    of its addresses the call changed from the poison must
+                    be the case's c.blind, reported as res.screen
      opts.only      case indices to replay
      opts.fill      the poison (0xA5); opts.stop stops at the first bad case
+   A run that throws is a bad case in res.bytes, named with the message:
+   one engine fault must not hide the cases after it.
    Returns { n, bytes: [bad, first], <name>: [bad, first], masked, still }.
      masked  out bytes the call wrote over a byte it never read, equal to
              the poison: an engine that skips that store still passes (T131)
@@ -173,6 +179,14 @@ function replay(fx, run, opts = {}) {
   nonEmpty('replay: the fixture\'s cases', idx.length);
   const res = { n: 0, bytes: [0, ''], masked: 0, still: 0 };
   for (const k in expect) res[k] = [0, ''];
+  let blind = null;
+  if (opts.blind){
+    nonEmpty('replay: the blind ranges', opts.blind.length);
+    blind = new Uint8Array(0x10000);
+    for (const [lo, hi] of opts.blind) blind.fill(1, lo, hi + 1);
+    res.screen = [0, ''];
+  }
+  const name = (i, c) => `case ${i}${c.site !== undefined ? ' (' + hex(c.site) + ')' : ''}`;
   for (const i of idx) {
     const c = fx.cases[i];
     const m = new Uint8Array(0x10000).fill(fill);
@@ -184,14 +198,35 @@ function replay(fx, run, opts = {}) {
       const a = a0 + k, v = parseInt(h.substr(2 * k, 2), 16);
       if (v === read[a]) { if (v === fill && !inRuns(c.in, a)) res.masked++; else res.still++; }
     }
-    const got = run(m, c, i) || {};
+    let got;
     res.n++;
+    try { got = run(m, c, i) || {}; }
+    catch (e) {
+      if (!res.bytes[0]++) res.bytes[1] = `${name(i, c)}: threw ${e.message}`;
+      if (opts.stop) break; else continue;
+    }
     let bad = false;
     for (let a = 0; a < 0x10000; a++) {
       if (opts.skip) { a = opts.skip(a, c); if (a > 0xFFFF) break; }
+      if (blind && blind[a]) continue;
       if (m[a] !== want[a]) {
-        if (!res.bytes[0]++) res.bytes[1] = `case ${i}${c.site !== undefined ? ' (' + hex(c.site) + ')' : ''}: ${hex(a)} = ${m[a]} want ${want[a]}`;
+        if (!res.bytes[0]++) res.bytes[1] = `${name(i, c)}: ${hex(a)} = ${m[a]} want ${want[a]}`;
         bad = true; break;
+      }
+    }
+    if (blind) {
+      /* both as ascending sets: a fixture lists its ranges in capture order */
+      const real = new Uint8Array(0x10000);
+      for (const [lo, hi] of c.blind || []) real.fill(1, lo, hi + 1);
+      let nw = 0, nr = 0, odd = -1;
+      for (let a = 0; a < 0x10000; a++) {
+        const w = blind[a] && m[a] !== fill ? 1 : 0;
+        nw += w; nr += real[a];
+        if (w !== real[a] && odd < 0) odd = a;
+      }
+      if (odd >= 0) {
+        if (!res.screen[0]++) res.screen[1] = `${name(i, c)}: wrote ${nw} blind bytes, the real code ${nr}, first apart ${hex(odd)}`;
+        bad = true;
       }
     }
     for (const k in expect) {
@@ -204,6 +239,21 @@ function replay(fx, run, opts = {}) {
     if (bad && opts.stop) break;
   }
   return res;
+}
+/* failed(r, ...keys) -- a replay folded into one row's [bad, first]: the
+   bytes, the blind set when replayed with one, then each named observation;
+   the first that failed, or [0, ''] when none did. */
+function failed(r, ...keys) {
+  for (const k of ['bytes', 'screen', ...keys]) {
+    if (k !== 'screen' && !r[k]) throw new Error(`gate: failed: no observation ${k}`);
+    if (r[k] && r[k][0]) return r[k];
+  }
+  return [0, ''];
+}
+/* frames(a, c) -- an opts.skip over the call's own stack frames, the 130
+   bytes below and at c.sp a callio bracket pushes into. */
+function frames(a, c) {
+  return a === c.sp - 128 ? c.sp + 2 : a;
 }
 function inRuns(runs, a) {
   return runs.some(([a0, h]) => a0 <= a && a < a0 + h.length / 2);
@@ -220,6 +270,14 @@ function corrupt(fx) {
   const out = c.out.slice();
   out[0] = [a0, (parseInt(h.slice(0, 2), 16) ^ 1).toString(16).padStart(2, '0') + h.slice(2)];
   return Object.assign({}, fx, { cases: [Object.assign({}, c, { out })] });
+}
+
+/* negative(fx, run, opts) -- the gate's negative control as a row's value:
+   the bad-case count of a replay of corrupt(fx), 1 when the gate works,
+   or the message when corrupt or the run throws -- a row, not a crash. */
+function negative(fx, run, opts) {
+  try { return replay(corrupt(fx), run, opts).bytes[0]; }
+  catch (e) { return e.message; }
 }
 
 /* ran(cases) -- the set of PCs a fixture's cases executed (each case's
@@ -272,7 +330,7 @@ function untouched(m, lo, hi, v, wrote) {
   return bad.map(hex);
 }
 
-const gate = { POISON, replay, corrupt, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty };
+const gate = { POISON, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty };
 
 module.exports = {
   ROOT, sandbox, els, drawCalls, listeners, localStorageStore,

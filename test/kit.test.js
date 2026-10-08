@@ -492,6 +492,32 @@ const mockCtx = (state) => ({
         [G.replay(fx, m => { good(m); m[0x7FFF] = 0; }, { skip: a => a === 0x7FFF ? 0x8000 : a }).bytes[0],
          G.replay(fx, m => { good(m); m[0x7FFE] = 0; }, { skip: a => a === 0x7FFF ? 0x8000 : a }).bytes[0]], [0, 1]);
   check('corrupt makes the passing engine fail on that case', G.replay(G.corrupt(fx), good).bytes[0], 1);
+  check('negative is the corrupt replay\'s count, and a throw\'s message rather than a crash',
+        [G.negative(fx, good), G.negative({ cases: [{ in: [], out: [] }] }, good)],
+        [1, 'gate: corrupt: the writes of the cases is empty -- a check over nothing passes (T110)']);
+  /* a blind range $4000-$4003: the real call wrote $4001 and $4002, values unknown */
+  const fb = { cases: [Object.assign({ blind: [[0x4001, 0x4002]] }, fx.cases[0])] }, bl = { blind: [[0x4000, 0x4003]] };
+  const glyphs = m => { good(m); m[0x4001] = 1; m[0x4002] = 2; };
+  check('replay with a blind range ignores the values written there',
+        [G.replay(fb, glyphs, bl).bytes, G.replay(fb, glyphs, bl).screen], [[0, ''], [0, '']]);
+  check('replay with a blind range compares sets, whatever order the ranges are listed in',
+        G.replay({ cases: [Object.assign({}, fb.cases[0], { blind: [[0x4002, 0x4002], [0x4001, 0x4001]] })] }, glyphs,
+                 { blind: [[0x4002, 0x4003], [0x4000, 0x4001]] }).screen, [0, '']);
+  check('replay with a blind range sees a blind byte missed, and one too many',
+        [G.replay(fb, m => { glyphs(m); m[0x4002] = 0xA5; }, bl).screen[0], G.replay(fb, m => { glyphs(m); m[0x4003] = 3; }, bl).screen[0]], [1, 1]);
+  check('replay with a blind range still compares the bytes outside it',
+        G.replay(fb, m => { glyphs(m); m[0x4004] = 0; }, bl).bytes[1], 'case 0 ($1234): $4004 = 0 want 165');
+  check('replay counts a run that throws as a bad case and goes on to the next',
+        (() => { const two = { cases: [fx.cases[0], fx.cases[0]] };
+                 const r2 = G.replay(two, (m, c, i) => { if (!i) throw new Error('boom'); good(m); });
+                 return [r2.n, r2.bytes]; })(), [2, [1, 'case 0 ($1234): threw boom']]);
+  check('failed folds a replay into its first failure, the bytes first, and none to [0, \'\']',
+        [G.failed({ bytes: [0, ''], screen: [2, 's'], t: [1, 't'] }, 't'), G.failed({ bytes: [1, 'b'], t: [1, 't'] }, 't'),
+         G.failed({ bytes: [0, ''], t: [0, ''] }, 't'),
+         (() => { try { G.failed({ bytes: [0, ''] }, 'tt'); return 'passed'; } catch (e) { return e.message; } })()],
+        [[2, 's'], [1, 'b'], [0, ''], 'gate: failed: no observation tt']);
+  check('frames steps over the 130 bytes of the call\'s stack frames, and only those',
+        [G.frames(0x7F80, { sp: 0x8000 }), G.frames(0x7F7F, { sp: 0x8000 }), G.frames(0x8002, { sp: 0x8000 })], [0x8002, 0x7F7F, 0x8002]);
   check('corrupt leaves the fixture it copies unchanged', fx.cases[0].out[0][1], '1122a5');
   check('corrupt skips a case that writes nothing',
         (() => { try { return G.corrupt({ cases: [{ in: [], out: [] }, fx.cases[0]] }).cases.map(c => c.out[0][1]); }
@@ -515,70 +541,52 @@ const mockCtx = (state) => ({
    ======================================================================= */
 
 /* ---- the sprite decoder $8803 against its frozen oracle (sprdec) ------
-   Every case is replayed in a blank 64K holding only the tables and the
-   bytes the real call read; the whole of memory outside the scratch
-   $8AE9-$8B1C must then equal the bytes the real call left, and the T must
-   equal its uncontended T (python tools/sprdec.py --capture). */
+   Every case is replayed in a poisoned 64K holding only the tables and the
+   bytes the real call read (rig.gate.replay); the whole of memory outside
+   the scratch $8AE9-$8B1C must then equal the bytes the real call left,
+   and the T must equal its uncontended T (python tools/sprdec.py --capture). */
 {
-  const fx = P.assets.sprdec;
+  const fx = P.assets.sprdec, G = rig.gate;
   const tables = Buffer.from(fx.tables, 'hex');
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
   const paths = {};
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000);
-    m.set(tables, 0xB500); put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    const t = P.spriteDecode(m, c.hl, c.de, paths);
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === 0x8AE9) a = 0x8B1D;
-      if (m[a] !== want[a]){ diff = a; break; }
-    }
-    if (diff >= 0 && !badBytes++)
-      firstBytes = `case ${i} HL=$${c.hl.toString(16)}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i} HL=$${c.hl.toString(16)}: T ${t} want ${c.t}`;
-  }
-  check(`spriteDecode writes every byte the real $8803 wrote (${fx.cases.length} sprdec cases)`, [badBytes, firstBytes], [0, '']);
-  check('spriteDecode tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const run = (m, c) => ({ t: P.spriteDecode(m, c.hl, c.de, paths) });
+  const opts = { base: m => m.set(tables, 0xB500), skip: a => a === 0x8AE9 ? 0x8B1D : a };
+  const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t } }, opts));
+  check(`spriteDecode writes every byte the real $8803 wrote (${fx.cases.length} sprdec cases)`, r.bytes, [0, '']);
+  check('spriteDecode tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('the spriteDecode gate fails on a case with one byte corrupted (T100)',
+        G.negative(fx, run, opts), 1);
+  /* sprites hold $A5 (5 stores over unread bytes) and $5A (10): no byte is
+     both, so a second replay under $5A sees every store the first masked */
+  check('spriteDecode writes the bytes the $A5 poison masked, replayed under $5A (T131)',
+        G.replay(fx, run, Object.assign({ fill: 0x5A }, opts)).bytes, [0, '']);
   check('the sprdec cases reach every row path seen in play',
         ['packed', 'edges', 'single', 'recolour', 'mirror', 'shift2', 'shift4', 'shift6'].filter(k => !paths[k]), []);
 }
 
 /* ---- render_fighters $BF13 against its frozen oracle (rendfx) ---------
-   Every case is replayed in a blank 64K holding only the decoder tables and
-   the bytes the real call read; the whole of memory outside the stack must
-   then equal the bytes the real call left -- back buffer, display file,
-   boxes and scratch -- and the T must equal its uncontended T (python
-   tools/rendfx.py --capture). */
+   Every case is replayed in a poisoned 64K holding only the decoder tables
+   and the bytes the real call read (rig.gate.replay); the whole of memory
+   outside the stack must then equal the bytes the real call left -- back
+   buffer, display file, boxes and scratch -- and the T must equal its
+   uncontended T (python tools/rendfx.py --capture). */
 {
-  const fx = P.assets.rendfx;
+  const fx = P.assets.rendfx, G = rig.gate;
   const tables = Buffer.from(fx.tables, 'hex');
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
   const paths = {};
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000);
-    m.set(tables, 0xB500); put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    P.M1.m1 = 0;
-    const t = P.renderFighters(m, paths, c.sp);
-    if ((P.M1.m1 & 0x7F) !== c.m1 && !badM1++) firstM1 = `case ${i} [${c.paths}]: M1 ${P.M1.m1} want ${c.m1} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 64) a = c.sp + 2;
-      if (m[a] !== want[a]){ diff = a; break; }
-    }
-    if (diff >= 0 && !badBytes++)
-      firstBytes = `case ${i} [${c.paths}]: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i} [${c.paths}]: T ${t} want ${c.t}`;
-  }
-  check(`renderFighters writes every byte the real $BF13 wrote (${fx.cases.length} rendfx cases)`, [badBytes, firstBytes], [0, '']);
-  check('renderFighters tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const run = (m, c) => { P.M1.m1 = 0; const t = P.renderFighters(m, paths, c.sp); return { t, m1: P.M1.m1 & 0x7F }; };
+  const opts = { base: m => m.set(tables, 0xB500), skip: (a, c) => a === c.sp - 64 ? c.sp + 2 : a };
   /* R: the fixture's m1 is how far R advanced from $BF13 to $9793 (rendfx.py --stamp-r) */
-  check('renderFighters counts the M1 cycles of every case as R advanced in the real $BF13', [badM1, firstM1], [0, '']);
+  const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, m1: c => c.m1 } }, opts));
+  check(`renderFighters writes every byte the real $BF13 wrote (${fx.cases.length} rendfx cases)`, r.bytes, [0, '']);
+  check('renderFighters tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('renderFighters counts the M1 cycles of every case as R advanced in the real $BF13', r.m1, [0, '']);
+  check('the renderFighters gate fails on a case with one byte corrupted (T100)',
+        G.negative(fx, run, opts), 1);
+  /* the frames hold $A5 (7 stores over unread bytes) and $5A (6): no byte
+     is both, so a second replay under $5A sees every store the first masked */
+  check('renderFighters writes the bytes the $A5 poison masked, replayed under $5A (T131)',
+        G.replay(fx, run, Object.assign({ fill: 0x5A }, opts)).bytes, [0, '']);
   check('the rendfx cases reach every render path seen in play',
         ['separate', 'merged', 'p1-first', 'p2-first', 'floor-part', 'flip', 'unflipped'].filter(k => !paths[k]), []);
   /* per comparison, margin 0 is the last merged case and 1 the first drawn
@@ -629,7 +637,7 @@ const mockCtx = (state) => ({
   check('fighterStep tallies the uncontended T of every case exactly', r.t, [0, '']);
   check('fighterStep counts the M1 cycles of every case as R advanced in the real $97BB', r.m1, [0, '']);
   check('the fighterStep gate fails on a case with one byte corrupted (T100)',
-        G.replay(G.corrupt(fx), run).bytes[0], 1);
+        G.negative(fx, run), 1);
   check('no fighterStep case stores the poison over a byte it never read (T131)', r.masked, 0);
   /* every exit of every callee, play or derived (callio.py --derive: the
      real code on a constructed input, e.g. both fighters facing one way) */
@@ -655,7 +663,7 @@ const mockCtx = (state) => ({
   check('fighterPost tallies the uncontended T of every case exactly', r.t, [0, '']);
   check('fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D', r.m1, [0, '']);
   check('the fighterPost gate fails on a case with one byte corrupted (T100)',
-        G.replay(G.corrupt(fx), run).bytes[0], 1);
+        G.negative(fx, run), 1);
   check('no fighterPost case stores the poison over a byte it never read (T131)', r.masked, 0);
   check('the callio cases reach every exit and branch of $9AD7',
         G.missing([0x9AE3, 0x9AF4, 0x9AFD, 0x9B09, 0x9B0E, 0x9B1E, 0x9B23, 0x9B67, 0x9B71, 0x9B8A], G.ran(fx.cases)), []);
@@ -669,41 +677,28 @@ const mockCtx = (state) => ({
    ROM-font values, so the gate checks that set of addresses, and separately
    that each cell shows the lookalike glyph of the character in $932C. */
 {
-  const fx = P.assets.timer9c6f;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  const fx = P.assets.timer9c6f, G = rig.gate;
   check('the lookalike font holds no $A5 byte (the poison marks screen writes)', P.font.includes(0xA5), false);
-  let badBytes = 0, badBlind = 0, badT = 0, badGlyph = 0, firstBytes = '', firstBlind = '', firstT = '', firstGlyph = '';
-  let badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
+  const run = m => {
     P.M1.m1 = 0;
     const t = P.boutTimer(m);
-    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++)
-      firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    if (wrote.join() !== blind.join() && !badBlind++)
-      firstBlind = `case ${i}: wrote ${wrote.length} screen bytes, the real code ${blind.length}`;
-    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
-    if (blind.length) for (let k = 0; k < 5; k++) for (let r = 0; r < 8; r++){
+    let glyph = '';
+    if (fx.blind.some(([lo, hi]) => m.subarray(lo, hi + 1).some(v => v !== G.POISON))) for (let k = 0; k < 5; k++) for (let r = 0; r < 8; r++){
       const ch = m[0x932C + k], a = 0x4000 + 0x0B + k + (r << 8);
-      if (m[a] !== P.font[(ch - 0x20) * 8 + r] && !badGlyph++) firstGlyph = `case ${i}: char ${k} row ${r}`;
+      if (m[a] !== P.font[(ch - 0x20) * 8 + r] && !glyph) glyph = `char ${k} row ${r}`;
     }
-  }
-  check('boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('boutTimer writes exactly the screen bytes the real $9C6F wrote', [badBlind, firstBlind], [0, '']);
-  check('boutTimer tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+    return { t, m1: P.M1.m1 & 0x7F, glyph };
+  };
+  const r = G.replay(fx, run, { blind: fx.blind, expect: { t: c => c.t, m1: c => (c.rx - c.r) & 0x7F, glyph: () => '' } });
+  check('boutTimer writes every byte the real $9C6F wrote outside the screen (callio cases)', r.bytes, [0, '']);
+  check('boutTimer writes exactly the screen bytes the real $9C6F wrote', r.screen, [0, '']);
+  check('boutTimer tallies the uncontended T of every case exactly', r.t, [0, '']);
   /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
-  check('boutTimer counts the M1 cycles of every case as R advanced in the real $9C6F', [badM1, firstM1], [0, '']);
-  check('each printed cell shows the lookalike glyph of its $932C character', [badGlyph, firstGlyph], [0, '']);
+  check('boutTimer counts the M1 cycles of every case as R advanced in the real $9C6F', r.m1, [0, '']);
+  check('each printed cell shows the lookalike glyph of its $932C character', r.glyph, [0, '']);
+  check('the boutTimer gate fails on a case with one byte corrupted (T100)',
+        G.negative(fx, run, { blind: fx.blind }), 1);
+  check('no boutTimer case stores the poison over a byte it never read (T131)', r.masked, 0);
   const pcs = fx.cases.map(c => rig.gate.ran([c]));
   /* each RET of $9C6F: a case that passed the PC before it and not the one after */
   check('the callio cases take every early return of $9C6F',
@@ -727,7 +722,7 @@ const mockCtx = (state) => ({
   check('p2HitsP1 tallies the uncontended T of every case exactly', r.t, [0, '']);
   check('p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2', r.m1, [0, '']);
   check('the p2HitsP1 gate fails on a case with one byte corrupted (T100)',
-        G.replay(G.corrupt(fx), run).bytes[0], 1);
+        G.negative(fx, run), 1);
   check('no p2HitsP1 case stores the poison over a byte it never read (T131)', r.masked, 0);
   const pcs = fx.cases.map(c => rig.gate.ran([c]));
   /* each early RET: a case that passed the PC before it and not the one after */
@@ -756,7 +751,7 @@ const mockCtx = (state) => ({
   check('p1HitsP2 tallies the uncontended T of every case exactly', r.t, [0, '']);
   check('p1HitsP2 counts the M1 cycles of every case as R advanced in the real $9D29', r.m1, [0, '']);
   check('the p1HitsP2 gate fails on a case with one byte corrupted (T100)',
-        G.replay(G.corrupt(fx), run).bytes[0], 1);
+        G.negative(fx, run), 1);
   check('no p1HitsP2 case stores the poison over a byte it never read (T131)', r.masked, 0);
   const pcs = fx.cases.map(c => rig.gate.ran([c]));
   /* each early RET: a case that passed the PC before it and not the one after */
@@ -785,7 +780,7 @@ const mockCtx = (state) => ({
   check('fighterMotion tallies the uncontended T of every case exactly', r.t, [0, '']);
   check('fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4', r.m1, [0, '']);
   check('the fighterMotion gate fails on a case with one byte corrupted (T100)',
-        G.replay(G.corrupt(fx), run).bytes[0], 1);
+        G.negative(fx, run), 1);
   check('no fighterMotion case stores the poison over a byte it never read (T131)', r.masked, 0);
   const pcs = fx.cases.map(c => rig.gate.ran([c]));
   check('the callio cases reach every branch of $95D4 and its swap $971E',
@@ -807,9 +802,7 @@ const mockCtx = (state) => ({
    written is checked, and the menu's ($8C54, ledger/8C54.toml) last
    screen must show the lookalike glyphs of its strings. */
 {
-  const fx = P.assets.control97cb;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  const fx = P.assets.control97cb, G = rig.gate;
   const iA = fx.regs.indexOf(0);
   const scr = (y, x) => 0x4000 | (y & 0xC0) << 5 | (y & 7) << 8 | (y & 0x38) << 2 | x;
   const screens = [                                // [PC that marks it, its strings as [text, pos]]
@@ -817,13 +810,8 @@ const mockCtx = (state) => ({
     [0x8CDB, [[0x8ED6, 0x012D], [0x8EF4, 0x0136], [0x8F0F, 0x013F], [0x8F2A, 0x0148], [0x8F41, 0x0151], [0x8F59, 0x0371]]],
     [0x8C54, [[0x8E6B, 0x002D], [0x8E8C, 0x1436], [0x8E99, 0x143F], [0x8EA6, 0x1448], [0x8EB3, 0x055C], [0x8EC6, 0x0765]]]];
   const missed = P.fontMiss.count;
-  let badBytes = 0, badT = 0, badA = 0, badR = 0, badPorts = 0, badBlind = 0, badGlyph = 0, menus = 0;
-  let firstBytes = '', firstT = '', firstA = '', firstR = '', firstPorts = '', firstBlind = '', firstGlyph = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
+  let menus = 0;
+  const run = (m, c) => {
     const log = c.ports || [];
     let j = 0, portErr = '';
     const io = { r: c.r, in: p => {
@@ -837,38 +825,32 @@ const mockCtx = (state) => ({
     let res;
     try { res = P.controlPass(m, io); } catch (e){ res = { t: -1, a: -1, r: -1 }; portErr = portErr || e.message; }
     if (j !== log.length) portErr = portErr || `${j} port reads, the machine ${log.length}`;
-    if (portErr && !badPorts++) firstPorts = `case ${i}: ${portErr}`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    if (wrote.join() !== blind.join() && !badBlind++)
-      firstBlind = `case ${i}: wrote ${wrote.length} screen bytes, the real code ${blind.length}`;
-    const sig = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) sig.add(parseInt(c.sig.slice(j, j + 4), 16));
+    let glyph = '';
+    const sig = G.ran([c]);
     const last = screens.find(([pc]) => sig.has(pc));
     if (last){
       menus++;
-      for (const [text, pos] of last[1]) for (let k = 0, ch; (ch = want[text + k]); k++)
+      for (const [text, pos] of last[1]) for (let k = 0, ch; (ch = m[text + k]); k++)
         for (let r = 0; r < 8; r++)
-          if (m[scr((pos & 0xFF) + r, (pos >> 8) + k)] !== P.font[(ch - 0x20) * 8 + r] && !badGlyph++)
-            firstGlyph = `case ${i}: $${text.toString(16)} char ${k} row ${r}`;
+          if (m[scr((pos & 0xFF) + r, (pos >> 8) + k)] !== P.font[(ch - 0x20) * 8 + r] && !glyph)
+            glyph = `$${text.toString(16)} char ${k} row ${r}`;
     }
-    if (res.t !== c.t && !badT++) firstT = `case ${i}: T ${res.t} want ${c.t}`;
-    if (res.a !== c.exit[iA] && !badA++) firstA = `case ${i}: A ${res.a} want ${c.exit[iA]}`;
-    if (res.r !== c.rx && !badR++) firstR = `case ${i}: R ${res.r} want ${c.rx}`;
-  }
-  check('controlPass reads the same ports in the same order as the real $97CB', [badPorts, firstPorts], [0, '']);
-  check('controlPass writes every byte the real $97CB wrote outside the screen (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('controlPass writes exactly the screen bytes the real $97CB wrote', [badBlind, firstBlind], [0, '']);
-  check('the menu cases end with the lookalike glyphs of the strings of their last screen', [menus, badGlyph, firstGlyph], [13, 0, '']);
+    return { ports: portErr, glyph, t: res.t, a: res.a, r: res.r };
+  };
+  const r = G.replay(fx, run, { blind: fx.blind, expect: { ports: () => '', glyph: () => '',
+                                               t: c => c.t, a: c => c.exit[iA], r: c => c.rx } });
+  check('controlPass reads the same ports in the same order as the real $97CB', r.ports, [0, '']);
+  check('controlPass writes every byte the real $97CB wrote outside the screen (callio cases)', r.bytes, [0, '']);
+  check('controlPass writes exactly the screen bytes the real $97CB wrote', r.screen, [0, '']);
+  check('the menu cases end with the lookalike glyphs of the strings of their last screen', [menus].concat(r.glyph), [13, 0, '']);
   check('every character controlPass printed has a lookalike glyph (fontMiss unchanged)',
         [P.fontMiss.count - missed, [...P.fontMiss.codes].map(x => x.toString(16)).join()], [0, '']);
-  check('controlPass tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
-  check('controlPass returns the A the real $97CB returned (the RET M at $975B)', [badA, firstA], [0, '']);
-  check('controlPass counts R to the value the real $97CB left (the AI draws)', [badR, firstR], [0, '']);
+  check('controlPass tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('controlPass returns the A the real $97CB returned (the RET M at $975B)', r.a, [0, '']);
+  check('controlPass counts R to the value the real $97CB left (the AI draws)', r.r, [0, '']);
+  check('the controlPass gate fails on a case with one byte corrupted (T100)',
+        G.negative(fx, run, { blind: fx.blind }), 1);
+  check('no controlPass case stores the poison over a byte it never read (T131)', r.masked, 0);
   /* Every outcome of every conditional the cases executed, from python
      tools/branches.py --fixture build/callio_97cb.json --js.  Captured with
      --poke (2P: $9C2C=2 $AA46=0; Kempston: $8BD2=$8C42) and derived
@@ -921,26 +903,16 @@ const mockCtx = (state) => ({
    draw -- so derived cases (the real code on a set count) reach 3 and 4+,
    which $ABD2 and $AD22 can bring (ledger/900E.toml). */
 {
-  const fx = P.assets.yy976f;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    P.M1.m1 = 0;
-    const t = P.yinYang2P(m);
-    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
-  }
-  check('yinYang2P writes every byte the real $976F-$978D wrote (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('yinYang2P tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const fx = P.assets.yy976f, G = rig.gate;
+  const run = m => { P.M1.m1 = 0; const t = P.yinYang2P(m); return { t, m1: P.M1.m1 & 0x7F }; };
   /* R: the fixture's R at $976F and at $978D (callio.py --check --stamp-r) */
-  check('yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D', [badM1, firstM1], [0, '']);
+  const r = G.replay(fx, run, { expect: { t: c => c.t, m1: c => (c.rx - c.r) & 0x7F } });
+  check('yinYang2P writes every byte the real $976F-$978D wrote (callio cases)', r.bytes, [0, '']);
+  check('yinYang2P tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D', r.m1, [0, '']);
+  check('the yinYang2P gate fails on a case with one byte corrupted (T100)',
+        G.negative(fx, run), 1);
+  check('no yinYang2P case stores the poison over a byte it never read (T131)', r.masked, 0);
   const pcs = fx.cases.map(c => rig.gate.ran([c]));
   check('the callio cases reach every branch of $976F, $900E and its copy $9255',
         [0x9776, 0x977C, 0x9783, 0x9015, 0x901E, 0x9028, 0x9036, 0x904D, 0x905C, 0x9065, 0x906F, 0x907D, 0x9094,
@@ -1008,17 +980,9 @@ const mockCtx = (state) => ({
    with the D6 substitutes (the sfx gate holds those): their writes must
    match in count and value, the first at the same T. */
 {
-  const fx = P.assets.pass9745;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  const fx = P.assets.pass9745, G = rig.gate;
   const iA = fx.regs.indexOf(0);
-  let badBytes = 0, badBlind = 0, badT = 0, badA = 0, badR = 0, badPorts = 0, badOuts = 0;
-  let firstBytes = '', firstBlind = '', firstT = '', firstA = '', firstR = '', firstPorts = '', firstOuts = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
+  const run = (m, c) => {
     const log = c.ports || [];
     let j = 0, portErr = '';
     const io = { r: c.r, out: [], in: p => {
@@ -1027,36 +991,30 @@ const mockCtx = (state) => ({
     }, };
     const res = P.playPass(m, io, c.sp);
     if (j !== log.length) portErr = portErr || `${j} port reads, the machine ${log.length}`;
-    if (portErr && !badPorts++) firstPorts = `case ${i}: ${portErr}`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
-      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    }
-    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    if (wrote.join() !== blind.join() && !badBlind++)
-      firstBlind = `case ${i}: wrote ${wrote.length} screen bytes, the real code ${blind.length}`;
     const outs = c.outs || [];
-    if ((io.out.length !== outs.length || io.out.some((e, k) => e[1] !== outs[k][1])
-         || (outs.length && io.out[0][0] !== outs[0][0])) && !badOuts++)
-      firstOuts = `case ${i}: ${io.out.length} writes, first ${JSON.stringify(io.out[0])}; the machine ${outs.length}, ${JSON.stringify(outs[0])}`;
-    if (res.t !== c.t && !badT++) firstT = `case ${i}: T ${res.t} want ${c.t}`;
-    if (res.a !== c.exit[iA] && !badA++) firstA = `case ${i}: A ${res.a} want ${c.exit[iA]}`;
-    if (res.r !== c.rx && !badR++) firstR = `case ${i}: R ${res.r} want ${c.rx}`;
-    /* stop at the first bad case: a pass gone wrong reads bytes the case
-       never held, and over the $A5 poison a sprite walk finds no end */
-    if (badPorts + badBytes + badBlind + badOuts + badT + badA + badR) break;
-  }
-  check('playPass reads the same ports in the same order as the real $9745', [badPorts, firstPorts], [0, '']);
-  check('playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('playPass writes exactly the timer-cell bytes the real $9745 wrote', [badBlind, firstBlind], [0, '']);
-  check('playPass makes the effect\'s $FE writes in number and value, the first at the machine\'s T', [badOuts, firstOuts], [0, '']);
-  check('playPass tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
-  check('playPass returns the A the real $9745 returned (the RET M at $AE2D)', [badA, firstA], [0, '']);
-  check('playPass counts R to the value the real $9745 left (the AI draws carried)', [badR, firstR], [0, '']);
+    const outErr = io.out.length !== outs.length || io.out.some((e, k) => e[1] !== outs[k][1])
+                   || (outs.length && io.out[0][0] !== outs[0][0])
+      ? `${io.out.length} writes, first ${JSON.stringify(io.out[0])}; the machine ${outs.length}, ${JSON.stringify(outs[0])}` : '';
+    return { ports: portErr, outs: outErr, t: res.t, a: res.a, r: res.r };
+  };
+  const opts = { skip: G.frames, blind: fx.blind, stop: true };   // the call's own stack frames (callio)
+  /* stop at the first bad case: a pass gone wrong reads bytes the case
+     never held, and over the $A5 poison a sprite walk finds no end */
+  const r = G.replay(fx, run, Object.assign({ expect: { ports: () => '', outs: () => '',
+                                                      t: c => c.t, a: c => c.exit[iA], r: c => c.rx } }, opts));
+  check('playPass reads the same ports in the same order as the real $9745', r.ports, [0, '']);
+  check('playPass writes every byte the real $9745 wrote outside the timer cells (callio cases)', r.bytes, [0, '']);
+  check('playPass writes exactly the timer-cell bytes the real $9745 wrote', r.screen, [0, '']);
+  check('playPass makes the effect\'s $FE writes in number and value, the first at the machine\'s T', r.outs, [0, '']);
+  check('playPass tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('playPass returns the A the real $9745 returned (the RET M at $AE2D)', r.a, [0, '']);
+  check('playPass counts R to the value the real $9745 left (the AI draws carried)', r.r, [0, '']);
+  check('the playPass gate fails on a case with one byte corrupted (T100)',
+        G.negative(fx, run, opts), 1);
+  /* one store of $A5 over an unread byte (case 4, $8B16) and none of $5A:
+     a second replay under $5A sees the store the first masked */
+  check('playPass writes the bytes the $A5 poison masked, replayed under $5A (T131)',
+        G.replay(fx, run, Object.assign({ fill: 0x5A }, opts)).bytes, [0, '']);
   const pcs = fx.cases.map(c => rig.gate.ran([c]));
   check('the pass cases cover 1P, 2P, a timer print, an effect and both fighter draws',
         [0x975C, 0x9776, 0x9C93, 0xB15C, 0x9790, 0x97A6].filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
@@ -1070,22 +1028,15 @@ const mockCtx = (state) => ({
    python tools/callio.py --capture --call 0xAE2C 0xAE29 (p1, s1; the $AA44
    = $11 arm derived: no play reached it).  Exact: $C427, T, R. */
 {
-  const fx = P.assets.tail_ae2c;
+  const fx = P.assets.tail_ae2c, G = rig.gate;
   const iA = fx.regs.indexOf(0);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
-    const res = P.roundTail(m, c.regs[iA], c.r);
-    const got = [res.exit, res.t, res.r, m.findIndex((v, a) => v !== want[a])];
-    if (JSON.stringify(got) !== JSON.stringify([null, c.t, c.rx, -1]) && !bad++)
-      first = `case ${i}: exit, T, R, first bad byte ${JSON.stringify(got)} want ${JSON.stringify([null, c.t, c.rx, -1])}`;
-  }
-  check('roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly', [bad, first], [0, '']);
+  const run = (m, c) => { const res = P.roundTail(m, c.regs[iA], c.r); return { exit: res.exit, t: res.t, r: res.r }; };
+  const r = G.replay(fx, run, { expect: { exit: () => null, t: c => c.t, r: c => c.rx } });
+  check('roundTail matches the real $AE2C-$AE65 on every case: $C427, T and R exactly', G.failed(r, 'exit', 't', 'r'), [0, '']);
   check('...and the cases reach both $11 arms ($AA04, and $AA44 derived)',
         [0xAA04, 0xAA44].map(a => fx.cases.some(c => c.in.some(([x, h]) => x === a && h === '11'))), [true, true]);
+  check('the roundTail gate fails on a case with one byte corrupted (T100)', G.negative(fx, run), 1);
+  check('no roundTail case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- the point path $AD1B back to $AE29, against its frozen oracle -----
@@ -1094,37 +1045,21 @@ const mockCtx = (state) => ({
    Exact: every byte outside the score row, the score-row bytes written (D5:
    ROM glyphs), the way out (xpc), T and R. */
 {
-  const fx = P.assets.point_ad1b;
+  const fx = P.assets.point_ad1b, G = rig.gate;
   const iA = fx.regs.indexOf(0);
   const EXIT = { 0xAE29: null, 0xAD5F: 'p1', 0xAD94: 'p2', 0xAD44: 'time' };
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
-    const res = P.pointPath(m, c.regs[iA], c.r);
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
-      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    }
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    const got = [res.exit, res.t, res.r, diff, wrote.join() === blind.join()];
-    const w = [EXIT[c.xpc], c.t, c.rx, -1, true];
-    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
-      first = `case ${i}: exit, T, R, first bad byte, score row ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
-  }
-  check('pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly', [bad, first], [0, '']);
+  const run = (m, c) => { const res = P.pointPath(m, c.regs[iA], c.r); return { exit: res.exit, t: res.t, r: res.r }; };
+  const opts = { skip: G.frames, blind: fx.blind };      // the call's own stack frames (callio)
+  const r = G.replay(fx, run, Object.assign({ expect: { exit: c => EXIT[c.xpc], t: c => c.t, r: c => c.rx } }, opts));
+  check('pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly', G.failed(r, 'exit', 't', 'r'), [0, '']);
   check('...and the cases take every way out: back in, P1 wins, P2 wins, time up',
         [0xAE29, 0xAD5F, 0xAD94, 0xAD44].map(x => fx.cases.some(c => c.xpc === x)), [true, true, true, true]);
   const set = c => (c.derived || {}).set || {};
   check('...and the derived cases hold a count of 3 (no win), a binary carry into DAA and a half-carry under 10',
         [fx.cases.some(c => set(c).aa08 === 1 && set(c).aa01 === 2), fx.cases.some(c => set(c).b030 === 0xF5),
          fx.cases.some(c => set(c).b019 === 8 && set(c).b030 === 9)], [true, true, true]);
+  check('the pointPath gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  check('no pointPath case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- the 2UP game's ways on from $AE17, against its frozen oracle -------
@@ -1137,16 +1072,10 @@ const mockCtx = (state) => ({
    $AD9C's level, the call's) and twoOut, as the live engine runs them.
    Exact as pointPath's, and the tune's $FE writes at their T. */
 {
-  const fx = P.assets.round_ae17;
+  const fx = P.assets.round_ae17, G = rig.gate;
   const iA = fx.regs.indexOf(0);
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '', badO = 0;
   const kinds = [];
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+  const run = (m, c) => {
     const u = P.twoOn(m, c.regs[iA], c.r), outs = [];
     let t = u.t, at = u.exit === 'quit' ? 0xAC34 : u.exit === null ? 0xAE29 : 0, kind = u.exit || 'point';
     if (u.exit === 'time'){
@@ -1163,25 +1092,17 @@ const mockCtx = (state) => ({
       }
     }
     kinds.push(kind);
-    const r = (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F);
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
-      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    }
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    const got = [at, t, r, diff, wrote.join() === blind.join()];
-    const w = [c.xpc, c.t, c.rx, -1, true];
-    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
-      first = `case ${i}: PC, T, R, first bad byte, score row ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
-    if (JSON.stringify(outs) !== JSON.stringify(c.outs || [])) badO++;
-  }
-  check('twoOn and the 2UP game\'s ways on match the real $AE17 to $AE29 or $AC34 on every case: bytes, PC, T and R exactly', [bad, first], [0, '']);
-  check('...and the tune\'s $FE writes at their T from $AE17, on every case', badO, 0);
+    return { at, t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), outs: JSON.stringify(outs) };
+  };
+  const opts = { skip: G.frames, blind: fx.blind };
+  const r = G.replay(fx, run, Object.assign({ expect: { at: c => c.xpc, t: c => c.t, r: c => c.rx,
+                                                       outs: c => JSON.stringify(c.outs || []) } }, opts));
+  check('twoOn and the 2UP game\'s ways on match the real $AE17 to $AE29 or $AC34 on every case: bytes, PC, T and R exactly', G.failed(r, 'at', 't', 'r'), [0, '']);
+  check('...and the tune\'s $FE writes at their T from $AE17, on every case', r.outs[0], 0);
   check('...and the cases take every way: a point back in, the quit, time up into the next bout, and the game end both posed, P1\'s pose and P2\'s',
         ['point', 'quit', 'time', 'both', 'pose aa00', 'pose aa40'].map(x => kinds.includes(x)), [true, true, true, true, true, true]);
+  check('the twoOn gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  check('no twoOn case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- the demo's point path $ABCB back to $AE29, against its oracle -----
@@ -1190,32 +1111,14 @@ const mockCtx = (state) => ({
    other arms derived, the RETs to $ABB9 with --up, port.json).  Exact as
    pointPath's: every byte outside the score row, the way out, T and R. */
 {
-  const fx = P.assets.demo_abcb;
+  const fx = P.assets.demo_abcb, G = rig.gate;
   const iA = fx.regs.indexOf(0);
   const EXIT = { 0xAE29: null, 0xAC00: 'p1', 0xABE5: 'p2' };
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
-    const res = P.demoPoint(m, c.regs[iA], c.r);
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
-      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    }
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    const out = c.xpc === 0xABB9 ? (c.exit[iA] & 0x80 ? 'quit' : 'time') : EXIT[c.xpc];   // the RET: A says which
-    const got = [res.exit, res.t, res.r, diff, wrote.join() === blind.join()];
-    const w = [out, c.t, c.rx, -1, true];
-    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
-      first = `case ${i}: exit, T, R, first bad byte, score row ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
-  }
-  check("demoPoint matches the real $ABCB to $AE29 (or its way out) on every case: bytes, exit, T and R exactly", [bad, first], [0, '']);
+  const run = (m, c) => { const res = P.demoPoint(m, c.regs[iA], c.r); return { exit: res.exit, t: res.t, r: res.r }; };
+  const out = c => c.xpc === 0xABB9 ? (c.exit[iA] & 0x80 ? 'quit' : 'time') : EXIT[c.xpc];   // the RET: A says which
+  const opts = { skip: G.frames, blind: fx.blind };
+  const r = G.replay(fx, run, Object.assign({ expect: { exit: out, t: c => c.t, r: c => c.rx } }, opts));
+  check("demoPoint matches the real $ABCB to $AE29 (or its way out) on every case: bytes, exit, T and R exactly", G.failed(r, 'exit', 't', 'r'), [0, '']);
   const set = c => (c.derived || {}).set || {};
   check('...and the cases take every way out: back in, P1 wins, P2 wins, time up with and without a point, the RET M',
         [[0xAE29, 0xAC00, 0xABE5].map(x => fx.cases.some(c => c.xpc === x)),
@@ -1223,6 +1126,8 @@ const mockCtx = (state) => ({
         [[true, true, true], [[0, false], [0, true], [0x80, false]]]);
   check('...and P1 at 4 with $AA03 set is not looked at: back in, faithful',
         fx.cases.filter(c => set(c).aa03 === 1).map(c => c.xpc), [0xAE29]);
+  check('the demoPoint gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  check('no demoPoint case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- the demo's ways on $ABB9, against its oracle ----------------------
@@ -1232,37 +1137,25 @@ const mockCtx = (state) => ({
    Every byte outside the text cells (D5), the cells written, T, R, and
    where it left. */
 {
-  const fx = P.assets.demo_abb9;
+  const fx = P.assets.demo_abb9, G = rig.gate;
   const iA = fx.regs.indexOf(0);
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+  const run = (m, c) => {
     P.M1.m1 = 0;
-    let res;
-    try { res = P.demoOn(m, c.regs[iA], c.r); }
-    catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
-      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    }
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    const got = [res.at, res.t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, wrote.join() === blind.join()];
-    const w = [c.xpc, c.t, c.rx, -1, true];
-    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
-      first = `case ${i}: at, T, R, first bad byte, text cells ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
-  }
-  check("demoOn matches the real $ABB9 to the next stage's $AE29 or $AC27 on every case: bytes, text cells, at, T and R exactly", [bad, first], [0, '']);
+    const res = P.demoOn(m, c.regs[iA], c.r);
+    return { at: res.at, t: res.t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F) };
+  };
+  const opts = { skip: G.frames, blind: fx.blind };
+  const r = G.replay(fx, run, Object.assign({ expect: { at: c => c.xpc, t: c => c.t, r: c => c.rx } }, opts));
+  check("demoOn matches the real $ABB9 to the next stage's $AE29 or $AC27 on every case: bytes, text cells, at, T and R exactly", G.failed(r, 'at', 't', 'r'), [0, '']);
   const set = c => (c.derived || {}).set || {};
   check('...and the cases take every way: each stage 1-3 next, the RET at rank 4 (with and without the stage wrap), the quit',
         [fx.cases.filter(c => c.xpc === 0xAE29).length, fx.cases.filter(c => c.xpc === 0xAC27).map(c => [set(c).b05f, set(c).af34, ((c.derived || {}).reg || {})[0]])],
         [3, [[3, undefined, undefined], [undefined, undefined, 128], [3, 3, undefined]]]);
+  check('the demoOn gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  /* some stores here are $A5 over a byte never read: no byte is both $A5 and
+     $5A, so a second replay under $5A sees every store the first masked */
+  check('demoOn writes the bytes the $A5 poison masked, replayed under $5A (T131)',
+        G.replay(fx, run, Object.assign({ fill: 0x5A }, opts)).bytes, [0, '']);
 }
 
 /* ---- P2 wins the 1UP bout: $AD94, the victory pose $AE9D, to $ACA6 -----
@@ -1271,33 +1164,24 @@ const mockCtx = (state) => ({
    until its RET, winEnd, composed as the engine runs them: every byte
    outside the stack frames, T and R exactly. */
 {
-  const fx = P.assets.win_ad94;
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+  const fx = P.assets.win_ad94, G = rig.gate;
+  const run = (m, c) => {
     P.M1.m1 = 0;
     let t = P.winStart(m, 0xAA40), n = 0, w;       // the CALL at $AD94 and $AE9D's body
     try {                                          // a pose longer than the machine's, or one that draws garbage, fails
       do { w = P.winPass(m, 0xAA40, c.sp - 2, null); t += w.t; n++; } while (!w.out && t <= c.t);
-    } catch (e){ if (!bad++) first = `case ${i}: pass ${n}: ${e.message}`; continue; }
+    } catch (e){ throw new Error(`pass ${n}: ${e.message}`); }
     t += P.winEnd();
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;
-      if (m[a] !== want[a]){ diff = a; break; }
-    }
-    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, n];
-    const wnt = [c.t, c.rx, -1, 66];
-    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-      first = `case ${i}: T, R, first bad byte, passes ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-  }
+    return { t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), passes: n };
+  };
+  const opts = { skip: G.frames };
+  const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx, passes: () => 66 } }, opts));
   check('winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly',
-        [bad, first], [0, '']);
+        G.failed(r, 't', 'r', 'passes'), [0, '']);
   check('...and the machine left for $ACA6 with A = 0 (the 1UP bout lost: winEnd)',
         fx.cases.map(c => c.exit[fx.regs.indexOf(0)]), [0]);
+  check('the winPass (P2) gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  check('no winPass (P2) case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- P1 wins the 1UP bout: $AD5F, the pose $AE7A, the time bonus -------
@@ -1307,42 +1191,29 @@ const mockCtx = (state) => ({
    bonusStart, bonusPass until out: every byte outside the stack frames and
    the score row, the score-row bytes written (D5), T and R exactly. */
 {
-  const fx = P.assets.win_ad5f;
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
+  const fx = P.assets.win_ad5f, G = rig.gate;
   const secs = [];
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+  const run = (m, c) => {
     P.M1.m1 = 0;
     let t = P.winStart(m, 0xAA00), n = 0, k = 0, w;  // the CALL at $AD5F and $AE7A's body
     try {
       do { w = P.winPass(m, 0xAA00, c.sp - 2, null); t += w.t; n++; } while (!w.out && t <= c.t);
       w = P.bonusStart(m); t += w.t;
       while (!w.out && t <= c.t){ w = P.bonusPass(m); t += w.t; k++; }
-    } catch (e){ if (!bad++) first = `case ${i}: pose ${n}, second ${k}: ${e.message}`; continue; }
+    } catch (e){ throw new Error(`pose ${n}, second ${k}: ${e.message}`); }
     secs.push(k);
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;
-      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    }
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, wrote.join() === blind.join(), n];
-    const wnt = [c.t, c.rx, -1, true, 66];
-    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-      first = `case ${i}: T, R, first bad byte, score row, passes ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-  }
+    return { t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), passes: n };
+  };
+  const opts = { skip: G.frames, blind: fx.blind };
+  const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx, passes: () => 66 } }, opts));
   check('winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly',
-        [bad, first], [0, '']);
+        G.failed(r, 't', 'r', 'passes'), [0, '']);
   const clock = c => { for (const [a, h] of c.in) if (a <= 0x9CA5 && 0x9CA5 < a + h.length / 2) return parseInt(h.substr((0x9CA5 - a) * 2, 2), 16); };
   check('...and the machine left for $ACA6 with A = 1 (the bout won), a second counted for each left on the clock, played and none (Time 0 derived)',
         [fx.cases.map(c => c.exit[fx.regs.indexOf(0)]), secs, fx.cases.map(c => (c.derived || {}).set), secs[0] > 1],
         [[1, 1], fx.cases.map(clock), [undefined, { '9ca5': 0 }], true]);
+  check('the winPass (P1) gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  check('no winPass (P1) case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- time up: the round end $AE67 and the decision $AD44 ----------------
@@ -1353,98 +1224,79 @@ const mockCtx = (state) => ({
    composed as the engine runs them: every byte outside the stack frames
    and the score row, the score-row bytes written (D5), T, R and A. */
 {
-  const load = (fx, c) => {
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
-    return [m, want];
-  };
-  const verdict = (fx, c, m, want) => {             // first bad byte outside frames and blind, and the blind bytes written
-    const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++){
-      if (a === c.sp - 128) a = c.sp + 2;
-      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
-    }
-    const wrote = [], blind = [];
-    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
-    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
-    return [diff, wrote.join() === blind.join()];
-  };
+  const G = rig.gate;
   const rx = c => (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F);
   {
-    const fx = P.assets.end_ae67, iA = fx.regs.indexOf(0);
-    let bad = 0, first = '', passes = [];
-    for (let i = 0; i < fx.cases.length; i++){
-      const c = fx.cases[i], [m, want] = load(fx, c);
+    const fx = P.assets.end_ae67, iA = fx.regs.indexOf(0), passes = [];
+    const run = (m, c) => {
       P.M1.m1 = 0;
       let t = P.endStart(m), n = 0, w, e;
       try {
         do { w = P.winPass(m, 0xAA00, c.sp - 2, null); t += w.t; n++; } while (!w.out && t <= c.t);
         e = P.endTail(m); t += e.t;
-      } catch (err){ if (!bad++) first = `case ${i}: pass ${n}: ${err.message}`; continue; }
+      } catch (err){ throw new Error(`pass ${n}: ${err.message}`); }
       passes.push(n);
-      const got = [t, rx(c), ...verdict(fx, c, m, want), e.a], wnt = [c.t, c.rx, -1, true, c.exit[iA]];
-      if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-        first = `case ${i}: T, R, first bad byte, score row, A ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-    }
+      return { t, r: rx(c), a: e.a };
+    };
+    const opts = { skip: G.frames, blind: fx.blind };
+    const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx, a: c => c.exit[iA] } }, opts));
     check('endStart, winPass on $AA0D and endTail match the real $AE67 to $AD1B (time up, the round end): bytes, T, R and A = (IX) exactly',
-          [bad, first], [0, '']);
+          G.failed(r, 't', 'r', 'a'), [0, '']);
     checkTrue('...over a loop of many passes, the start constructed (Time poked to 1)',
               passes[0] > 1 && fx.cases.every(c => (c.poked || {})['9ca5'] === 1), `passes ${passes}`);
+    check('the endStart gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+    check('no endStart case stores the poison over a byte it never read (T131)', r.masked, 0);
   }
   {
     const fx = P.assets.time_ad44, iA = fx.regs.indexOf(0);
-    let bad = 0, first = '';
     const ways = [];
-    for (let i = 0; i < fx.cases.length; i++){
-      const c = fx.cases[i], [m, want] = load(fx, c);
+    const run = (m, c) => {
       P.M1.m1 = 0;
       const u = P.timeUp(m);
       let t = u.t, w, a = 0x81;
       ways.push(u.exit);
-      try {
-        if (u.exit !== 'draw'){
-          const A = u.exit === 'p1' ? 0xAA00 : 0xAA40;
-          t += P.winStart(m, A);
-          do { w = P.winPass(m, A, c.sp - 2, null); t += w.t; } while (!w.out && t <= c.t);
-          if (A === 0xAA40){ t += P.winEnd(); a = 0; }
-          else {
-            w = P.bonusStart(m); t += w.t;
-            while (!w.out && t <= c.t){ w = P.bonusPass(m); t += w.t; }
-            a = 1;
-          }
+      if (u.exit !== 'draw'){
+        const A = u.exit === 'p1' ? 0xAA00 : 0xAA40;
+        t += P.winStart(m, A);
+        do { w = P.winPass(m, A, c.sp - 2, null); t += w.t; } while (!w.out && t <= c.t);
+        if (A === 0xAA40){ t += P.winEnd(); a = 0; }
+        else {
+          w = P.bonusStart(m); t += w.t;
+          while (!w.out && t <= c.t){ w = P.bonusPass(m); t += w.t; }
+          a = 1;
         }
-      } catch (err){ if (!bad++) first = `case ${i}: ${err.message}`; continue; }
-      const got = [t, rx(c), ...verdict(fx, c, m, want), a], wnt = [c.t, c.rx, -1, true, c.exit[iA]];
-      if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-        first = `case ${i}: T, R, first bad byte, score row, A ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-    }
+      }
+      return { t, r: rx(c), a };
+    };
+    const opts = { skip: G.frames, blind: fx.blind };
+    const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx, a: c => c.exit[iA] } }, opts));
     check('timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly',
-          [bad, first], [0, '']);
+          G.failed(r, 't', 'r', 'a'), [0, '']);
     check('...and the cases take every arm: the draw, P1 and P2 ahead on the count, then on the tally ($AD5C, $AD91)',
           [ways, fx.cases.map(c => c.exit[iA])], [['draw', 'p1', 'p2', 'p1', 'p2'], [0x81, 1, 0, 1, 0]]);
+    check('the timeUp gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+    check('no timeUp case stores the poison over a byte it never read (T131)', r.masked, 0);
   }
   {
-    const fx = P.assets.draw_ad44;
-    let bad = 0, first = '', passes = [];
-    for (let i = 0; i < fx.cases.length; i++){
-      const c = fx.cases[i], [m, want] = load(fx, c);
+    const fx = P.assets.draw_ad44, passes = [];
+    const run = (m, c) => {
       P.M1.m1 = 0;
       const u = P.timeUp(m);
       let t = u.t, n = 0, w;
-      if (u.exit !== 'draw'){ if (!bad++) first = `case ${i}: timeUp ${u.exit}`; continue; }
+      if (u.exit !== 'draw') throw new Error(`timeUp ${u.exit}`);
       t += P.drawStart(m);                          // $ACA6, $ACCF and the CALL $ACE8 at $ACD3
       try {
         do { w = P.winPass(m, 0xAA00, c.sp, null); t += w.t; n++; } while (!w.out && t <= c.t);   // $BF13 at SP - 4 + 2
-      } catch (err){ if (!bad++) first = `case ${i}: pass ${n}: ${err.message}`; continue; }
+      } catch (err){ throw new Error(`pass ${n}: ${err.message}`); }
       passes.push(n);
-      const got = [t, rx(c), ...verdict(fx, c, m, want)], wnt = [c.t, c.rx, -1, true];
-      if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-        first = `case ${i}: T, R, first bad byte, score row ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-    }
+      return { t, r: rx(c) };
+    };
+    const opts = { skip: G.frames, blind: fx.blind };
+    const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx } }, opts));
     check('timeUp, drawStart and winPass on $AA0D match the real $AD44 to the return of the CALL $ACE8 at $ACD3 (the draw: both to script $19): bytes, T and R exactly, 66 passes',
-          [bad, first, passes], [0, '', [66]]);
+          G.failed(r, 't', 'r').concat([passes]), [0, '', [66]]);
+    check('the drawStart gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+    check('no drawStart case stores the poison over a byte it never read (T131)', r.masked, 0);
   }
 }
 
@@ -1463,41 +1315,29 @@ const mockCtx = (state) => ({
    every byte outside the stack frames and the score row, T, R and the PC
    left by. */
 {
-  const fx = P.assets.next_aca6, iA = fx.regs.indexOf(0);
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+  const fx = P.assets.next_aca6, iA = fx.regs.indexOf(0), G = rig.gate;
+  const run = (m, c) => {
     P.M1.m1 = 0;
     const a = c.regs[iA];
     let t, at, n = 0;
-    try {
-      if (a === 0x81){                              // $ACCF, CALL $ACE8, its loop, JP $AC5F
-        t = P.drawStart(m); let w;
-        do { w = P.winPass(m, 0xAA00, c.sp - 2, null); t += w.t; n++; } while (!w.out && t <= c.t);
-        t += 10; P.M1.m1 += 1; at = 0xAC5F;
-      } else { const b = P.boutNext(m, a, c.r); t = b.t; at = b.at; }
-    } catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
-    let diff = -1;
-    for (let x = 0; x < 0x10000; x++){
-      if (x === c.sp - 128) x = c.sp + 2;
-      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
-    }
-    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, at];
-    const wnt = [c.t, c.rx, -1, c.xpc];
-    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-      first = `case ${i}: T, R, first bad byte, PC ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-  }
+    if (a === 0x81){                                // $ACCF, CALL $ACE8, its loop, JP $AC5F
+      t = P.drawStart(m); let w;
+      do { w = P.winPass(m, 0xAA00, c.sp - 2, null); t += w.t; n++; } while (!w.out && t <= c.t);
+      t += 10; P.M1.m1 += 1; at = 0xAC5F;
+    } else { const b = P.boutNext(m, a, c.r); t = b.t; at = b.at; }
+    return { t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), at };
+  };
+  const opts = { skip: G.frames };                       // no blind range: the fixture's is empty
+  const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx, at: c => c.xpc } }, opts));
   check("boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly",
-        [bad, first], [0, '']);
+        G.failed(r, 't', 'r', 'at'), [0, '']);
   check("...and the cases take every arm: lost, won with bouts left, rank up, rank up with the stage wrapping, the top rank's random, the draw; and from a real snapshot (stage2, not poked): rank up, then lost",
         [fx.cases.map(c => c.regs[iA]), fx.cases.map(c => c.t), fx.cases.map(c => c.source)],
         [[0, 1, 0, 1, 1, 1, 0x81, 1, 1, 0], [40, 54, 40, 222, 240, 251, fx.cases[6].t, 222, 222, 40], [...Array(8).fill(undefined), 'stage2', 'stage2']]);
   check('...and one derived: the rank from 9 to $10, a BCD carry through DAA',
         [fx.cases[7].derived, fx.cases[7].out.find(([a]) => a === 0xB05F)], [{ from: 3, set: { b05f: 9 } }, [0xB05F, '10']]);
+  check('the boutNext gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  check('no boutNext case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- the lost bout's way on: Check_HighScore, $AC39 to $AC3C ----------
@@ -1507,35 +1347,20 @@ const mockCtx = (state) => ({
    one, and 2UP).  checkHighScore: every byte outside the stack frames and
    the text cells (D5), the score buffer the text is drawn from, T and R. */
 {
-  const fx = P.assets.hiscore_ac39;
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
-    P.M1.m1 = 0;
-    let t;
-    try { t = P.checkHighScore(m); } catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
-    let diff = -1;
-    for (let x = 0; x < 0x10000; x++){
-      if (x === c.sp - 128) x = c.sp + 2;
-      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
-    }
-    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff];
-    const wnt = [c.t, c.rx, -1];
-    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-      first = `case ${i}: T, R, first bad byte ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-  }
+  const fx = P.assets.hiscore_ac39, G = rig.gate;
+  const run = (m, c) => { P.M1.m1 = 0; const t = P.checkHighScore(m); return { t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F) }; };
+  const opts = { skip: G.frames, blind: fx.blind };
+  const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx } }, opts));
   check('checkHighScore matches the real $AC39 to $AC3C on every case: bytes, T and R exactly',
-        [bad, first], [0, '']);
+        G.failed(r, 't', 'r'), [0, '']);
   const hi = c => (c.out.find(([a]) => a === 0xB024) || [, ''])[1].slice(0, 16);
   check("...and the cases take every arm: below (twice), the table beaten (played, a tie, above), a higher top byte not enough; 2UP: a tie, P2 higher (copied over P1) beating and tying the table, P1 higher beating it and not",
         [fx.cases.map(c => c.t), fx.cases.map(c => c.derived && c.derived.from), fx.cases.map(hi)],
         [[368, 11336, 368, 11208, 11106, 343, 807, 11596, 11621, 11597, 783, 11597],
          [undefined, undefined, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6],
          ['', '2020202020202030', '', '2020202031303030', '2020203131353030', '', '', '2020202032303030', '2020202031303030', '2020202035303030', '', '2020202035303030']]);
+  check('the checkHighScore gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  check('no checkHighScore case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
 
 /* ---- the next bout's setup: $AC5F to the CALL $AD18 --------------------
@@ -1545,82 +1370,56 @@ const mockCtx = (state) => ({
    every byte outside the stack frames and the text cells (D5), the text
    cells written, T, R and every $FE write of the tune at its T. */
 {
-  const fx = P.assets.setup_ac5f;
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+  const fx = P.assets.setup_ac5f, G = rig.gate;
+  const run = (m, c) => {
     P.M1.m1 = 0;
-    const outs = [];
-    let t;
-    try { const s = P.setupMusic(m, outs); t = s.t + P.setupRest(m, s.stage); }
-    catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
-    let diff = -1;
-    for (let x = 0; x < 0x10000; x++){
-      if (x === c.sp - 128) x = c.sp + 2;
-      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
-    }
-    const wrote = [], blind = [];
-    for (let x = 0; x < 0x10000; x++) if (inBlind(x) && m[x] !== 0xA5) wrote.push(x);
-    for (const [lo, hi] of c.blind || []) for (let x = lo; x <= hi; x++) blind.push(x);
-    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, wrote.join() === blind.join(), JSON.stringify(outs) === JSON.stringify(c.outs || [])];
-    const wnt = [c.t, c.rx, -1, true, true];
-    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-      first = `case ${i}: T, R, first bad byte, text cells, tune ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-  }
+    const outs = [], s = P.setupMusic(m, outs), t = s.t + P.setupRest(m, s.stage);
+    return { t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), outs: JSON.stringify(outs) };
+  };
+  const opts = { skip: G.frames, blind: fx.blind };
+  const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx, outs: c => JSON.stringify(c.outs || []) } }, opts));
   check("setupMusic and setupRest match the real $AC5F to the CALL $AD18 on every case: bytes, text cells, T, R and the tune's $FE writes exactly",
-        [bad, first], [0, '']);
+        G.failed(r, 't', 'r', 'outs'), [0, '']);
   const at = (c, x) => { for (const [a, h] of c.in) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
   check('...and the cases take every arm: each stage (2, 3, the wrap to 1) and rank suffix, the tune played, and derived: no new stage (neither read), sound off, novice; and stage 3 from a real snapshot (stage2, not poked)',
         [fx.cases.map(c => at(c, 0xAF34)), fx.cases.map(c => at(c, 0xB05F)), fx.cases.map(c => (c.outs || []).length),
          fx.cases.map(c => c.derived && c.derived.set), fx.cases.map(c => c.source)],
         [[2, 3, 1, 1, undefined, 2, 2, 3], [1, 2, 3, 6, undefined, 1, 0, 1], [3422, 3422, 3422, 3422, 0, 0, 3422, 3422],
          [undefined, undefined, undefined, undefined, { af35: 0 }, { b2fa: 0 }, { b05f: 0 }, undefined], [...Array(7).fill(undefined), 'stage2']]);
+  check('the setupRest gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
+  /* some stores here are $A5 over a byte never read: no byte is both $A5 and
+     $5A, so a second replay under $5A sees every store the first masked */
+  check('setupRest writes the bytes the $A5 poison masked, replayed under $5A (T131)',
+        G.replay(fx, run, Object.assign({ fill: 0x5A }, opts)).bytes, [0, '']);
 }
 
 /* ---- the attract demo after a lost bout: $AC3C to its first $AE29 -------
    python tools/callio.py --capture --state p1 --call 0xAC3C 0xAE29 (port.json:
    one played, the rest derived with R at the JR set, so the two draws for
    the demo's ranks take each value).  demoIn: every byte outside the stack
-   frames and the text cells (D5), the text cells written, T and R. */
+   frames and the text cells (D5), the text cells written, T and R.
+   demoEntry returns the replay; its row folds it with rig.gate.failed. */
 function demoEntry(fx, run){
-  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
-  let bad = 0, first = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);
-    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
-    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
-    P.M1.m1 = 0;
-    let t;
-    try { t = run(m, c.r); }
-    catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
-    let diff = -1;
-    for (let x = 0; x < 0x10000; x++){
-      if (x === c.sp - 128) x = c.sp + 2;
-      if (!inBlind(x) && m[x] !== want[x]){ diff = x; break; }
-    }
-    const wrote = [], blind = [];
-    for (let x = 0; x < 0x10000; x++) if (inBlind(x) && m[x] !== 0xA5) wrote.push(x);
-    for (const [lo, hi] of c.blind || []) for (let x = lo; x <= hi; x++) blind.push(x);
-    const got = [t, (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F), diff, wrote.join() === blind.join()];
-    const wnt = [c.t, c.rx, -1, true];
-    if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
-      first = `case ${i}: T, R, first bad byte, text cells ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
-  }
-  return [bad, first];
+  const G = rig.gate;
+  const go = (m, c) => { P.M1.m1 = 0; const t = run(m, c.r); return { t, r: (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F) }; };
+  const opts = { skip: G.frames, blind: fx.blind };
+  const r = G.replay(fx, go, Object.assign({ expect: { t: c => c.t, r: c => c.rx } }, opts));
+  r.corrupt = () => G.negative(fx, go, opts);
+  /* the demo's text and stage hold $A5 over bytes never read: no byte is
+     both $A5 and $5A, so a second replay under $5A sees what the first masked */
+  r.under5A = () => G.replay(fx, go, Object.assign({ fill: 0x5A }, opts)).bytes;
+  return r;
 }
 {
-  const fx = P.assets.demo_ac3c;
+  const fx = P.assets.demo_ac3c, r = demoEntry(fx, P.demoIn);
   check("demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly",
-        demoEntry(fx, P.demoIn), [0, '']);
+        rig.gate.failed(r, 't', 'r'), [0, '']);
   const outAt = (c, x) => { for (const [a, h] of c.out) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
   check('...and the cases draw each demo rank 7-10 for both sides ($AA94, Also_Rank $AA80), R at the JR 94 played, 95, 96, 97 and $7F derived',
         [[0xAA94, 0xAA80].map(x => [...new Set(fx.cases.map(c => outAt(c, x)))].sort()), fx.cases.map(c => c.r)],
         [[[10, 7, 8, 9], [10, 7, 8, 9]], [94, 95, 96, 97, 127]]);
+  check('the demoIn gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
+  check('demoIn writes the bytes the $A5 poison masked, replayed under $5A (T131)', r.under5A(), [0, '']);
 }
 
 /* ---- Main_Game_Loop's dispatch $AC27 after the demo's RET ------------
@@ -1629,8 +1428,11 @@ function demoEntry(fx, run){
    JR Z to $AC09 and a new demo).  gameDispatch as demoIn's gate. */
 {
   const fx = P.assets.demo_ac27;
+  const r = demoEntry(fx, (m, r) => { const d = P.gameDispatch(m, r); return d.at === 0xAE29 ? d.t : -1; });
   check("gameDispatch matches the real $AC27 (Num_Players 0: JR Z, a new demo) to its first $AE29: bytes, text cells, T and R exactly",
-        demoEntry(fx, (m, r) => { const d = P.gameDispatch(m, r); return d.at === 0xAE29 ? d.t : -1; }), [0, '']);
+        rig.gate.failed(r, 't', 'r'), [0, '']);
+  check('the gameDispatch gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
+  check('gameDispatch writes the bytes the $A5 poison masked, replayed under $5A (T131)', r.under5A(), [0, '']);
 }
 /* python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29 --keys 2
    (port.json start2_ac27: the demo quit by key 2, Num_Players 2).
@@ -1639,18 +1441,21 @@ function demoEntry(fx, run){
 {
   const fx = P.assets.start2_ac27;
   const outs = [], all = [];
+  const r = demoEntry(fx, (m, r) => {
+    const d = P.gameDispatch(m, r);
+    if (d.at !== 0xADB1) return -1;
+    outs.length = 0;
+    const u = P.introMusic(m, outs, 0);
+    all.push(JSON.stringify(outs.map(([t, v]) => [t + d.t, v])));
+    return d.t + u + P.start2Rest(m) + P.stage2(m) + P.roundIn(m, r);
+  });
   check("gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly",
-        demoEntry(fx, (m, r) => {
-          const d = P.gameDispatch(m, r);
-          if (d.at !== 0xADB1) return -1;
-          outs.length = 0;
-          const u = P.introMusic(m, outs, 0);
-          all.push(JSON.stringify(outs.map(([t, v]) => [t + d.t, v])));
-          return d.t + u + P.start2Rest(m) + P.stage2(m) + P.roundIn(m, r);
-        }), [0, '']);
+        rig.gate.failed(r, 't', 'r'), [0, '']);
   check("...and the tune's $FE writes at their T from $AC27, on every case",
         [all.length, fx.cases.every((c, i) => all[i] === JSON.stringify(c.outs || [])), fx.cases.map(c => (c.outs || []).length)],
         [fx.cases.length, true, [3422]]);
+  check('the start2Rest gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
+  check('start2Rest writes the bytes the $A5 poison masked, replayed under $5A (T131)', r.under5A(), [0, '']);
 }
 /* python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29 --keys 1
    (port.json start_ac27: the demo quit by key 1, Num_Players 1).
@@ -1659,18 +1464,21 @@ function demoEntry(fx, run){
 {
   const fx = P.assets.start_ac27;
   const outs = [], all = [];
+  const r = demoEntry(fx, (m, r) => {
+    const d = P.gameDispatch(m, r);
+    if (d.at !== 0xAC5F) return -1;
+    outs.length = 0;
+    const s = P.setupMusic(m, outs);
+    all.push(JSON.stringify(outs.map(([u, v]) => [u + d.t, v])));
+    return d.t + s.t + P.setupRest(m, s.stage) + P.roundIn(m, r);
+  });
   check("gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly",
-        demoEntry(fx, (m, r) => {
-          const d = P.gameDispatch(m, r);
-          if (d.at !== 0xAC5F) return -1;
-          outs.length = 0;
-          const s = P.setupMusic(m, outs);
-          all.push(JSON.stringify(outs.map(([u, v]) => [u + d.t, v])));
-          return d.t + s.t + P.setupRest(m, s.stage) + P.roundIn(m, r);
-        }), [0, '']);
+        rig.gate.failed(r, 't', 'r'), [0, '']);
   check("...and the tune's $FE writes at their T from $AC27, on every case",
         [all.length, fx.cases.every((c, i) => all[i] === JSON.stringify(c.outs || [])), fx.cases.map(c => (c.outs || []).length)],
         [fx.cases.length, true, [3422]]);
+  check('the start1 gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
+  check('start1 writes the bytes the $A5 poison masked, replayed under $5A (T131)', r.under5A(), [0, '']);
 }
 
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
