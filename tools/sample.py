@@ -45,6 +45,13 @@ on the same IN.  The JSON records both, and "reads_used" (the count).
 start no saved state holds (P1 one point from the bout).  The JSON records
 them as "poked"; the start state is constructed, so say so.
 
+--from N runs the first N visits to --at unrecorded: the JSON's start
+state is visit N and its rows begin there (each keeps its absolute "p"),
+with "from": N and as "script" the tail of --script from pass N on, so the
+engine's pass 0 is the machine's pass N.  For a behaviour a long play
+reaches late (the demo's time up, thousands of passes in) without a
+fixture of thousands of rows.  Not with --start-here or --reads.
+
 --start-here takes the JSON's start state as resumed, before play (with its
 "pc"), not at the first visit, and times row 0 from there: the engine runs
 from the start to the first visit itself (the boot: --state boot, $8800).
@@ -55,7 +62,7 @@ Usage:
                            [--script "40:,60:D"] [--json FILE]
                            [--hash LO-HI ...] [--skip LO-HI ...] [--mark PC ...]
                            [--also PC ...] [--poke ADDR=VAL,...] [--start-here]
-                           [--reads-at PC --reads "N:KEYS,..."]
+                           [--reads-at PC --reads "N:KEYS,..."] [--from N]
     python tools/sample.py --state s1 --at 0x9745 --var time=0x9CA5 --var cnt=0x9CA6 --changes
 """
 import json
@@ -99,7 +106,7 @@ def main():
     target = parse_target(args)
     at, passes, changes, keys, vars_ = None, 1000, False, None, []
     script, out, hashes, skip, marks, also = None, None, [], [], [], []
-    pokes, here = {}, False
+    pokes, here, frm = {}, False, 0
     reads, reads_at = None, None
     i = 0
     while i < len(args):
@@ -135,6 +142,8 @@ def main():
             reads_at = int(args[i + 1], 0); i += 2
         elif a == '--start-here':
             here = True; i += 1
+        elif a == '--from':
+            frm = int(args[i + 1], 0); i += 2
         elif a == '--skip':
             skip.append(parse_range(args[i + 1])); i += 2
         else:
@@ -145,6 +154,10 @@ def main():
         sys.exit('sample.py: --keys or --script, not both')
     if (reads is None) != (reads_at is None):
         sys.exit('sample.py: --reads and --reads-at go together')
+    if frm and (here or reads):
+        sys.exit('sample.py: --from is not for --start-here or --reads')
+    if frm and frm >= passes:
+        sys.exit('sample.py: --from N needs --passes above N')
     h = boot_target(target, 'sample.py')
     for pa, pv in pokes.items():            # before play, as callio.py --poke: a start no saved state holds
         if pa < 0x4000:
@@ -197,10 +210,14 @@ def main():
             print(f'# stopped at pass {p}: {reason}'); break
         row = tuple(bytes(m[a:a + n]).hex().upper() if n > 1 else f'{m[a]:02X}'
                     for _, a, n in vars_)
-        if not changes or row != prev:
+        if frm and p <= frm:                # --from: unrecorded to here, row 0 has nothing before it
+            hit, sub, t0 = [], [], None
+        if p < frm:
+            prev = row
+        elif not changes or row != prev:
             print(p, ' '.join(f'{v[0]}={x}' for v, x in zip(vars_, row)))
         prev = row
-        if out:
+        if out and p >= frm:
             if start is None:
                 start = {'ram': bytes(m[0x4000:0x10000]).hex(), 'r': h.regs[R], 'sp': h.regs[SP]}
             rows.append({'p': p, 'v': list(row), 'r': h.regs[R],
@@ -223,7 +240,16 @@ def main():
         h.step(1)
     if out:
         with open(out, 'w') as f:
-            json.dump({'at': at, 'source': source_label(target), 'script': script,
+            tail = script
+            if frm and script:              # the script from pass frm on, run-length coded as --script
+                tail, run = [], None
+                for names in plan[frm:]:
+                    k = '+'.join(names)
+                    if run and run[1] == k: run[0] += 1
+                    else: run = [1, k]; tail.append(run)
+                tail = ','.join(f'{n}:{k}' for n, k in tail) or None
+            json.dump({'at': at, 'source': source_label(target), 'script': tail,
+                       **({'from': frm} if frm else {}),
                        'vars': [[nm, a, n] for nm, a, n in vars_],
                        'hash': hashes, 'skip': skip, 'marks': marks,
                        **({'also': also} if also else {}),

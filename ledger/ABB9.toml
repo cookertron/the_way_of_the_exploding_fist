@@ -4,7 +4,7 @@
 name     = "demo_ways_on"
 entries  = ["$ABB9"]
 oracle   = "tools/callio.py"
-fixtures = ["demo_abb9"]
+fixtures = ["demo_abb9", "live_dtime"]
 port     = "demoOn"
 manual   = ["7.2"]
 
@@ -34,7 +34,12 @@ kind   = "measured"
 says   = "the machine's contended T for an identical stage pass spreads 0.55% (rows 801, 2830: 744631, 740536; 614767 uncontended, same PCs): the stage pass gate is 0.7%"
 by     = "python tools/callio.py --capture --state p1 --call 0xABB9 0xAE29,0xAC27 --frames 15000 --per 10 (scratch)"
 
-[[open]]
-ask    = "the demo's time up, round end ($AE67 into $ACF0, endPass by demoPoint) and the quit through roundPass -- not yet reached by live play"
-tried  = "live_p1's 1500 rows end both demo bouts by a pose; Fist.demoOut is wiring-checked only"
-settle = "a live sample whose demo bout runs out of time (a later demo stage, or --passes past the next), and the quit with a key held in the demo (the $AC27 dispatch unit)"
+[[fact]]
+kind   = "gated"
+says   = "live_dtime follows the demo's time ups row for row: $AE67, $AD0B x3, demoPoint to $ABB9, on into a new demo (row 66, rank 4) and the next stage (1067); the quit via roundPass is live_1up's row 401"
+by     = "python tools/sample.py (live's arguments) --from 4250 --passes 5420 --json build/live_dtime.json ; node test/kit.test.js (demo time block)"
+
+[[fact]]
+kind   = "measured"
+says   = "demo time up charge: $AD0B passes 0.987-0.995 of the machine (live_time's own 0.980-1.018, D4 means), to $ABB9 0.9993 and 0.9996, stage passes 1.0004-1.0012"
+by     = "node test/kit.test.js (demo time block: ratio of the engine's charge to live_dtime's t)"

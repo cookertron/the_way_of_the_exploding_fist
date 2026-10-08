@@ -151,6 +151,12 @@
       "note": "live rows for time up and the draw, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0x9CA5=1 --passes 200 --also 0xAD0B --also 0xAE8E --also 0xAEB2 --also 0xAD6E --also 0xAD18 --json build/live_time.json with live_p1w's script, vars, marks, hashes (with 0x4800-0x5AFF) and skips; the setup sampled at $AD18"
     },
     {
+      "key": "live_dtime",
+      "file": "build/live_dtime.json",
+      "required": true,
+      "note": "live rows for the demo's time up, TAPE-DERIVED (gitignored, rule 7): python tools/sample.py with live's arguments (--state p1, its script, vars, hashes, skips, marks, --also) --from 4250 --passes 5420 --json build/live_dtime.json; the demo runs out of time at passes 4316 (stage 3: rank 4, a new demo) and 5317 (stage 1 on to 2)"
+    },
+    {
       "key": "live_1up",
       "file": "build/live_1up.json",
       "required": true,

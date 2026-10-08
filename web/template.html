@@ -2947,6 +2947,13 @@ class Fist {
     this.two = false;                              // ...by the 2UP game's $AE14: its ways on by twoWay, its poses at SP + 2
     this.demoNext = null;                          // at $ABB9 with this A: demoOn the next pass, a new stage or out to $AC27
     this.boot = st.pc === 0x8800;                  // the tape's hand-over: bootPass the first pass, to the demo's $AE29
+    /* a start at $AE29 inside the demo or the 2UP game (sample.py --from):
+       round_loop's caller is the return address on the stack -- $ABCB
+       after the demo's CALL at $ABC8, $AE17 after the 2UP game's $AE14 */
+    if (!this.boot){
+      const ret = this.m[this.sp] | this.m[(this.sp + 1) & 0xFFFF] << 8;
+      this.demo = ret === 0xABCB; this.two = ret === 0xAE17;
+    }
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();

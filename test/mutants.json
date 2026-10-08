@@ -4669,5 +4669,37 @@
   "new": "",
   "increment": "8C54",
   "kills": "menu: roundPass and the victory pose follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: Fist: a start in the demo not recognised from the stack",
+  "old": "this.demo = ret === 0xABCB;",
+  "new": "this.demo = false;",
+  "increment": "ABB9",
+  "kills": "demo time: roundPass, the demo, its round end and time up follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: demoOut: the demo's round end not posed in $ACF0's loop",
+  "old": "if (res.exit === 'end'){ t += endStart(this.m); this.both = 'end'; }",
+  "new": "if (res.exit === 'end'){ t += endStart(this.m); }",
+  "increment": "ABB9",
+  "kills": "demo time: roundPass, the demo, its round end and time up follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: demoOut: time up taken as the quit",
+  "old": "this.demoNext = res.exit === 'quit' ? 0x80 : 0;",
+  "new": "this.demoNext = res.exit === 'quit' || res.exit === 'time' ? 0x80 : 0;",
+  "increment": "ABB9",
+  "kills": "demo time: roundPass, the demo, its round end and time up follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "ABB9: endPass: the demo's round end returns by pointPath",
+  "old": "res = (this.demo ? demoPoint : pointPath)(this.m, e.a, this.r);",
+  "new": "res = pointPath(this.m, e.a, this.r);",
+  "increment": "ABB9",
+  "kills": "demo time: roundPass, the demo, its round end and time up follow the machine sample for sample"
  }
 ]
