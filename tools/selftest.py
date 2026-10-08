@@ -1027,6 +1027,76 @@ def t_callio_up():
     eq((up, lm.popped), ({}, set()), 'LD SP is not a pop')
 
 
+def t_measure():
+    H, h = fresh()
+    ME = mod('measure')
+    h.poke(0x8000, 0x38, 0x05,            # JR C,$8007        (carry in)
+           0x21, 0x00, 0x90,              # LD HL,$9000
+           0x36, 0x00,                    # LD (HL),0         a write of the value already there
+           0x3A, 0x00, 0x91,              # LD A,($9100)
+           0xB7,                          # OR A
+           0xC8,                          # RET Z
+           0x32, 0x01, 0x91,              # LD ($9101),A
+           0xCD, 0x20, 0x80,              # CALL $8020
+           0xC9)                          # RET
+    h.poke(0x8020, 0x32, 0x00, 0x00,      # LD ($0000),A      an attempted ROM write
+           0xC3, 0x30, 0x80)              # JP $8030          the stop
+    h.poke(0x8030, 0xC9)
+    before = h.save_state()
+    m = ME.measure(h, 0x8000, [{}, {'poke': {0x9100: 7}}], stop_at=(0x8030, 0x8040))
+    eq(h.save_state(), before, 'the harness is left as found')
+    eq(len(m.runs), 4, 'two cases x carry clear/set')
+    r0 = m.runs[0]
+    eq((r0.flags, r0.exit), ({'C': 0}, ('ret', 0)), 'run 0: carry clear, RET Z')
+    eq(r0.writes, [(0x8005, 0x9000, 0)], 'the unchanged-value write is logged with its PC (G11b, f)')
+    eq(r0.changed, set(), 'and the diff alone saw nothing')
+    eq(r0.poison['diverged'], None, 'the poisoned twin agrees')
+    eq(r0.poison['fill'], 1, 'poisoned where it wrote: one byte')
+    eq(r0.poison['unlogged'], set(), 'diff against the poison equals the log')
+    r1 = m.runs[1]
+    eq(r1.exit, ('ret', 0), 'run 1: carry set skips the store')
+    eq(r1.writes, [], 'no writes, not even the armed sentinels (G11a)')
+    r2 = m.runs[2]
+    eq(r2.exit, ('stop', 0x8030), 'run 2 stops at $8030, observed not run (G11e)')
+    eq(sorted((r2.window_of(a), a) for _, a, _ in r2.writes),
+       [('ram', 0x9000), ('ram', 0x9101), ('stack', r2.sp - 2), ('stack', r2.sp - 1)],
+       'writes by window, the CALL frame as stack; the ROM attempt is not seen (G11c, f)')
+    eq(m.branches(), {0x8000: 'both', 0x800B: 'both'}, 'carry swept: both branches both ways (G11d)')
+    eq(m.stops_unreached(), [0x8040], 'an unreached stop is named (TRAPS #144)')
+    txt = m.text()
+    assert 'stop_at $8040: no run reached it' in txt, txt
+    m1 = ME.measure(h, 0x8000, [{}], flags_in=())
+    eq(m1.branches(), {0x8000: 'never taken', 0x800B: 'taken only'}, 'one-way branches flagged')
+    assert any('branch $8000: never taken' in p for p in m1.problems())
+    mx = ME.measure(h, 0x8000, [{'poke': {0x9100: 7}}], stop_at=(0x8030,), exclude=('stack',), flags_in=())
+    assert 'stack     excluded: 2 writes to 2 bytes' in mx.text(), mx.text()
+    for bad in ((0x5800,), ('screen',)):
+        try:
+            ME.measure(h, 0x8000, exclude=bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('exclude=%r accepted' % (bad,))
+    mw = ME.measure(h, 0x8000, [{'poke': {0x9100: 7}}], flags_in=(), stop_at=(0x8030,),
+                    windows={'vars': (0x9100, 0x9110)})
+    eq(mw.runs[0].window_of(0x9101), 'vars', "a port's window wins over 'ram'")
+    # a routine that reads what it writes: the poisoned twin says so
+    h.poke(0x8050, 0x21, 0x00, 0x90, 0x34, 0xC9)        # LD HL,$9000; INC (HL); RET
+    mr = ME.measure(h, 0x8050, flags_in=())
+    eq(mr.runs[0].poison['diverged'], 'wrote other values', 'INC (HL) under poison')
+    # DJNZ $ in one fast step still counts as both ways
+    h.poke(0x8060, 0x06, 0x05, 0x10, 0xFE, 0xC9)        # LD B,5; DJNZ $; RET
+    eq(ME.measure(h, 0x8060, flags_in=()).branches(), {0x8062: 'both'}, 'fast DJNZ')
+    fx = m.fixture(argv=['selftest'])
+    eq(fx['_stamp']['branches'], {'$8000': 'both', '$800B': 'both'}, 'the stamp carries the branches')
+    d = tempfile.mkdtemp()
+    p = os.path.join(d, 'oracle.py')
+    with open(p, 'w') as f:
+        f.write('ok = [a for a in x if lo <= a < hi]\nif ad < 0x5800:\n    pass\n# ad < 0x5800 in a comment\n')
+    eq([n for n, _ in ME.lint(p)], [2], 'the lint names the raw comparison only (G11c)')
+
+
+
 def run_py(script, stdin='', env=None, cwd=None):
     import subprocess
     e = dict(os.environ)
@@ -1418,6 +1488,7 @@ CHECKS = [
     ('stackscan: slot-based frames, discards, fake return, LD SP reset vs switch, ISR', t_stackscan),
     ('blitforensics: two-background differential on known sprites + guards', t_blitforensics),
     ('callio: up recorded for any pop past the entry SP, not LD SP', t_callio_up),
+    ('measure: arm then snapshot, poison twin, named windows, branches, stop_at, lint (6.11)', t_measure),
     ('manual: entries, traps, index, grep across both documents', t_manual_ids),
     ('tools: every script in tools/ has a row in tools/README.md', t_tools_registry),
     ('records: record.py writes each record to its home, refuses what it cannot check', t_records),

@@ -7,12 +7,6 @@
   },
   "assets": [
     {
-      "key": "assets",
-      "file": "build/assets.json",
-      "required": true,
-      "note": "written by your extractor (manual phase 4); the starter ships a stub"
-    },
-    {
       "key": "sprdec",
       "file": "build/sprdec_cases.json",
       "required": true,

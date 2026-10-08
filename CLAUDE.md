@@ -103,6 +103,8 @@ record up loses nothing.
 - `tools/stamp.py` — evidence freshness (manual 12.3): every fixture writer
   stamps what produced it; a replay `--check` restamps; a green full suite
   writes `build/gate.json`.  status.py reports fresh / stale / unstamped.
+- `tools/measure.py` — `measure()`, the one entry point an oracle calls
+  (manual 6.11): G11's six defaults built in, `--lint` for oracle scripts.
 
 ## Still to build
 
@@ -112,7 +114,6 @@ each must prevent.
 
 | Tool | Replaces |
 |---|---|
-| `measure()` in the harness | the measurement checklist (manual 6.11, G11) |
 | gate helpers in `test/rig.js` | remembering how gates fail (map: `gate`) |
 | per-verdict stamps and pruning, for the runner (manual 6.12 steps 4, 6) | re-running unchanged verdicts at milestones; keeping redundant cases (map: `battery`) |
 | the byte-usage map and roster manifest | backward-decode verdicts; guessing how saved states differ (12.5, 12.6) |

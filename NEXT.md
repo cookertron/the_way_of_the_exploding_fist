@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     stamp the 34 unstamped fixtures (python tools/stamp.py lists them), then measure() in the harness (manual 6.11)
-Step:     callio/rendfx: --check with each fixture's state (port.json note); live_*: rebuild each sample.py command from its JSON once, capture to a temp, compare rows, keep the stamped copy; sfx/sprdec: recapture, compare
-Then:     measure() (manual 6.11, G11), then the rest of CLAUDE.md's still-to-build table in order
+Unit:     the remaining still-to-build items, in CLAUDE.md's table order: gate helpers in test/rig.js
+Step:     python tools/manual.py --map gate; read each trap, design helpers that make each failure unwritable, gate them in kit.test.js
+Then:     per-verdict stamps and pruning for mutants.py (6.12 steps 4, 6); the byte-usage map and roster (12.5, 12.6); brief.py, verify_claims.py (12.7)
 Blocked:  none
-Notes:    live_dtime needs live's script with --from 4250 --passes 5420. sprdec --check replays the model, so it does not restamp. built.json/gate.json are local (gitignored). Full mutation run started at the end of the stamps unit, 10 workers
+Notes:    measure.py exists, no oracle calls it yet: new oracles use it and pass --lint (10 raw comparisons in older tools, not oracles of measure). Writes below $4000 are invisible to it (SkoolKit drops them). Full mutation run is due (20 workers)
