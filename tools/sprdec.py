@@ -33,6 +33,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import Harness, SP, T                                 # noqa: E402
 from probeutil import parse_target, boot_target, source_label, TARGET_HELP  # noqa: E402
+import stamp as stamps                                             # noqa: E402
 
 ENTRY, RET = 0x8803, 0xC304
 SCRATCH = range(0x8AE9, 0x8B1D)
@@ -353,6 +354,7 @@ def capture(args):
     fx['about'] = ('Purpose: frozen oracle for the sprite decoder $8803 -- one call per sprite and flag set: HL, DE, the bytes it read as [addr, hex] runs '
                    '(in), every byte it wrote outside its scratch (out), its uncontended T (t) and its T in play (tc). '
                    'Read by: python tools/sprdec.py --check, and the JS decoder gate.')
+    stamps.step(fx, 'append' if append else 'capture')    # --check replays the model, not the machine: it does not stamp
     with open(out, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
 

@@ -62,6 +62,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import portconfig                                        # noqa: E402
+import stamp                                             # noqa: E402  every file read goes into the fixture's stamp
 import tzx as tzxmod                                     # noqa: E402
 from mkimage import build_image, ImageError              # noqa: E402
 
@@ -113,11 +114,13 @@ if TAPE_RET_PC is None and TAPE_CALL_PC is not None:
 
 
 def rom48():
+    stamp.note(U.ROM48)
     return bytearray(open(U.ROM48, 'rb').read())
 
 
 def tape_blocks(path):
     """Data blocks off a tape, in order, as (flag, payload) pairs."""
+    stamp.note(path)
     _, blocks = tzxmod.parse(path)
     return [(b.data[0], b.data[1:-1]) for b in blocks
             if b.data is not None and len(b.data) >= 2]
@@ -131,6 +134,7 @@ def load_snapshot(path):
     snapshot is refused here: this harness is a 48K machine (manual 3.1)."""
     if Snapshot is None:
         sys.exit('harness: this SkoolKit cannot read snapshots')
+    stamp.note(path)
     snap = Snapshot.get(path)
     ram = snap.ram(-1)
     if len(ram) != 0xC000 and (getattr(snap, 'out7ffd', 0) & 0x17) == 0x10:
@@ -340,6 +344,7 @@ class Harness:
             if tp is not None:
                 if not os.path.exists(tp):
                     sys.exit(f'harness: tape not found: {tp} (port.json tape.path)')
+                stamp.note(tp)
                 try:
                     mem, self.image_lines = build_image(
                         tp, portconfig.blocks_spec(), portconfig.copies_spec(),
@@ -351,6 +356,8 @@ class Harness:
                 if entry is None and ENTRY is None:
                     portconfig.need('tape', 'entry', what='PC when the loader hands over')
         elif image is not False:
+            if not isinstance(image, (bytes, bytearray)):
+                stamp.note(image)
             data = image if isinstance(image, (bytes, bytearray)) else open(image, 'rb').read()
             data = bytes(data[:0x10000]).ljust(0x10000, b'\0')
             raw[0x4000:] = data[0x4000:]
@@ -624,6 +631,7 @@ class Harness:
             pickle.dump(self.save_state(), f)
 
     def load_state_file(self, path):
+        stamp.note(path)
         with open(path, 'rb') as f:
             self.load_state(pickle.load(f))
 

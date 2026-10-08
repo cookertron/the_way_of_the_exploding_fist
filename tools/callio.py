@@ -127,6 +127,7 @@ from keyprobe import press, parse_script                           # noqa: E402
 from harness import Ports                                          # noqa: E402
 from probeutil import parse_target, boot_target, source_label, TARGET_HELP  # noqa: E402
 from sprdec import runs as hexruns, unruns                         # noqa: E402
+import stamp as stamps                                             # noqa: E402
 
 FLAT = {'fast_djnz': False, 'fast_ldir': False}
 
@@ -433,6 +434,7 @@ def capture(args):
                    'addresses, whose bytes come from the target, as do ROM data reads (rom, addresses '
                    'only, D5); outputs inside the blind ranges are addresses only (blind). Read by: python tools/callio.py --check, '
                    'and the JS gate of that routine.')
+    stamps.step(fx, 'append' if append else 'capture')
     with open(out, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
     print(f'callio: {source_label(t)}, {frames} frames: {n} calls, {new} new cases '
@@ -495,10 +497,12 @@ def check(args):
         elif stamp and 'r' not in c:
             c['r'], c['rx'] = regs[R], lm.exit[R]
             stamped += 1
-    if stamp and not bad and stamped:
+    if not bad:                                    # every case replayed: the check vouches for them (manual 12.3)
+        stamps.step(fx, 'check')
         with open(fixture, 'w') as f:
             json.dump(fx, f, separators=(',', ':'))
-        print(f'callio: stamped R at the CALL and the return on {stamped} cases (R at the CALL as the harness left it)')
+        if stamped:
+            print(f'callio: stamped R at the CALL and the return on {stamped} cases (R at the CALL as the harness left it)')
     elif stamp:
         print(f'callio: nothing stamped ({bad} cases disagree, {stamped} lacked R)')
     ts = [c['t'] for c in fx['cases']]
@@ -609,6 +613,7 @@ def derive(args):
                                     **({'port': {str(i): v for i, v in psets.items()}} if psets else {}),
                                     **({'script': script} if script is not None else {}),
                                     **({'up': up} if up is not None else {})}})
+    stamps.step(fx, 'derive')
     with open(fixture, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
     print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {dt}; PCs no case reached before: '
@@ -635,6 +640,7 @@ def cover(args):
             keep.add(i)
     old = len(fx['cases'])
     fx['cases'] = [c for i, c in enumerate(fx['cases']) if i in keep]
+    stamps.step(fx, 'cover')
     json.dump(fx, open(fixture, 'w'), separators=(',', ':'))
     print(f'callio: {fixture}: kept {len(fx["cases"])} of {old} cases, every one of {len(want)} PCs still reached')
 

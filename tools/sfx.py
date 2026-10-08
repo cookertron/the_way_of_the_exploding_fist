@@ -36,6 +36,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import Harness, rom48, R                               # noqa: E402
+import stamp as stamps                                             # noqa: E402
 
 ENTRY = 0xB15A
 FLAG_SOUND = 0xB2FA
@@ -202,6 +203,7 @@ def capture(state, out):
     fx = {'note': 'python tools/sfx.py --capture: uncontended $B15A calls from build/' + state +
                   '.pkl; ROM effects over the D6 substitutes (no ROM byte kept)',
           'segments': segs, 'cases': cases}
+    stamps.step(fx, 'capture')
     with open(out, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
     print(f'sfx --capture: {len(cases)} cases -> {out}')

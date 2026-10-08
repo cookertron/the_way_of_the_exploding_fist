@@ -99,8 +99,10 @@ record up loses nothing.
   suite.
 - `tools/record.py` and `tools/status.py` — the records (manual 12.11):
   record.py writes each to its home and checks its links; status.py gives
-  the orientation, `status.py ADDR`, `--check` and `--index`.  Evidence is
-  reported as present, not yet as fresh.
+  the orientation, `status.py ADDR`, `--check` and `--index`.
+- `tools/stamp.py` — evidence freshness (manual 12.3): every fixture writer
+  stamps what produced it; a replay `--check` restamps; a green full suite
+  writes `build/gate.json`.  status.py reports fresh / stale / unstamped.
 
 ## Still to build
 
@@ -110,7 +112,6 @@ each must prevent.
 
 | Tool | Replaces |
 |---|---|
-| stamps for status.py (build first) | trusting evidence that predates a harness fix (manual 12.3) |
 | `measure()` in the harness | the measurement checklist (manual 6.11, G11) |
 | gate helpers in `test/rig.js` | remembering how gates fail (map: `gate`) |
 | per-verdict stamps and pruning, for the runner (manual 6.12 steps 4, 6) | re-running unchanged verdicts at milestones; keeping redundant cases (map: `battery`) |

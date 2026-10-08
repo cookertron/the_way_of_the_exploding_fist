@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import Harness, Simulator, SP, PC, T, R              # noqa: E402,F401
 from probeutil import parse_target, boot_target, source_label, TARGET_HELP  # noqa: E402
 from sprdec import runs, unruns                                   # noqa: E402
+import stamp as stamps                                            # noqa: E402
 
 ENTRY, RET = 0xBF13, 0x9793
 CODE = (range(0x8803, 0x8AE9), range(0xBF13, 0xC2B0), range(0xC2B5, 0xC407))
@@ -209,6 +210,7 @@ def capture(args):
                    'SP at entry, the bytes it read before writing them as [addr, hex] runs (in; code and the tables '
                    '$B500-$B9FF excepted), its margin at the $C03B overlap test, every byte it wrote outside the stack (out), its uncontended T (t) and its '
                    'T in play (tc). Read by: python tools/rendfx.py --check, and the JS renderFighters gate.')
+    stamps.step(fx, 'append' if append else 'capture')
     with open(out, 'w') as f:
         json.dump(fx, f, separators=(',', ':'))
 
@@ -260,9 +262,11 @@ def check(args):
         for p in c['paths']:
             tally[p] = tally.get(p, 0) + 1
     ts = [c['t'] for c in fx['cases']]
-    if stamp and not bad:
+    if not bad:                                    # every case replayed: the check vouches for them (manual 12.3)
+        stamps.step(fx, 'check')
         with open(fixture, 'w') as f:
             json.dump(fx, f, separators=(',', ':'))
+    if stamp and not bad:
         print(f'rendfx: stamped the M1 count mod 128 (m1, R advanced from $BF13 to $9793) on every case')
     print(f'rendfx: {len(fx["cases"])} cases, {bad} disagree; T {min(ts)}-{max(ts)}')
     if want_paths:

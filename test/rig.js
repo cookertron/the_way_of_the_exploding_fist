@@ -34,8 +34,26 @@ function checkTrue(name, cond, detail) {
   if (cond) console.log(`  ok    ${name}`);
   else { failures++; console.log(`  FAIL  ${name}${detail ? '  ' + detail : ''}`); }
 }
+/* The gate stamp (manual 12.3): when the WHOLE suite passes -- not a block
+   subset the mutation runner selected -- build/gate.json records the suite's
+   hashes and the build it ran (build/built.json), so tools/stamp.py can say
+   whether a fixture's gate is still fresh. */
+function hash12(rel) {
+  return require('crypto').createHash('sha256').update(fs.readFileSync(path.join(ROOT, rel))).digest('hex').slice(0, 12);
+}
+function gateStamp() {
+  const suite = path.relative(ROOT, process.argv[1] || '').split(path.sep).join('/');
+  if (failures || process.env.ZX_BLOCKS || !/^test\/[^/]+\.test\.js$/.test(suite)) return;
+  let built;
+  try { built = JSON.parse(fs.readFileSync(path.join(ROOT, 'build/built.json'), 'utf8')); } catch (e) { return; }
+  if (hash12(built.out) !== built.html) return;      // the page on disk is not the one built.json describes
+  const gate = { Purpose: 'the last green full suite and the build it ran; read by tools/stamp.py and tools/status.py',
+                 checks, files: { [suite]: hash12(suite), 'test/rig.js': hash12('test/rig.js') }, built };
+  fs.writeFileSync(path.join(ROOT, 'build/gate.json'), JSON.stringify(gate, null, 1));
+}
 function done() {
   console.log(`\n${checks - failures}/${checks} checks passed`);
+  gateStamp();
   process.exit(failures ? 1 : 0);
 }
 

@@ -1154,7 +1154,7 @@ def make_port(d):
     one test that reads the fixture -- enough for record.py and status.py."""
     import shutil
     import subprocess
-    for rel in ('tools/record.py', 'tools/status.py', 'tools/manual.py',
+    for rel in ('tools/record.py', 'tools/status.py', 'tools/manual.py', 'tools/stamp.py',
                 'docs/PORTING-ZX-TO-JS.txt', 'docs/TRAPS.md', 'docs/TRAPS-MAP.md'):
         os.makedirs(os.path.join(d, os.path.dirname(rel)), exist_ok=True)
         shutil.copy(os.path.join(REPO, rel), os.path.join(d, rel))
@@ -1273,7 +1273,7 @@ def make_mutport(d):
     port = json.load(io.open(os.path.join(REPO, 'port.json'), encoding='utf-8'))
     assets = [a['file'] for a in port.get('assets', [])          # every asset the build needs
               if os.path.exists(os.path.join(REPO, a['file']))]
-    for rel in ['tools/build.py', 'tools/mutants.py', 'tools/mutants.js', 'test/rig.js',
+    for rel in ['tools/build.py', 'tools/stamp.py', 'tools/mutants.py', 'tools/mutants.js', 'test/rig.js',
                 'web/platform.js'] + assets:
         os.makedirs(os.path.join(d, os.path.dirname(rel)), exist_ok=True)
         shutil.copy(os.path.join(REPO, rel), os.path.join(d, rel))
@@ -1427,6 +1427,62 @@ CHECKS = [
     ('traps: every trap has exactly one row in the trap-to-check map', t_traps_map),
     ('hooks: read and heredoc guards, stop check, session and sub-agent context', t_hooks),
 ]
+
+
+def t_stamp():
+    import json
+    import shutil
+    import tempfile
+    st = mod('stamp')
+    d = tempfile.mkdtemp(dir=st.ROOT, prefix='.stamptest')
+    keep = (st.READ[:], st.GATE)
+    try:
+        inp, fxp, gate = (os.path.join(d, n) for n in ('state.pkl', 'fx.json', 'gate.json'))
+        open(inp, 'wb').write(b'one')
+        st.READ[:] = []
+        st.note(inp)
+        st.note(os.path.join('x', 'site-packages', 'skoolkit', '48.rom'))   # covered by pip:
+        eq(st.READ, [st.rel(inp)], 'note keeps repo files, drops installed ones')
+        fx = st.step({'cases': [1, 2]}, 'capture', argv=['t.py', '--capture'])
+        json.dump(fx, open(fxp, 'w'))
+        eq(st.freshness(fxp)[0], 'fresh', 'just written')
+        open(inp, 'wb').write(b'two')
+        state, why = st.freshness(fxp)
+        eq((state, any(st.rel(inp) in w for w in why)), ('stale', True), 'a changed input names itself')
+        open(inp, 'wb').write(b'one')
+        fx['cases'].append(3)
+        json.dump(fx, open(fxp, 'w'))
+        state, why = st.freshness(fxp)
+        eq((state, any('#97' in w for w in why)), ('stale', True), 'a hand edit')
+        eq(len(st.step(fx, 'derive')['_stamp']['steps']), 2, 'derive appends a step')
+        eq(len(st.step(fx, 'check')['_stamp']['steps']), 1, 'check vouches: one step')
+        json.dump(fx, open(fxp, 'w'))
+        eq(st.freshness(fxp)[0], 'fresh', 'restamped')
+        eq(st.freshness(os.path.join(d, 'none.json'))[0], 'missing', 'absent')
+        json.dump({'cases': []}, open(os.path.join(d, 'old.json'), 'w'))
+        eq(st.freshness(os.path.join(d, 'old.json'))[0], 'unstamped', 'before stamps')
+        # the gate chain: built.json's asset hash, the suite's files, the page
+        page = os.path.join(d, 'page.html')
+        open(page, 'w').write('page')
+        built = {'out': st.rel(page), 'html': st.file_hash(page), 'files': {st.rel(inp): st.file_hash(inp)},
+                 'assets': {'k': [st.rel(fxp), st.content_hash(fxp)]}}
+        json.dump({'files': {}, 'built': built}, open(gate, 'w'))
+        st.GATE = st.rel(gate)
+        eq(st.gate_freshness('k', fxp)[0], 'fresh', 'gate as built')
+        eq(st.gate_freshness('other', fxp)[0], 'stale', 'an asset the page never had')
+        open(page, 'w').write('rebuilt')
+        eq(st.gate_freshness('k', fxp)[0], 'stale', 'the page rebuilt since the suite')
+        open(page, 'w').write('page')
+        json.dump(st.step(dict(fx, cases=[9]), 'capture', argv=['t.py']), open(fxp, 'w'))
+        eq(st.gate_freshness('k', fxp)[0], 'stale', 'the fixture recaptured since the build')
+        st.GATE = os.path.join(d, 'nothing.json')
+        eq(st.gate_freshness('k', fxp)[0], 'none', 'no green suite on record')
+    finally:
+        st.READ[:], st.GATE = keep
+        shutil.rmtree(d, ignore_errors=True)
+
+
+CHECKS.append(('stamp: fresh, stale on a changed input or a hand edit, steps, the gate chain', t_stamp))
 
 
 def main():

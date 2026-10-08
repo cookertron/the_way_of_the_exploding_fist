@@ -15,8 +15,11 @@ status.py -- where the project stands, derived from its records, never typed
 
 Evidence is what exists now: MEASURED (the routine's fixtures are registered
 and present), PORTED (its port function is defined in web/), GATED (every one
-of its fixtures is read by a test).  Freshness -- whether that evidence
-predates a harness fix -- needs stamps (manual 12.3), not built yet.
+of its fixtures is read by a test).  Freshness comes from the stamps (manual
+12.3, tools/stamp.py): a fixture is FRESH while every file that produced it
+hashes the same, STALE once one does not, UNSTAMPED if written before stamps;
+its gate is fresh while the last green full suite ran a page built from it
+as it is now.  --brief counts them and names the first stale few.
 """
 import json
 import os
@@ -27,6 +30,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import record as R  # noqa: E402
+import stamp as ST  # noqa: E402
 
 ROOT = R.ROOT
 HOMES = {'README.md', 'CLAUDE.md', 'NEXT.md', 'docs/PORTING-ZX-TO-JS.txt', 'docs/TRAPS.md',
@@ -99,6 +103,33 @@ def evidence(data, ctx):
     ported = bool(data.get('port')) and R.port_defined(data['port'], ctx['web'])
     gated = bool(fx) and all(re.search(r'\b%s\b' % re.escape(k), ctx['tests']) for k in fx)
     return {'measured': measured, 'ported': ported, 'gated': gated}
+
+
+def fresh(key, ctx):
+    """(fixture state, gate state, reasons) for one asset key, cached."""
+    cache = ctx.setdefault('fresh', {})
+    if key not in cache:
+        path = ctx['assets'].get(key, {}).get('file', '')
+        st, why = ST.freshness(path)
+        g, gwhy = ST.gate_freshness(key, path)
+        cache[key] = (st, g, why + gwhy)
+    return cache[key]
+
+
+def freshness_lines(ctx, keys):
+    """The brief's freshness summary over these asset keys."""
+    states = {k: fresh(k, ctx) for k in keys}
+    count = lambda i, *v: sum(1 for s in states.values() if s[i] in v)
+    out = ['Stamps (manual 12.3): fixtures %d fresh, %d stale, %d unstamped; gates %d fresh, %d not'
+           % (count(0, 'fresh'), count(0, 'stale', 'unreadable'), count(0, 'unstamped', 'missing'),
+              count(1, 'fresh'), count(1, 'stale', 'none'))]
+    stale = [(k, s) for k, s in states.items() if s[0] != 'fresh' or s[1] != 'fresh']
+    stale.sort(key=lambda ks: ks[1][0] != 'stale')        # stale fixtures first: they are the re-run list
+    for k, s in stale[:3]:
+        out.append('  %s %s: %s' % (s[0] if s[0] != 'fresh' else 'gate ' + s[1], k, s[2][0] if s[2] else s[0]))
+    if len(stale) > 3:
+        out.append('  ... %d more: python tools/stamp.py' % (len(stale) - 3))
+    return out
 
 
 def label(it):
@@ -309,6 +340,8 @@ def brief(ctx):
                     if d.get('manual'):
                         out.append('  read: python tools/manual.py ' + ' '.join(d['manual']))
                     break
+    keys = sorted({k for it in routines for k in it['data'].get('fixtures', []) if k in ctx['assets']})
+    out += freshness_lines(ctx, keys)
     block, warn = check(ctx)
     out.append('Check: %d blocking, %d warnings%s' % (
         len(block), len(warn), ' -- python tools/status.py --check' if block or warn else ''))
@@ -333,6 +366,10 @@ def view(ident, ctx):
         out.append('oracle:   %s' % d['oracle'])
     if d.get('fixtures'):
         out.append('fixtures: %s' % ' '.join(d['fixtures']))
+        for k in d['fixtures']:
+            if k in ctx['assets']:
+                st, g, why = fresh(k, ctx)
+                out.append('  %s: %s, gate %s%s' % (k, st, g, ('; ' + why[0]) if why else ''))
     if d.get('port'):
         out.append('port:     %s' % d['port'])
     e = evidence(d, ctx)

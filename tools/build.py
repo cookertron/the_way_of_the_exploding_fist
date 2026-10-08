@@ -26,6 +26,12 @@ A port adds its own shape assertions on the assets it extracts ("the font is
 106 glyphs of 8 bytes", "307 dungeon records") right here, so a stale
 extractor output cannot ship.  See the case study's build.py for the idea:
 every count that the engine depends on is asserted at build time.
+
+A fixture's "_stamp" (manual 12.3) is left out of the page: it says what
+produced the evidence, not what the game needs.  build/built.json records
+the build -- the page's hash, each asset's content hash, the hashes of the
+build's own inputs -- for rig.done() to carry into build/gate.json when the
+whole suite passes (tools/stamp.py reads both).
 """
 import json
 import os
@@ -34,6 +40,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+import stamp  # noqa: E402
 
 
 def load_manifest():
@@ -71,7 +79,8 @@ def main():
         sys.exit('BUILD FAILED: include marker(s) not in port.json: %s' % ', '.join(left))
 
     # ---- assets ---------------------------------------------------------
-    assets = {}
+    assets, files = {}, {stamp.rel(__file__): None, tpl_rel: None, 'port.json': None}
+    files.update({rel: None for rel in (cfg.get('includes') or {}).values()})
     for a in (cfg.get('assets') or []):
         rel = a['file']
         path = os.path.join(ROOT, rel)
@@ -82,6 +91,8 @@ def main():
             print('NOTE: %s missing%s' % (rel, ' -- ' + note if note else ''))
             continue
         assets[a['key']] = json.load(open(path, encoding='utf-8'))
+        if isinstance(assets[a['key']], dict):
+            assets[a['key']].pop('_stamp', None)
 
     payload = json.dumps(assets, separators=(',', ':'))
     escaped = payload.replace('</', '<\\/')
@@ -108,6 +119,13 @@ def main():
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     open(out_path, 'w', encoding='utf-8').write(out)
+    built = {'Purpose': 'what the last build put in the page; read by test/rig.js done() and tools/stamp.py',
+             'out': out_rel, 'html': stamp.file_hash(out_rel),
+             'files': {f: stamp.file_hash(f) for f in files},
+             'assets': {k: [next(a['file'] for a in cfg['assets'] if a['key'] == k), stamp.content_hash(v)]
+                        for k, v in assets.items()}}
+    with open(os.path.join(ROOT, stamp.BUILT), 'w', encoding='utf-8') as f:
+        json.dump(built, f, indent=1)
     print('payload %d bytes -> escaped %d bytes, re-parsed OK' % (len(payload), len(escaped)))
     print('wrote %s (%d bytes)' % (out_path, len(out)))
 
