@@ -33,6 +33,14 @@ a loop the main loop calls that runs many times between two visits to --at
 v, r, t, h}, ...], in order); t is then always since the previous sample of
 either kind, so the engine can charge each sub-loop pass its own T.
 
+--reads "N:KEYS,..." with --reads-at PC holds keys BY PORT READ inside a
+pass: from the first time PC is reached, each segment holds its keys for N
+reads (every IN, whatever the port), then all keys are released until the
+next visit to --at, where --script takes over again.  For a routine that
+polls the keys for many frames inside one pass (the options menu, DI): the
+engine counts its own reads the same way, so both halves see the same keys
+on the same IN.  The JSON records both, and "reads_used" (the count).
+
 --poke ADDR=VAL[,...] sets data bytes before play, as callio.py --poke: a
 start no saved state holds (P1 one point from the bout).  The JSON records
 them as "poked"; the start state is constructed, so say so.
@@ -47,6 +55,7 @@ Usage:
                            [--script "40:,60:D"] [--json FILE]
                            [--hash LO-HI ...] [--skip LO-HI ...] [--mark PC ...]
                            [--also PC ...] [--poke ADDR=VAL,...] [--start-here]
+                           [--reads-at PC --reads "N:KEYS,..."]
     python tools/sample.py --state s1 --at 0x9745 --var time=0x9CA5 --var cnt=0x9CA6 --changes
 """
 import json
@@ -91,6 +100,7 @@ def main():
     at, passes, changes, keys, vars_ = None, 1000, False, None, []
     script, out, hashes, skip, marks, also = None, None, [], [], [], []
     pokes, here = {}, False
+    reads, reads_at = None, None
     i = 0
     while i < len(args):
         a = args[i]
@@ -119,6 +129,10 @@ def main():
                 pa, pv = kv.split('=')
                 pokes[int(pa, 0)] = int(pv, 0)
             i += 2
+        elif a == '--reads':
+            reads = args[i + 1]; i += 2
+        elif a == '--reads-at':
+            reads_at = int(args[i + 1], 0); i += 2
         elif a == '--start-here':
             here = True; i += 1
         elif a == '--skip':
@@ -129,6 +143,8 @@ def main():
         sys.exit('sample.py: need --at PC and at least one --var')
     if keys and script:
         sys.exit('sample.py: --keys or --script, not both')
+    if (reads is None) != (reads_at is None):
+        sys.exit('sample.py: --reads and --reads-at go together')
     h = boot_target(target, 'sample.py')
     for pa, pv in pokes.items():            # before play, as callio.py --poke: a start no saved state holds
         if pa < 0x4000:
@@ -139,6 +155,18 @@ def main():
     plan = []                               # the keys held on each pass, by pass
     for n, names in (parse_script(script) if script else []):
         plan += [names] * n
+    rplan = []                              # the keys held on each port read after --reads-at
+    for n, names in (parse_script(reads) if reads else []):
+        rplan += [names] * n
+    nread = [None]                          # reads counted since --reads-at; None: not reached yet
+
+    def on_read(port):
+        i = nread[0]
+        h.ports.release_all()
+        for k in (rplan[i] if i < len(rplan) else []):
+            press(h.ports, k)
+        nread[0] = i + 1
+
     print(f'# sample.py at ${at:04X} over {passes} passes, {source_label(target)}'
           + (f', keys {keys}' if keys else '') + (f', script {script}' if script else ''))
     m = h.memobj.m
@@ -149,9 +177,13 @@ def main():
     hit, sub = [], []                       # marks and --also rows since the previous visit
     for p in range(passes):
         while True:
-            reason, _ = h.run_until({at, *marks, *also}, limit=50_000_000)
+            reason, _ = h.run_until({at, *marks, *also} | ({reads_at} if reads_at is not None and nread[0] is None else set()),
+                                    limit=50_000_000)
             if reason != 'target' or h.pc() == at:
                 break
+            if h.pc() == reads_at and nread[0] is None:
+                nread[0] = 0; h.ports.on_read = on_read
+                print(f'# pass {p}: ${reads_at:04X} reached, keys by read from here')
             if h.pc() in marks:
                 hit.append(h.pc())
             if h.pc() in also and out:
@@ -181,6 +213,9 @@ def main():
                 print(f'# pass {p}: {len(sub)} --also rows')
             hit, sub = [], []
             t0 = h.tstates()
+        if h.ports.on_read is not None:     # back at --at: the reads script is over
+            h.ports.on_read = None
+            print(f'# pass {p}: {nread[0]} reads by the reads script ({len(rplan)} in it)')
         if script:                          # the keys for the pass about to run
             h.ports.release_all()
             for k in (plan[p] if p < len(plan) else []):
@@ -192,6 +227,7 @@ def main():
                        'vars': [[nm, a, n] for nm, a, n in vars_],
                        'hash': hashes, 'skip': skip, 'marks': marks,
                        **({'also': also} if also else {}),
+                       **({'reads': reads, 'reads_at': reads_at, 'reads_used': nread[0]} if reads else {}),
                        **({'poked': {f'{a:04x}': v for a, v in pokes.items()}} if pokes else {}), 'start': start, 'rows': rows}, f)
         print(f'# wrote {out}: {len(rows)} rows')
 

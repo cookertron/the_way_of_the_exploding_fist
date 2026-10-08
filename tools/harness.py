@@ -207,6 +207,7 @@ class Ports:
         self.record_writes = False
         self.reads = {}
         self.unattached = 0xFF
+        self.on_read = None        # called with the port before each read is answered (sample.py --reads)
 
     def press(self, select, value):
         self.pressed[select] = self.pressed.get(select, 0xFF) & value
@@ -217,6 +218,8 @@ class Ports:
 
     def read_port(self, registers, port):
         self.reads[port] = self.reads.get(port, 0) + 1
+        if self.on_read is not None:
+            self.on_read(port)
         low = port & 0xFF
         if low & 1 == 0:                        # the ULA answers every even port
             hi = (port >> 8) & 0xFF

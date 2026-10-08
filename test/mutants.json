@@ -4637,5 +4637,37 @@
   "new": "if (end){ this.win = 0xAA40; }",
   "increment": "AE17",
   "kills": "2UP: roundPass and the victory pose follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: menuPass: the steps' T charged twice",
+  "old": "return this.pass(this.kb) - M.paid;",
+  "new": "return this.pass(this.kb);",
+  "increment": "8C54",
+  "kills": "menu: ...and the menu's pass is charged within 0.5%"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: menuPass: the steps not on the clock",
+  "old": "if (!s.done){ this.simT += d; return d; }",
+  "new": "if (!s.done){ return d; }",
+  "increment": "8C54",
+  "kills": "menu: ...and on the page's frames the menu opened by key 0"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: Fist.pass: the menu's reads not counted",
+  "old": "      if (this.menu) this.menu.n++;\n",
+  "new": "",
+  "increment": "8C54",
+  "kills": "menu: roundPass and the victory pose follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: Fist.pass: the menu's reads not recorded for the replay",
+  "old": "      rec.push([p, v]);\n",
+  "new": "",
+  "increment": "8C54",
+  "kills": "menu: roundPass and the victory pose follow the machine sample for sample"
  }
 ]

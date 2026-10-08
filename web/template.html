@@ -1349,7 +1349,12 @@ function fighterMotion(m){
    the uncontended T from the CALL at $9757 to $975A, A at the return and
    R there.  Starting a game (1/Kempston fire, 2) runs New_Round $909E and
    returns $80; key 0 (code 0x23) runs the options menu $8C54 (configs,
-   below) and returns $80. */
+   below) and returns $80 -- to the end in this call, or, with io.menu
+   set, by throwing a MenuSuspend that carries the menu's generator and
+   its clock, for a live loop to run across frames (Fist.menuPass). */
+class MenuSuspend {
+  constructor(g, t){ this.g = g; this.t = t; }
+}
 function newRound(m, cnt){                         // New_Round $909E without its CALL: the counts cleared, the yin-yang cells blanked
   m[0xAA01] = 0; m[0xAA41] = 0; m[0xAA02] = 0; m[0xAA42] = 0;
   let t = 4 + 4 * 13; cnt.m1 += 5;
@@ -1382,6 +1387,7 @@ function controlPass(m, io){
   k(12 + 24, 1 + 2);                               // $9806 taken, $981A-$981C
   if (!keyTest(0x23)[0]){
     k(7 + 17, 1 + 1);                              // $9821 CALL Game_Configs_Main
+    if (io.menu) throw new MenuSuspend(configs(), () => t);
     for (const _ of configs());                    // eslint-disable-line no-unused-vars
     k(7 + 10, 2);
     return out(0x80);
@@ -2051,7 +2057,7 @@ function playPass(m, io, sp){
   t += soundEffect(m, a, fx);
   for (const [ft, v] of fx) io.out.push([tb + ft, v]);
   const r = (io.r & 0x80) | ((io.r + M1.m1) & 0x7F);
-  const c = controlPass(m, { r, in: io.in });
+  const c = controlPass(m, { r, in: io.in, menu: io.menu });
   t += c.t + 4; M1.m1 = 1;                         // AND A
   if (c.a & 0x80){ M1.m1 += 1; return { t: t + 11, a: c.a, r: rAt() }; }   // RET M taken
   t += 5 + 7 + 13 + 7; M1.m1 += 4;                 // RET M, LD A,$40: LD ($9C29),A: LD C,0
@@ -2945,10 +2951,17 @@ class Fist {
     this.sound = { log: [] };
     this.scr = new SpecScreen();
     this.script = null;                            // [[passes, keys]], as sample.py --script
+    this.menu = null;                              // the options menu $8C54 up: its generator, run by menuPass across frames
+    this.snap = new Uint8Array(0x10000);           // RAM at the pass's start, for the menu's replay
+    this.replay = null;                            // the menu's pass again: its port reads, [[port, value]], in order
+    this.menuRead = null;                          // test hook: called with n before the menu's nth port read (sample.py --reads)
+    this.kb = null;
   }
   get simFrame(){ return this.simT / T_FRAME; }
   /* one pass with these keys; returns its charged T */
   pass(kb){
+    this.kb = kb;
+    if (this.menu) return this.menuPass();
     if (this.boot) return this.bootPass();
     if (this.setup) return this.setupPass();
     if (this.enter) return this.enterPass();
@@ -2957,8 +2970,32 @@ class Fist {
     if (this.win || this.bonus) return this.winPass();
     if (this.both) return this.endPass();
     this.stage = false;
-    const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0, t: 0 } };   // t stays 0 if the pass leaves before $BF13 (a quit)
-    const res = roundPass(this.m, io, this.sp, this.demo, this.two);
+    /* every read recorded, for the menu: key 0 in the demo suspends the
+       pass at $9821 (MenuSuspend), the menu runs live across frames, and
+       the pass is then run again from this start, its reads replayed */
+    const replay = this.replay, rec = [], r0 = this.r, sim0 = this.simT;
+    this.replay = null;
+    if (!replay) this.snap.set(this.m);
+    const portIn = replay ? p => {
+      const x = replay.shift();
+      if (!x || x[0] !== p) throw new Error(`menu replay: port $${p.toString(16)} read, the recording has ${x ? '$' + x[0].toString(16) : 'no more'}`);
+      return x[1];
+    } : p => {
+      if (this.menu && this.menuRead) this.menuRead(this.menu.n);
+      if (this.menu) this.menu.n++;
+      const v = specPort(this.kb, p);
+      rec.push([p, v]);
+      return v;
+    };
+    const io = { r: this.r, out: [], in: portIn, menu: !replay, cost: { dec: 0, copy: 0, ldir: 0, t: 0 } };   // t stays 0 if the pass leaves before $BF13 (a quit)
+    let res;
+    try { res = roundPass(this.m, io, this.sp, this.demo, this.two); }
+    catch (e){
+      if (!(e instanceof MenuSuspend)) throw e;
+      this.menu = { g: e.g, t: e.t, n: 0, rec, r0, sim0, paid: 0 };
+      return this.menuPass();
+    }
+    if (replay && replay.length) throw new Error(`menu replay: ${replay.length} reads left over`);
     let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
     for (const [t, v] of io.out){                  // before the ways on: a tune there logs its edges after these
       this.border = v & 7;
@@ -2979,6 +3016,20 @@ class Fist {
     this.simT += cost; this.r = res.r; this.passes++;
     if (res.exit) this.exit = res;
     return cost;
+  }
+  /* the options menu $8C54, up inside a demo pass (key 0): one step of
+     its generator, to its next port read or past a Configs_Delay, its T
+     charged as it runs (the screen is live: it draws into this.m).  At
+     its RET, RAM, R and the clock go back to the pass's start and the pass
+     runs again whole with its reads replayed (the menu then synchronous),
+     charged less what the steps paid */
+  menuPass(){
+    const M = this.menu, t0 = M.t(), s = M.g.next(), d = M.t() - t0;
+    M.paid += d;
+    if (!s.done){ this.simT += d; return d; }
+    this.menu = null;
+    this.m.set(this.snap); this.r = M.r0; this.simT = M.sim0; this.replay = M.rec;
+    return this.pass(this.kb) - M.paid;
   }
   /* the way on from pointPath's exit in res: 'time' decided by timeUp, then
      'p1' / 'p2' into the victory pose to its loop top, 'draw' out to $ACA6;

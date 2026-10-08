@@ -4,7 +4,7 @@
 name     = "game_configs"
 entries  = ["$8C54"]
 oracle   = "tools/callio.py"
-fixtures = ["control97cb"]
+fixtures = ["control97cb", "live_menu"]
 manual   = ["5.1", "7.2"]
 
 [[fact]]
@@ -35,7 +35,12 @@ kind   = "gated"
 says   = "29 menu and font mutants all killed (affected run 211 listed, 207 killed, 4 timeouts, then killed once the gate throws on a read 64 past the port log)"
 by     = "python tools/mutants.py --affected ; python tools/mutants.py --match \"Get_Key mask||Kempston tests key 4\""
 
-[[open]]
-ask    = "how does the live loop run the menu across frames -- controlPass is synchronous; configs() yields before each IN and after each delay but nothing drives it incrementally yet"
-tried  = "the gate runs it to the end in one call (for...of), fine against scripted ports, would block a browser frame for ~470 frames of T"
-settle = "when the live main loop is built, expose the generator (controlPass returns it, or takes a driver) and pace it by its T against the frame budget"
+[[fact]]
+kind   = "gated"
+says   = "key 0 throws MenuSuspend at $9821; Fist.menuPass steps configs() to each IN or delay, T on the clock, keys live; at its RET the pass replays from its start with its recorded reads. live_menu follows 700 rows, menu pass within 0.5%"
+by     = "python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "menu from the demo (key 0, visit 400) runs inside one pass; RET with A=$80 to $ABCB, $ABB9, $AC27, Num_Players 0, a new demo by gameDispatch -- no new engine path; 118 reads for P1, 4, nine keys"
+by     = "python tools/sample.py (port.json live_menu note) --reads-at 0x8C54 --reads ..."

@@ -335,6 +335,19 @@ def t_harness_ports():
     h.regs[H.PC] = 0x8100
     h.run_until(end)
     eq(h.peek(0x9000, 4), bytes([0xFF, 0x00, 0xFF, 0xFF]), 'everything released')
+    seen = []                                                   # on_read: sample.py --reads presses keys per read
+
+    def on_read(port):
+        seen.append(port & 0xFF)
+        h.ports.release_all()
+        if len(seen) == 4:
+            kp.press(h.ports, 'z')
+    h.ports.on_read = on_read
+    h.regs[H.PC] = 0x8100
+    h.run_until(end)
+    h.ports.on_read = None
+    eq(seen, [0xFE, 0x1F, 0xFF, 0xFE], 'on_read called before each read, in order')
+    eq(h.peek(0x9000, 4), bytes([0xFF, 0x00, 0xFF, 0xFD]), 'a key pressed in on_read is seen by that read alone')
 
 
 def t_harness_watch():
@@ -1383,7 +1396,7 @@ CHECKS = [
     ('screen: render + attrs', t_screen_render),
     ('harness: real ROM, ROM writes ignored', t_harness_rom),
     ('harness: step / run_until / T-states / port write', t_harness_run),
-    ('harness: keyboard, Kempston, unattached ports', t_harness_ports),
+    ('harness: keyboard, Kempston, unattached ports, on_read', t_harness_ports),
     ('harness: Mem.watch write log', t_harness_watch),
     ('harness: save/load state, snapshot/diff', t_harness_state),
     ('harness: call() with sentinels', t_harness_call),

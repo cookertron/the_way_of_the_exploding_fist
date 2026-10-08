@@ -1731,6 +1731,16 @@ function liveGate(L, who, how){
   const want = r => [...r.v, r.r, ...r.h];
   const g = new P.Fist(L.start), kb = new S.Keyboard();
   let first = '', exit = null, ratio = [];
+  /* the menu's keys by port read from $8C54 (sample.py --reads), through
+     the engine's hook: the nth read of the menu sees the nth entry */
+  const rplan = [];
+  for (const seg of (L.reads || '').split(',').filter(Boolean)){
+    const [n, keys] = seg.split(':');
+    for (let i = 0; i < +n; i++) rplan.push(keys ? keys.split('+') : []);
+  }
+  let menuReads = 0, menuSteps = 0;
+  const menuPaid = [];
+  if (L.reads) g.menuRead = n => { kb.releaseAll(); for (const x of rplan[n] || []) kb.press(x); menuReads = n + 1; };
   /* boot: the start is the tape's hand-over at $8800 (sample.py
      --start-here), and row 0 the demo's first $AE29: bootPass runs to it */
   const bootT = how === 'boot' ? g.pass(kb) / L.rows[0].t : 1, bootBorder = g.border;
@@ -1780,7 +1790,15 @@ function liveGate(L, who, how){
   for (; k < seq.length; k++){
     if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt && g.demoNext === null){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
     logN = g.sound.log.length;
-    let cost = g.pass(kb);
+    let cost;
+    try {                                          // a pass that throws (the menu's replay guard) is this row's failure
+      cost = g.pass(kb);
+      if (g.menu){                                 // the menu up: run it step by step, as the frames would
+        while (g.menu){ cost += g.pass(kb); menuSteps++; }
+        menuPaid.push([seq[k].p, cost / seq[k].t]);
+      }
+    } catch (e){ first = `row ${seq[k].p}: the pass threw: ${e.message}`; break; }
+    const textUp = menuPaid.length && menuPaid[menuPaid.length - 1][0] === seq[k].p && seq[k].sub;
     if (g.setup){
       const t1 = g.simT, e = g.sound.log.slice(logN).filter(([f]) => f * P.T_FRAME <= t1);
       edges = e.length; if (edges) tail = t1 - e[edges - 1][0] * P.T_FRAME;
@@ -1797,6 +1815,10 @@ function liveGate(L, who, how){
     const got = [pcNow(), ...row(g.m, g.r)], w = [seq[k].pc, ...want(seq[k])];
     if (g.stage) blind = true;                     // the new stage's text rows stay on screen
     if (blind) got[1 + L.vars.length + 1 + disp] = w[1 + L.vars.length + 1 + disp];
+    /* the menu's last screen, still up at $ABB9, is text in the font (D5):
+       the display unchecked there (the menu's screens are gated glyph by
+       glyph on callio_97cb's cases); the new demo redraws it */
+    if (textUp) L.hash.forEach(([lo], i) => { if (lo >= 0x4000 && lo < 0x5B00) got[1 + L.vars.length + 1 + i] = w[1 + L.vars.length + 1 + i]; });
     if (JSON.stringify(got) !== JSON.stringify(w)){
       const names = ['PC', ...L.vars.map(v => v[0]), 'R', ...L.hash.map(([lo, hi]) => `hash $${lo.toString(16)}-$${hi.toString(16)}`)];
       const j = got.findIndex((x, i) => x !== w[i]);
@@ -1804,7 +1826,7 @@ function liveGate(L, who, how){
     }
     if (g.exit){ exit = g.exit.exit; at = seq[k].p; break; }   // stopped where the machine was sampled: the row compared first
   }
-  const what = { boot: ' and the demo', won: ', the victory pose and the time bonus', lost: ' and the victory pose', start: ' and the victory pose', start2: ' and the victory pose', draw: ', the round end and the draw' }[how];
+  const what = { menu: ' and the victory pose', boot: ' and the demo', won: ', the victory pose and the time bonus', lost: ' and the victory pose', start: ' and the victory pose', start2: ' and the victory pose', draw: ', the round end and the draw' }[how];
   check(`${who}: roundPass${what} follow the machine sample for sample over keyed 1P play until the bout ends`, first, '');
   /* lost: the high score checked, sampled at $AC3C; Main_Game_Loop's rows
      and Demo_Mode (demoIn, a pass of its own) into the demo's $AE29, the
@@ -1832,6 +1854,43 @@ function liveGate(L, who, how){
        (1.6% over), 8080 and 8020 after the won and drawn bouts */
     check(`${who}: ...and the pass from the CALL $AD18 into the game's first $AE29 is charged within 2% of the contended machine`,
           enterT.map(x => Math.abs(x - 1) < 0.02), [true]);
+  }
+  if (how === 'menu'){
+    /* the demo's key 0 (sample.py's script: one pass) runs the options menu
+       $8C54 inside that pass, DI: the engine suspends the pass there
+       (MenuSuspend) and runs the menu a step at a time, each step to its
+       next port read or past a Configs_Delay, as the live frames would;
+       then the whole pass again, its reads replayed.  The menu's keys come
+       by read (sample.py --reads): P1, 4 (reconfigure), nine keys.  At its
+       RET, $80: RET M to $ABB9, Num_Players still 0, out to $AC27 and a
+       new demo by gameDispatch, played on to the fixture's last row */
+    const want = [...[0xFB01, 0xFB02, 0xDF01, 0xBF02, 0xFD01, 0xFE02, 0xDF02, 0xF701, 0x7F01].flatMap(v => [v & 0xFF, v >> 8])];
+    check(`${who}: ...and leave the bout into the demo, open the options menu by key 0 (row ${startAt}), run it across ${menuSteps} steps with its keys by port read (${L.reads_used} reads), P1's keyboard reconfigured, out by $ABB9 to $AC27 into a new demo, played on to the fixture's last row with no way out`,
+          [demoP, at, exit, k, startAt > out, menuPaid.map(([p]) => p), menuReads, menuSteps > 100, L.rows[startAt].m.includes(0xABCB), (L.rows[startAt].s || []).map(x => x.pc), g.demo, g.menu,
+           [...g.m.subarray(0x8BD2, 0x8BD4)], [...g.m.subarray(0x8BD4, 0x8BD4 + 18)]],
+          [out, -1, null, seq.length, true, [startAt], L.reads_used, true, true, [0xABB9], true, null,
+           [0xD4, 0x8B], want]);
+    /* the menu's pass is the delays' (uncontended code above $8000) and
+       the screens' (the clears and prints into contended RAM, at the
+       listing's T) */
+    check(`${who}: ...and the menu's pass is charged within 0.5% of the contended machine, its steps charged to the clock as they ran`,
+          menuPaid.map(([, x]) => Math.abs(x - 1) < 0.005 ? '' : `ratio ${x}`), ['']);
+    /* the page's own frames: the script to key 0's pass, then step() as
+       the loop calls it, no keys held -- the menu stays up, a frame's T
+       spent per frame (it polls, DI), the keyboard read live; E, then
+       one frame: its RET, the pass replayed, on to $ABB9 */
+    const f = new P.Fist(L.start), kf = new S.Keyboard();
+    for (let n = 0; n <= startAt - 1 && !f.menu; ){
+      if (!f.win && !f.bonus && !f.both && !f.setup && !f.enter && !f.demoAt && f.demoNext === null){ kf.releaseAll(); for (const x of plan[n] || []) kf.press(x); n++; }
+      f.pass(kf);
+    }
+    const up = !!f.menu, sim0 = f.simT, passes0 = f.passes;
+    kf.releaseAll();
+    for (let i = 0; i < 100; i++) f.step(kf);
+    const held = [!!f.menu, Math.abs((f.simT - sim0) / P.T_FRAME - 100) <= 1, f.passes === passes0];
+    kf.press('E'); f.step(kf); kf.releaseAll();
+    check(`${who}: ...and on the page's frames the menu opened by key 0 stays up over 100 frames with no key (a frame's T each, no pass completed), and E closes it in a frame, out to $ABB9`,
+          [up, ...held, f.menu, f.demoNext === 0x80 || f.passes > passes0], [true, true, true, true, null, true]);
   }
   if (how === 'start2'){
     /* the demo quit by key 2, out to $AC27, Num_Players 2: gameDispatch's
@@ -1910,7 +1969,7 @@ function liveGate(L, who, how){
           [-1, null, seq.length, true, false, 5, true, wantStage]);
     check(`${who}: ...and the boot pass is charged within 0.5% of the contended machine`, Math.abs(bootT - 1) < 0.005 ? '' : `ratio ${bootT.toFixed(5)}`, '');
   }
-  else if (how !== 'start' && how !== 'start2'){
+  else if (how !== 'start' && how !== 'start2' && how !== 'menu'){
     /* the machine's samples at the CALL $AD18: the setup's ends */
     const wantIn = L.rows.map((r, i) => subsOf(r).some(x => x.pc === 0xAD18) ? i : -1).filter(i => i >= 0);
     check(`${who}: ...and ${how === 'draw' ? 'out at $AC5F drawn' : 'P1 wins, out to $ACA6 won, on to $AC5F'}, the setup to the CALL $AD18 and on into the next bout at $AE29, to the fixture's last row with no way out (CALL $AD18 sampled on rows ${wantIn.join(', ')})`,
@@ -1921,7 +1980,7 @@ function liveGate(L, who, how){
   const end = how === 'draw' ? sub.findIndex(x => x.t > 1e6) : 0;   // the round end's loop: to the delays
   if (how !== 'boot') check(`${who}: ...which the script reaches ${how === 'draw' ? 'by the clock, no point played, the round end loop then' : 'through points played on, the way out the last, after'} 66 passes of the pose${how === 'won' ? ' and a pass a second' : ''}`,
         [marked.filter(i => i <= out).length, outKind, subs, sub.filter(x => x.pc !== 0xAD6E).length - end, sub.filter(x => x.pc === 0xAD6E).length > 1, end],
-        { won: [1, 'won', sub.length, 66, true, 0], lost: [2, 'lost', sub.length, 66, false, 0], start: [2, 'start', sub.length, 66, false, 0], start2: [2, 'start2', sub.length, 66, false, 0], draw: [1, 'draw', sub.length, 66, false, 3] }[how]);
+        { won: [1, 'won', sub.length, 66, true, 0], lost: [2, 'lost', sub.length, 66, false, 0], start: [2, 'start', sub.length, 66, false, 0], menu: [2, 'menu', sub.length, 66, false, 0], start2: [2, 'start2', sub.length, 66, false, 0], draw: [1, 'draw', sub.length, 66, false, 3] }[how]);
   if (how === 'won' || how === 'draw')
     /* the draw's segment is mostly the pose's last pass, at the D4 means:
        0.16% off; the won one is mostly the tune and the scenery: 0.007%.
@@ -1936,7 +1995,7 @@ function liveGate(L, who, how){
     check(`${who}: ...and the pass from the CALL $AD18 into the next bout's $AE29 is charged within 1% of the contended machine`,
           enterT.map(x => Math.abs(x - 1) < 0.01), [true]);
   const sum = ratio.reduce((a, b) => a + b, 0) / ratio.length, worst = Math.max(...ratio.map(x => Math.abs(x - 1)));
-  checkTrue(`${who}: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round${{ won: ', the pose and the bonus', lost: ' and the pose', start: ', the pose, the demo and the game started', start2: ', the pose, the demo and the 2UP game to time up', boot: ' of the demo from the boot', draw: ', the round end and the draw' }[how]}`,
+  checkTrue(`${who}: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round${{ won: ', the pose and the bonus', lost: ' and the pose', start: ', the pose, the demo and the game started', start2: ', the pose, the demo and the 2UP game to time up', menu: ', the pose, the demo, the options menu and the new demo', boot: ' of the demo from the boot', draw: ', the round end and the draw' }[how]}`,
             Math.abs(sum - 1) < 0.005, `mean ${sum.toFixed(5)}, worst pass ${(worst * 100).toFixed(2)}% off`);
 }
 liveGate(P.assets.live, 'P2', 'lost');
@@ -1944,6 +2003,7 @@ liveGate(P.assets.live_p1w, 'P1', 'won');
 liveGate(P.assets.live_time, 'time', 'draw');
 liveGate(P.assets.live_1up, '1UP', 'start');
 liveGate(P.assets.live_2up, '2UP', 'start2');
+liveGate(P.assets.live_menu, 'menu', 'menu');
 liveGate(P.assets.live_boot, 'boot', 'boot');
 
 /* bouts at dans 2-8, from the user's snapshots (in the new stage's tune
