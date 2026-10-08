@@ -157,6 +157,12 @@
       "note": "live rows for the 1UP game started from the demo, TAPE-DERIVED (gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --passes 1000 --json build/live_1up.json with live's script and ',165:,1:1' after it (key 1 at visit 400, in the demo), live's vars, hashes, skips and marks, --also live's and 0xAD18"
     },
     {
+      "key": "round_ae17",
+      "file": "build/callio_ae17.json",
+      "required": true,
+      "note": "oracle for Two_Player_Round_On $AE17 to $AE29 or $AC34: python tools/callio.py --capture --state p1 --call 0xAE17 0xAE29,0xAC34 --keys 2 --frames 7000, then --derive case 0 with --set 0x9C2B=0 / --up 0xADE0,0xAC34 and --reg 0=0x80 / --set 0xB05F=3 / 0xB05F=3,0xB02E=5 / 0xB05F=3,0xB031=5 / 0xB05F=3,0xB02D=0x20"
+    },
+    {
       "key": "live_2up",
       "file": "build/live_2up.json",
       "required": true,

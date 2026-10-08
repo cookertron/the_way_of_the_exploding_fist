@@ -4,6 +4,7 @@
 name     = "Two_Player_Round_On"
 entries  = ["$AE17"]
 oracle   = "tools/callio.py"
+fixtures = ["round_ae17"]
 manual   = ["7.2"]
 
 [[fact]]
@@ -28,12 +29,17 @@ kind   = "measured"
 says   = "the 2UP game of fact 3's script, 2400 passes: the point back at $AE17 row 599; time up through $ADE2 into the next bout at rows 880, 1301, 1722; at 2143 rank 4: $ADF3, P1's pose ($AE8E), $AC34 and the demo's $AE29 in one row"
 by     = "python scratch/gen2up.py (fact 3's script) 2400 scratch/live_2up_new.json ADE2 ADF3 AC34"
 
-[[open]]
-ask    = "callio cannot replay a bracket from $AE17: $AE25 RET pops $ADE0 (the quit also $AC34) above the entry SP $5BFB, but up_io keeps 'up' only when the exit SP is above entry; the exit at $AE29 is below"
-tried  = "capture --call 0xAE17 0xAE29,0xAC34 --keys 2 --frames 7000: 2 time-up cases (12.9M T); 7 derives (no time up, points, A=$80, B05F=3 x3); --check: call never returned; derives past SP took 1UP paths"
-settle = "callio up_io: keep every byte popped above the entry SP (max SP reached), seed them in --check/--derive; selftest; recapture; python tools/callio.py --check --state p1 --fixture build/callio_ae17.json"
+[[fact]]
+kind   = "measured"
+says   = "callio records \"up\" for any POP/RET at or above the entry SP; --up takes WORD,WORD (2UP: $5BFB $ADE0, $5BFD $AC34); callio_ae17: 2 captured + 6 derived (no time up, quit, game end tie/P1/P2/hi), 0 disagree"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ae17.json"
 
 [[open]]
 ask    = "the port: twoOn $AE17 to $AE29 (roundIn, a point) / $ADE5 (the tune: music '2next', then setupPass twoNext + stage2) / $AC34 (demoIn inline); twoEnd $ADF3 checkHighScore and a pose at sp+2, out by $AE12 winEnd into demoIn inline"
 tried  = "designed, not written; the time up reuses endStart/endPass (sp-2 as 1UP), endTail then twoOn instead of pointPath; Fist.pass's this.two branch now stops at $AE17 (D7)"
 settle = "build.py, kit.test.js on build/live_2up.json from scratch/gen2up.py (2400 passes, fact 3's script, marks + ADE2 ADF3 AC34); liveGate's subsOf drops $AE14 sub-rows unless the row marks $ADE2 or $AC27"
+
+[[open]]
+ask    = "gate callio_ae17 in kit.test.js: twoOn and twoNext/twoEnd against the 8 cases (point, quit to $AC34, time up, rank 3 game end tie/P1/P2/high score)"
+tried  = "fixture captured and derived this session (open 1's answer); the design is in scratch/PORT-PLAN.md"
+settle = "node test/kit.test.js with a round_ae17 gate shaped as point_ad1b's (test/kit.test.js:1121)"

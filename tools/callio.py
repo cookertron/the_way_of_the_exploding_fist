@@ -82,10 +82,12 @@ how many reads were fetches.
              (a menu).  The reads are new, so the parent's log is not
              compared; the case logs its own.  Keys are released after
              the script's last segment.
-             --up WORD puts WORD at SP as the caller's return, recorded
-             as the case's "up": for a bracket entered mid-routine (not
-             at a CALL) whose derived path returns through its caller --
-             the replay's stack is the target's, not play's.
+             --up WORD[,WORD...] puts the words at SP, SP + 2, ... as the
+             callers' returns, recorded as the case's "up": for a bracket
+             entered mid-routine (not at a CALL) whose derived path
+             returns through its callers -- the replay's stack is the
+             target's, not play's.  It must extend the parent's own "up";
+             a derive that pops stack bytes no case recorded is refused.
   --cover    shrink a fixture in place to a greedy cover of its PC sets:
              the fewest cases (most new PCs first) that still reach every
              PC some case reached, plus every derived case.  For a call
@@ -241,14 +243,17 @@ def run_alone(mem, regs, ret, limit=20_000_000, ports=None):
     sim.registers[:] = regs
     r, ops, t0 = sim.registers, sim.opcodes, regs[T]
     mem.regs = r
-    pcs, stop = set(), set(ends(ret))
+    pcs, stop, sp0, popped = set(), set(ends(ret)), regs[SP], set()
     for _ in range(limit):
         pc = r[PC]
         if pc in stop:
-            mem.exit = list(r)
+            mem.exit, mem.popped = list(r), popped
             return r[T] - t0, pcs
         pcs.add(pc)
+        sp = r[SP]
         ops[mem.m[pc]]()
+        if 0 < r[SP] - sp <= 2 and sp >= sp0:      # a POP or RET at or above the entry SP (not LD SP)
+            popped.update(range(sp, r[SP]))
     sys.exit('callio: call never returned to ' + ','.join(f'${e:04X}' for e in stop))
 
 
@@ -290,11 +295,13 @@ def case_io(src, lm, blind):
 
 
 def up_io(src, sp, lm):
-    """A bracket that leaves through its caller's frame (a RET past the
-    entry SP: $AD90 back to $ACA6) pops the bytes at SP and SP + 1, which
-    frame() keeps out of the inputs: record them as "up" so --check can
-    replay the way out."""
-    return {'up': bytes(src[(sp + i) & 0xFFFF] for i in range(2)).hex()} if lm.exit[SP] > sp else {}
+    """A bracket that pops past the entry SP at any point (a RET through its
+    caller's frame: $AD90 back to $ACA6, or $AE25 to $ADE0 that then calls
+    on below it) pops the bytes at SP and SP + 1, which frame() keeps out of
+    the inputs: record them as "up" so --check can replay the way out.  The
+    bytes above SP + 1 are not in the frame and are logged as inputs (a
+    derive may give them in "up" as well, seed_up writes them all)."""
+    return {'up': bytes(src[(sp + i) & 0xFFFF] for i in range(2)).hex()} if sp in lm.popped else {}
 
 
 def seed_up(mem, c):
@@ -527,7 +534,7 @@ def derive(args):
         elif args[0] == '--script':
             script = args[1]; del args[:2]
         elif args[0] == '--up':
-            up = int(args[1], 0); del args[:2]
+            up = [int(w, 0) for w in args[1].split(',')]; del args[:2]
         else:
             sys.exit(f'callio: unknown argument {args[0]}')
     if script is not None and psets:
@@ -542,10 +549,11 @@ def derive(args):
     if missing:
         sys.exit('callio: --set may only change bytes the case read: not '
                  + ' '.join(f'${a:04X}' for a in missing))
-    if up is not None:                             # the caller's return at SP: a way out through it
-        if 'up' in c:
-            sys.exit('callio: --up: the case already returns through its caller')
-        c = {**c, 'up': bytes([up & 0xFF, up >> 8]).hex()}
+    if up is not None:                             # the callers' returns from SP up: ways out through them
+        uh = bytes(b for w in up for b in (w & 0xFF, w >> 8)).hex()
+        if not uh.startswith(c.get('up', '')) or len(uh) <= len(c.get('up', '')):
+            sys.exit('callio: --up must extend the "up" of the case: ' + repr(c.get('up', '')))
+        c = {**c, 'up': uh}
     mem = bytearray(h.memobj.m)                    # the target, for code the case never fetched
     for a, v in {**ins, **sets}.items():
         mem[a] = v
@@ -576,6 +584,11 @@ def derive(args):
     else:
         pl = PortLog(logged=ports)
     dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], ports=pl)
+    known = len(bytes.fromhex(c.get('up', '')))  # bytes above SP the case vouches for: up, then its inputs
+    guess = sorted(a for a in lm.popped if a >= sp + known and a in lm.reads and a not in ins)
+    if guess:                                      # it popped the target's returns, not play's
+        sys.exit('callio: the derived case pops past the entry SP into bytes no case recorded ('
+                 + ' '.join(f'${a:04X}' for a in guess) + '): give the returns of the callers with --up WORD[,WORD]')
     if pl.bad:                                     # stopping early is fine: the case keeps its own log
         sys.exit('callio: the derived case reads the ports differently from its parent; derive another way')
     sig = ''.join(f'{a:04x}' for a in sorted(pcs))

@@ -992,6 +992,28 @@ def t_blitforensics():
 REPO = os.path.dirname(HERE)
 
 
+def t_callio_up():
+    C = mod('callio')
+    from harness import Simulator, SP, PC
+    def go(code, ret):
+        mem = bytearray(0x10000)
+        mem[0x8000:0x8000 + len(code)] = code
+        mem[0x9000:0x9002] = bytes([0x10, 0x80])        # the caller's return at the entry SP: $8010
+        lm = C.Logged(bytes(mem), C.frame(0x9000))
+        regs = list(Simulator(bytearray(0x10000)).registers)
+        regs[PC], regs[SP] = 0x8000, 0x9000
+        C.run_alone(lm, regs, ret)
+        return lm, C.up_io(mem, 0x9000, lm)
+    # RET to $8010, then PUSH HL twice: the exit SP is below the entry, yet $9000 was popped
+    lm, up = go(bytes([0xC9] + [0] * 15 + [0xE5, 0xE5]), 0x8012)
+    eq(lm.exit[SP] < 0x9000, True, 'exit SP below the entry')
+    eq(up, {'up': '1080'}, 'a RET past the entry SP records up whatever the exit SP')
+    eq(sorted(lm.popped), [0x9000, 0x9001], 'the popped bytes')
+    # LD SP,$A000 is no pop: nothing above the entry SP is recorded
+    lm, up = go(bytes([0x31, 0x00, 0xA0, 0x00]), 0x8003)
+    eq((up, lm.popped), ({}, set()), 'LD SP is not a pop')
+
+
 def run_py(script, stdin='', env=None, cwd=None):
     import subprocess
     e = dict(os.environ)
@@ -1382,6 +1404,7 @@ CHECKS = [
     ('portconfig: manifest, defaults, need()', t_portconfig),
     ('stackscan: slot-based frames, discards, fake return, LD SP reset vs switch, ISR', t_stackscan),
     ('blitforensics: two-background differential on known sprites + guards', t_blitforensics),
+    ('callio: up recorded for any pop past the entry SP, not LD SP', t_callio_up),
     ('manual: entries, traps, index, grep across both documents', t_manual_ids),
     ('tools: every script in tools/ has a row in tools/README.md', t_tools_registry),
     ('records: record.py writes each record to its home, refuses what it cannot check', t_records),
