@@ -176,3 +176,7 @@ Scoped commits, one per unit of work, each with a message that says what
 was measured and what the mutation battery covered.  Suite count in the
 message.  `python tools/record.py draft` writes the mechanical lines; the
 body stays within 15 lines.
+
+## Additional
+
+Use only 20 workers when run mutation battery runs
