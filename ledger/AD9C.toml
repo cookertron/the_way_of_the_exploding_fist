@@ -21,15 +21,15 @@ by     = "python tools/adis.py 0xAD9C 60"
 
 [[fact]]
 kind   = "gated"
-says   = "live_2up follows the machine row for row: key 2 quits the demo at row 401, tune and setup within 0.05%, $AE14 to $AE29 within 2%, unkeyed to time up at row 816, the engine stopped at $AE17 there (D7)"
+says   = "live_2up follows the machine row for row: key 2 quits the demo at row 401, tune and setup within 0.05%, $AE14 to $AE29 within 2%, then the 2UP game on through $AE17's ways (ledger/AE17.toml)"
 by     = "node test/kit.test.js (live block, the 2UP rows)"
 
-[[open]]
-ask    = "the 2UP game's ways on from $AE17: round end, point, next round via $AE1F JR Z $AE14, bout won ($ADE2 on), high score at $ADF3"
-tried  = "live_2up runs to row 1500: the machine re-enters $AE14 at rows 816 and 1237 after each time up"
-settle = "python tools/callio.py --capture --state p1 --call 0xAE17 0xAE29,0xAC34 with key 2 in the demo; sample.py live_2up past row 816"
+[[fact]]
+kind   = "measured"
+says   = "answered by $AE17 (ledger/AE17.toml): its ways on ported and gated, callio_ae17 and live_2up to row 2400"
+by     = "node test/kit.test.js"
 
-[[open]]
-ask    = "mutant 'ad9c: Fist: the 2UP game's points played as 1UP' survives: no gate scores a 2UP point yet (live_2up ends at time up)"
-tried  = "affected run 2026-10-08: survived; live_2up has no keys after the start, so roundTail's first exit is 'end'"
-settle = "a 2UP live fixture with P1 keyed to score a point after key 2 (unit AE17), then python tools/mutants.py --match \"ad9c: Fist\""
+[[fact]]
+kind   = "measured"
+says   = "the mutant 'ad9c: Fist: the 2UP game's points played as 1UP' is now killed: live_2up scores P1 a 2UP point (row 599)"
+by     = "python tools/mutants.py --match \"points played as 1UP\""

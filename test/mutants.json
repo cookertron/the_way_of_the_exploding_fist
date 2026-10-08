@@ -3370,10 +3370,9 @@
  {
   "file": "template.html",
   "label": "AD44 time: Fist: the draw's pose one CALL deeper",
-  "old": "(this.sp + (this.both === 'draw' ? 2 : -2))",
-  "new": "(this.sp + (this.both === 'draw' ? -2 : -2))",
-  "increment": "AD44-time",
-  "kills": "time: roundPass, the round end and the draw follow the machine sample for sample over keyed 1P play until the bout ends"
+  "old": "(this.sp + (this.both === 'end' ? -2 : 2))",
+  "new": "(this.sp + (this.both === 'end' ? -2 : -2))",
+  "increment": "AD44-time"
  },
  {
   "file": "template.html",
@@ -3810,10 +3809,9 @@
  {
   "file": "template.html",
   "label": "AD18 in: Fist.setupPass: round_loop not entered after the setup",
-  "old": "this.stage = this.setup.stage; this.setup = null; this.enter = true;",
-  "new": "this.stage = this.setup.stage; this.setup = null;",
-  "increment": "AD18-in",
-  "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
+  "old": "this.stage = this.setup.stage && !end; this.setup = null; this.enter = !end;",
+  "new": "this.stage = this.setup.stage && !end; this.setup = null; this.enter = false;",
+  "increment": "AD18-in"
  },
  {
   "file": "template.html",
@@ -4187,8 +4185,8 @@
  {
   "file": "template.html",
   "label": "ABB9: Fist.winPass: the demo's pose ends without XOR A: RET",
-  "old": "      if (w.out && this.demo){ t += winEnd(); this.win = 0; this.demoNext = 0; }",
-  "new": "      if (w.out && this.demo){ this.win = 0; this.demoNext = 0; }",
+  "old": "      else if (w.out && this.demo){ t += winEnd(); this.win = 0; this.demoNext = 0; }",
+  "new": "      else if (w.out && this.demo){ this.win = 0; this.demoNext = 0; }",
   "increment": "ABB9"
  },
  {
@@ -4201,7 +4199,7 @@
  {
   "file": "template.html",
   "label": "ABB9: Fist.pass: the demo's exits go the game's way (ABCB's dropped guard)",
-  "old": "    if (this.demo) cost += this.demoOut(res);       // the demo's ways on",
+  "old": "    if (demo) cost += this.demoOut(res);           // the demo's ways on",
   "new": "    if (false) cost += this.demoOut(res);",
   "increment": "ABB9"
  },
@@ -4533,18 +4531,16 @@
  {
   "file": "template.html",
   "label": "ad9c: Fist: the 2UP tune skipped",
-  "old": "s = how === '2up' ? { t: introMusic(this.m, outs, 0), stage: true }",
-  "new": "s = how === '2up' ? { t: 0, stage: true }",
-  "increment": "AD9C",
-  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+  "old": "s = how === '2up' || how === '2next' ? { t: introMusic(this.m, outs, 0), stage: true }",
+  "new": "s = how === '2up' || how === '2next' ? { t: 0, stage: true }",
+  "increment": "AD9C"
  },
  {
   "file": "template.html",
   "label": "ad9c: Fist: the 2UP setup as the 1UP's",
-  "old": "u = this.setup.how === '2up' ? start2Rest(this.m) + stage2(this.m, cost) :",
-  "new": "u = false ? start2Rest(this.m) + stage2(this.m, cost) :",
-  "increment": "AD9C",
-  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+  "old": "else u = how === '2up' ? start2Rest(this.m) + stage2(this.m, cost) :",
+  "new": "else u = false ? start2Rest(this.m) + stage2(this.m, cost) :",
+  "increment": "AD9C"
  },
  {
   "file": "template.html",
@@ -4556,18 +4552,90 @@
  },
  {
   "file": "template.html",
-  "label": "ad9c: Fist: the 2UP round end played as 1UP",
-  "old": "    else if (this.two){ if (res.exit) res.at = 0xAE17; }",
-  "new": "    else if (false){ if (res.exit) res.at = 0xAE17; }",
-  "increment": "AD9C",
-  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+  "label": "AE17: twoOn: the quit's RET M at $ADE0 not taken",
+  "old": "if (a & 0x80) return (t += 6 + 4 + 11, M1.m1 += 2, out('quit'));",
+  "new": "if (a & 0x80) return (t += 6 + 4 + 5, M1.m1 += 2, out('quit'));",
+  "increment": "AE17",
+  "kills": "twoOn and the 2UP game's ways on match the real $AE17"
  },
  {
   "file": "template.html",
-  "label": "ad9c: Fist: the stop at $AE14",
-  "old": "if (res.exit) res.at = 0xAE17; }",
-  "new": "if (res.exit) res.at = 0xAE14; }",
-  "increment": "AD9C",
-  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+  "label": "AE17: twoOn: time up's RET M at $ADE0 taken",
+  "old": "t += 7 + 10 + 4 + 5; M1.m1 += 3;                 // RET: $ADE0 AND A: RET M",
+  "new": "t += 7 + 10 + 4 + 11; M1.m1 += 3;",
+  "increment": "AE17",
+  "kills": "twoOn and the 2UP game's ways on match the real $AE17"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: twoOn: the point's New_Round dropped",
+  "old": "t += 17 + newRound(m, M1); M1.m1 += 1;           // CALL New_Round\n  t += award(m)",
+  "new": "t += 17; M1.m1 += 1;\n  t += award(m)",
+  "increment": "AE17",
+  "kills": "twoOn and the 2UP game's ways on match the real $AE17"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: stageStep: the stage wraps to 2",
+  "old": "m[0xAF34] = 1; M1.m1 += 4;                       // LD A,1",
+  "new": "m[0xAF34] = 2; M1.m1 += 4;                       // LD A,1",
+  "increment": "AE17",
+  "kills": "2UP: roundPass and the victory pose follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: twoNext: the game ends at rank 5",
+  "old": "if (++m[0xB05F] === 4) return { t: t + 12, end: true };",
+  "new": "if (++m[0xB05F] === 5) return { t: t + 12, end: true };",
+  "increment": "AE17",
+  "kills": "twoOn and the 2UP game's ways on match the real $AE17"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: twoEnd: $A6B6 1 poses P2",
+  "old": "const A = v === 1 ? 0xAA00 : 0xAA40;",
+  "new": "const A = v === 2 ? 0xAA00 : 0xAA40;",
+  "increment": "AE17",
+  "kills": "twoOn and the 2UP game's ways on match the real $AE17"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: twoOut: P1's JR $AE12 dropped",
+  "old": "  M1.m1 += 1;\n  return 12 + winEnd();",
+  "new": "  return winEnd();",
+  "increment": "AE17",
+  "kills": "twoOn and the 2UP game's ways on match the real $AE17"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: Fist.winPass: the 2UP pose at the 1UP's SP",
+  "old": "(this.sp + (this.two ? 2 : 0))",
+  "new": "(this.sp + (this.two ? 0 : 0))",
+  "increment": "AE17",
+  "kills": "2UP: roundPass and the victory pose follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: Fist.twoDemo: the demo not resumed",
+  "old": "this.two = false; this.demo = true; this.stage = true;\n    return (u - cost.scen)",
+  "new": "this.two = false; this.demo = false; this.stage = true;\n    return (u - cost.scen)",
+  "increment": "AE17",
+  "kills": "2UP: roundPass and the victory pose follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: Fist.endPass: the 2UP round end's delays uncharged",
+  "old": "t += e.t; this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F); this.both = null;\n      const u = this.twoWay",
+  "new": "this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F); this.both = null;\n      const u = this.twoWay",
+  "increment": "AE17",
+  "kills": "2UP: ...and the passes from $ABB9 and from each round end's last"
+ },
+ {
+  "file": "template.html",
+  "label": "AE17: Fist.setupPass: the game end always P2's pose",
+  "old": "if (end){ if (end.A) this.win = end.A; else this.both = 'two'; }",
+  "new": "if (end){ this.win = 0xAA40; }",
+  "increment": "AE17",
+  "kills": "2UP: roundPass and the victory pose follow the machine sample for sample"
  }
 ]

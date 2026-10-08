@@ -5,6 +5,7 @@ name     = "Two_Player_Round_On"
 entries  = ["$AE17"]
 oracle   = "tools/callio.py"
 fixtures = ["round_ae17"]
+port     = "twoOn"
 manual   = ["7.2"]
 
 [[fact]]
@@ -34,12 +35,12 @@ kind   = "measured"
 says   = "callio records \"up\" for any POP/RET at or above the entry SP; --up takes WORD,WORD (2UP: $5BFB $ADE0, $5BFD $AC34); callio_ae17: 2 captured + 6 derived (no time up, quit, game end tie/P1/P2/hi), 0 disagree"
 by     = "python tools/callio.py --check --state p1 --fixture build/callio_ae17.json"
 
-[[open]]
-ask    = "the port: twoOn $AE17 to $AE29 (roundIn, a point) / $ADE5 (the tune: music '2next', then setupPass twoNext + stage2) / $AC34 (demoIn inline); twoEnd $ADF3 checkHighScore and a pose at sp+2, out by $AE12 winEnd into demoIn inline"
-tried  = "designed, not written; the time up reuses endStart/endPass (sp-2 as 1UP), endTail then twoOn instead of pointPath; Fist.pass's this.two branch now stops at $AE17 (D7)"
-settle = "build.py, kit.test.js on build/live_2up.json from scratch/gen2up.py (2400 passes, fact 3's script, marks + ADE2 ADF3 AC34); liveGate's subsOf drops $AE14 sub-rows unless the row marks $ADE2 or $AC27"
+[[fact]]
+kind   = "measured"
+says   = "round_ae17 gated: twoOn and its ways on as the engine runs them, 8 cases exact (bytes, PC, T, R, the tune's writes); recaptured with start2_ac27's text-cell blinds (D5), T and R unchanged"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ae17.json ; node test/kit.test.js"
 
-[[open]]
-ask    = "gate callio_ae17 in kit.test.js: twoOn and twoNext/twoEnd against the 8 cases (point, quit to $AC34, time up, rank 3 game end tie/P1/P2/high score)"
-tried  = "fixture captured and derived this session (open 1's answer); the design is in scratch/PORT-PLAN.md"
-settle = "node test/kit.test.js with a round_ae17 gate shaped as point_ad1b's (test/kit.test.js:1121)"
+[[fact]]
+kind   = "measured"
+says   = "ported; live_2up (2400 passes) followed row for row: point 599, time ups 880 1301 1722, rank-4 end with P1's pose out to $AC34 and the demo at 2143; tune passes within 0.05%, end pass 0.37% under"
+by     = "python tools/build.py ; node test/kit.test.js ; node scratch/endpass.js"

@@ -1151,6 +1151,63 @@ const mockCtx = (state) => ({
          fx.cases.some(c => set(c).b019 === 8 && set(c).b030 === 9)], [true, true, true]);
 }
 
+/* ---- the 2UP game's ways on from $AE17, against its frozen oracle -------
+   python tools/callio.py --capture --state p1 --call 0xAE17 0xAE29,0xAC34
+   (the 2UP game of live_2up's script: its time ups into the next bout; a
+   point back in, the quit and the game ends at rank 3 -- both posed, P1,
+   P2, a high score -- derived, the RETs to $ADE0 and $AC34 with --up,
+   port.json).  twoOn, and for time up stageStep, the tune, twoNext and
+   stage2 with roundIn, or twoEnd, the pose's loop (winPass at the SP of
+   $AD9C's level, the call's) and twoOut, as the live engine runs them.
+   Exact as pointPath's, and the tune's $FE writes at their T. */
+{
+  const fx = P.assets.round_ae17;
+  const iA = fx.regs.indexOf(0);
+  const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
+  let bad = 0, first = '', badO = 0;
+  const kinds = [];
+  for (let i = 0; i < fx.cases.length; i++){
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(0xA5);
+    for (const [a, h] of c.in) m.set(Buffer.from(h, 'hex'), a);
+    const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
+    const u = P.twoOn(m, c.regs[iA], c.r), outs = [];
+    let t = u.t, at = u.exit === 'quit' ? 0xAC34 : u.exit === null ? 0xAE29 : 0, kind = u.exit || 'point';
+    if (u.exit === 'time'){
+      t += P.stageStep(m);
+      t += P.introMusic(m, outs, t);
+      const n = P.twoNext(m);
+      t += n.t;
+      if (!n.end){ t += P.stage2(m) + P.roundIn(m, c.r); at = 0xAE29; }
+      else {
+        const e = P.twoEnd(m);
+        t += e.t; kind = e.A ? `pose ${e.A.toString(16)}` : 'both';
+        for (;;){ const w = P.winPass(m, e.A || 0xAA00, c.sp); t += w.t; if (w.out) break; }
+        t += P.twoOut(e.A); at = 0xAC34;
+      }
+    }
+    kinds.push(kind);
+    const r = (c.r & 0x80) | ((c.r + P.M1.m1) & 0x7F);
+    let diff = -1;
+    for (let a = 0; a < 0x10000; a++){
+      if (a === c.sp - 128) a = c.sp + 2;            // the call's own stack frames (callio)
+      if (!inBlind(a) && m[a] !== want[a]){ diff = a; break; }
+    }
+    const wrote = [], blind = [];
+    for (let a = 0; a < 0x10000; a++) if (inBlind(a) && m[a] !== 0xA5) wrote.push(a);
+    for (const [lo, hi] of c.blind || []) for (let a = lo; a <= hi; a++) blind.push(a);
+    const got = [at, t, r, diff, wrote.join() === blind.join()];
+    const w = [c.xpc, c.t, c.rx, -1, true];
+    if (JSON.stringify(got) !== JSON.stringify(w) && !bad++)
+      first = `case ${i}: PC, T, R, first bad byte, score row ${JSON.stringify(got)} want ${JSON.stringify(w)}`;
+    if (JSON.stringify(outs) !== JSON.stringify(c.outs || [])) badO++;
+  }
+  check('twoOn and the 2UP game\'s ways on match the real $AE17 to $AE29 or $AC34 on every case: bytes, PC, T and R exactly', [bad, first], [0, '']);
+  check('...and the tune\'s $FE writes at their T from $AE17, on every case', badO, 0);
+  check('...and the cases take every way: a point back in, the quit, time up into the next bout, and the game end both posed, P1\'s pose and P2\'s',
+        ['point', 'quit', 'time', 'both', 'pose aa00', 'pose aa40'].map(x => kinds.includes(x)), [true, true, true, true, true, true]);
+}
+
 /* ---- the demo's point path $ABCB back to $AE29, against its oracle -----
    python tools/callio.py --capture --call 0xABCB 0xAE29,0xABB9,0xAC00,0xABE5
    (p1, the demo after the lost bout: 7 points back in, 2 won by P1; the
@@ -1686,8 +1743,10 @@ function liveGate(L, who, how){
   /* $AD18 is sampled after the setup (a bout's end, or a game's start at
      $AC27) and inside every point played on
      ($AD42 JR Z): the second is mid-pass in pointPath, so dropped, its T
-     carried into the sample after it */
-  const subsOf = r => (r.s || []).filter(x => x.pc !== 0xAD18 || setupAt(r));
+     carried into the sample after it; the same for the 2UP game's $AE14,
+     kept after its start ($AC27) and time up ($ADE2) */
+  const subsOf = r => (r.s || []).filter(x => x.pc === 0xAD18 ? setupAt(r)
+    : x.pc === 0xAE14 ? r.m.includes(0xADE2) || r.m.includes(0xAC27) : true);   // the 2UP's: its next bouts and its start, not its points
   const IN = how === 'start2' ? 0xAE14 : 0xAD18;   // the setup's CALL: $AD18, the 2UP game's $AE14
   L.rows.slice(1).forEach((r, i) => {
     let carry = 0;
@@ -1717,7 +1776,7 @@ function liveGate(L, who, how){
      pass of its own then enters the next bout's round_loop at $AE29, and
      the gate follows that bout to the fixture's last row */
   const disp = L.hash.findIndex(([lo, hi]) => lo === 0x4000);
-  let at = -1, k = 0, round = 0, subs = 0, setupT = 0, setupM = 0, edges = -1, logN = 0, tail = -1, enters = [], enterT = [], blind = how === 'boot', demoP = -1, demoT = 0, stageAt = [], stageT = [];
+  let at = -1, k = 0, round = 0, subs = 0, setupT = 0, setupM = 0, edges = -1, logN = 0, tail = -1, enters = [], enterT = [], blind = how === 'boot', demoP = -1, demoT = 0, stageAt = [], stageT = [], setups = [];
   for (; k < seq.length; k++){
     if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt && g.demoNext === null){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
     logN = g.sound.log.length;
@@ -1726,6 +1785,7 @@ function liveGate(L, who, how){
       const t1 = g.simT, e = g.sound.log.slice(logN).filter(([f]) => f * P.T_FRAME <= t1);
       edges = e.length; if (edges) tail = t1 - e[edges - 1][0] * P.T_FRAME;
       cost += g.pass(kb); setupT = cost; setupM = seq[k].t;
+      setups.push([seq[k].p, cost / seq[k].t, edges]);
     }
     if (g.exit && g.exit.at !== seq[k].pc){ exit = g.exit.exit; at = seq[k].p; break; }
     if ((g.win || g.bonus || g.both) && seq[k].p <= out) subs++;
@@ -1777,22 +1837,42 @@ function liveGate(L, who, how){
     /* the demo quit by key 2, out to $AC27, Num_Players 2: gameDispatch's
        2UP start to its tune, the tune in that pass, start2Rest and stage2
        to the CALL $AE14 (sampled there), roundIn into the game's first
-       $AE29; both sides played on with no keys to time up: the pass that
-       reaches $AE67 stops the engine at $AE17 (the round end's RET there
-       and $AE17's ways on not ported: D7), on the row the machine marks
-       $AE67 and $AE17; its next rounds start at $AE14 after it */
+       $AE29.  P1 scores a point: the RET to $AE17, twoOn back into $AE29 in
+       the pass.  Time up three times: $AE67's loop, the RET to $AE17, out
+       to $ADE2, the stage step and the tune in that pass, twoNext and
+       stage2 to the CALL $AE14 (sampled there), roundIn the pass after.
+       The fourth, rank 4: twoEnd's high score and P1's pose ($AE8E) in the
+       pass after the tune, then out by $AE12 to $AC34, demoIn in the pose's
+       last pass, and the demo played on to the fixture's last row */
     const wantIn = L.rows.map((r, i) => subsOf(r).some(x => x.pc === 0xAE14) ? i : -1).filter(i => i >= 0);
-    const upAt = L.rows.findIndex((r, i) => i > startAt && r.m.includes(0xAE67));
-    check(`${who}: ...and leave the bout into the demo, quit it by key 2 to $ABB9 and $AC27 (row ${startAt}), start the 2UP game there through its tune and setup to the CALL $AE14 and on into its first $AE29, and play both sides on with no keys to time up, stopped at $AE17 on the machine's row (${upAt})`,
-          [demoP, at, exit, g.exit && g.exit.at, startAt > out, wantIn[0], enters, L.rows[startAt].m.includes(0xABCB), g.two, g.demo, L.rows[upAt].m.includes(0xAE17), wantIn[1] === upAt],
-          [out, upAt, 'end', 0xAE17, true, startAt, [startAt], true, true, false, true, true]);
-    /* the start's pass is mostly the tune: Start_2UP_Game's head to $ADB1
-       and the tune at SETUP_K.tune; the setup's rest, mostly the scenery,
-       is the next pass, SETUP_K.rest and SCEN_K (measured on the 1UP's) */
-    check(`${who}: ...and the passes from $ABB9 through the start's tune and setup are charged within 0.05% of the contended machine, the tune's edges inside them`,
-          [Math.abs(setupT / setupM - 1) < 0.0005, edges], [true, 3422]);
-    check(`${who}: ...and the pass from the CALL $AE14 into the game's first $AE29 is charged within 2% of the contended machine`,
-          enterT.map(x => Math.abs(x - 1) < 0.02), [true]);
+    const point = L.rows.map((r, i) => i > startAt && r.m.includes(0xAE17) && !r.m.includes(0xAE67) ? i : -1).filter(i => i >= 0);
+    const ups = L.rows.map((r, i) => r.m.includes(0xADE2) ? i : -1).filter(i => i >= 0);
+    const endAt = L.rows.findIndex(r => r.m.includes(0xADF3)), endSub = (L.rows[endAt] || {}).s || [];
+    const back = L.rows.map((r, i) => i > endAt && r.m.includes(0xABCB) ? i : -1).filter(i => i >= 0);
+    check(`${who}: ...and leave the bout into the demo, quit it by key 2 to $ABB9 and $AC27 (row ${startAt}), start the 2UP game there to the CALL $AE14 and its first $AE29, play P1's point on through $AE17 (row ${point}), time up through $ADE2 into the next bout by the CALL $AE14 (rows ${ups.slice(0, -1)}), at rank 4 the game's end, P1's pose and out by $AC34 into the demo (row ${endAt}), the demo played on (returns to $ABCB on rows ${back}) to the fixture's last row with no way out`,
+          [demoP, at, exit, k, startAt > out, enters, L.rows[startAt].m.includes(0xABCB), point, ups, ups[ups.length - 1] === endAt,
+           [0xAC34, 0xAC09].map(x => L.rows[endAt].m.includes(x)), endSub.filter(x => x.pc === 0xAE8E).length, back.length > 0, g.two, g.demo],
+          [out, -1, null, seq.length, true, wantIn, true, [599], [880, 1301, 1722, 2143], true,
+           [true, true], 66, true, false, true]);
+    /* the passes with a tune: the start's (Start_2UP_Game's head to $ADB1)
+       and each time up's (the round end's last loop pass, the delays, twoOn
+       and the stage step), at SETUP_K.tune; the setup's rest, mostly the
+       scenery, at SETUP_K.rest and SCEN_K (measured on the 1UP's) -- or,
+       at the game's end, twoEnd to the pose's loop top */
+    check(`${who}: ...and the passes from $ABB9 and from each round end's last through the tune and setup are charged within 0.05% of the contended machine, the tune's edges inside them`,
+          setups.map(([p, x, e]) => [p, Math.abs(x - 1) < 0.0005, e]),
+          [startAt, ...ups].map(p => [p, true, 3422]));
+    check(`${who}: ...and the passes from the CALL $AE14 into each bout's first $AE29 are charged within 2% of the contended machine`,
+          enterT.map(x => Math.abs(x - 1) < 0.02), wantIn.map(() => true));
+    /* the pose's last pass, $AE12 out to $AC34, and demoIn (charged as
+       demoPass: mostly the scenery).  0.5%: 0.37% under here (1040240 T
+       charged, 1044135 on the machine); the pose's own passes are 0.988 to
+       1.008 of the machine's one by one, mean 0.998 (the engine's passes
+       against row 2143's $AE8E sub-rows, unit AE17), and the same demoIn path took 771382 and
+       768438 T on the machine (the boot gate's frame-phase spread) */
+    const endK = seq.findIndex(x => x.p === endAt && !x.sub);
+    check(`${who}: ...and the pass out of the game's end into the demo's $AE29 is charged within 0.5% of the contended machine`,
+          Math.abs(ratio[endK] - 1) < 0.005 ? '' : `ratio ${ratio[endK]}`, '');
   }
   if (how === 'lost'){
     check(`${who}: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo through its points (returns to $ABCB on rows ${demoRet.join(', ')}) to the fixture's last row with no way out`,
