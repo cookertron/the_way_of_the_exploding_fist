@@ -2742,13 +2742,25 @@ function demoIn(m, r, cost){
 }
 /* $AC27, Main_Game_Loop's dispatch after Demo_Mode's RET: Num_Players 0
    (the demo ran out, or its menu key) is the JR Z to $AC09 and a new demo,
-   to its first $AE29; 1 or 2 start a game (not ported yet: D7), at $AC27
-   with T 0.  Gated against python tools/callio.py --capture --state p1
-   --call 0xAC27 0xAE29 (build/callio_ac27.json).  cost.scen as demoIn's. */
+   to its first $AE29; 1 is CALL Start_1UP_Game $AC3E: rank, demo flag and
+   points cleared, $AF35 = $AA46 = 1, $AA3C = $AF34 = 2, Reset_Score $AF0B
+   (the six bytes from $B02D), on to $AC5F, the setup the next bout's is
+   (setupMusic, setupRest, roundIn); 2 (Start_2UP_Game $AD9C, not ported
+   yet: D7) stays at $AC27 with T 0.  Gated against python tools/callio.py
+   --capture --state p1 --call 0xAC27 0xAE29 (build/callio_ac27.json; with
+   --keys 1, build/callio_ac27_1up.json).  cost.scen as demoIn's. */
 function gameDispatch(m, r, cost){
-  if (m[0x9C2C]) return { t: 0, at: 0xAC27 };
+  const n = m[0x9C2C];
+  if (n > 1) return { t: 0, at: 0xAC27 };
   M1.m1 += 3;                                      // LD A,(Num_Players): AND A: JR Z
-  return { t: 13 + 4 + 12 + mainLoop(m, r, cost), at: 0xAE29 };
+  if (!n) return { t: 13 + 4 + 12 + mainLoop(m, r, cost), at: 0xAE29 };
+  m[0xAA80] = m[0xB05F] = m[0xAA06] = m[0xAA08] = m[0xAA48] = 0;
+  m[0xAF35] = m[0xAA46] = 1; m[0xAA3C] = m[0xAF34] = 2;
+  M1.m1 += 3 + 13;                                 // CP 1: JR Z: CALL $AC3E .. CALL Reset_Score
+  let t = 13 + 4 + 7 + 7 + 12 + 17 + 4 + 5 * 13 + 4 + 2 * 13 + 4 + 2 * 13 + 17;
+  m.fill(0, 0xB02D, 0xB033);                       // LD HL: LD (HL),0: LD DE: INC DE: LD BC,5: LDIR: RET
+  t += 10 + 10 + 10 + 6 + 10 + 4 * 21 + 16 + 10; M1.m1 += 5 + 2 * 5 + 1;
+  return { t, at: 0xAC5F };
 }
 /* $AC09 Main_Game_Loop to the demo's first $AE29 */
 function mainLoop(m, r, cost){
@@ -2824,7 +2836,7 @@ class Fist {
     if (this.win || this.bonus) return this.winPass();
     if (this.both) return this.endPass();
     this.stage = false;
-    const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0 } };
+    const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0, t: 0 } };   // t stays 0 if the pass leaves before $BF13 (a quit)
     const res = roundPass(this.m, io, this.sp, this.demo);
     let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
     if (this.demo) cost += this.demoOut(res);       // the demo's ways on
@@ -2873,7 +2885,9 @@ class Fist {
   }
   /* $ABB9 on: demoOn, the next demo stage charged as demoPass, or out to
      $AC27: with Num_Players 0 gameDispatch's new demo, charged the same;
-     a game started (not ported yet: D7) stops the engine there */
+     1, the 1UP game's start to $AC5F and its tune in this pass, as next()'s
+     (the setup and roundIn the passes after); 2 (not ported yet: D7) stops
+     the engine there */
   demoNextPass(){
     M1.m1 = 0;
     const cost = { scen: 0 }, a = this.demoNext, u = demoOn(this.m, a, this.r, cost);
@@ -2881,11 +2895,12 @@ class Fist {
       const d = gameDispatch(this.m, this.r, cost);
       u.t += d.t; u.at = d.at;
     }
-    const t = u.at === 0xAC27 ? u.t : (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];
+    let t = u.at === 0xAE29 ? (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]] : u.t;
+    if (u.at === 0xAC5F){ this.demo = false; t += this.music('start', t); }
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.demoNext = null;
     if (u.at === 0xAC27) this.exit = { exit: a & 0x80 ? 'quit' : 'over', at: 0xAC27, r: this.r, t };
-    else this.stage = true;
+    else if (u.at === 0xAE29) this.stage = true;
     this.simT += t; this.passes++;
     return t;
   }

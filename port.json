@@ -151,6 +151,12 @@
       "note": "live rows for time up and the draw, TAPE-DERIVED (gitignored, rule 7), the start constructed: python tools/sample.py --state p1 --at 0xAE29 --poke 0x9CA5=1 --passes 200 --also 0xAD0B --also 0xAE8E --also 0xAEB2 --also 0xAD6E --also 0xAD18 --json build/live_time.json with live_p1w's script, vars, marks, hashes (with 0x4800-0x5AFF) and skips; the setup sampled at $AD18"
     },
     {
+      "key": "live_1up",
+      "file": "build/live_1up.json",
+      "required": true,
+      "note": "live rows for the 1UP game started from the demo, TAPE-DERIVED (gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --passes 1000 --json build/live_1up.json with live's script and ',165:,1:1' after it (key 1 at visit 400, in the demo), live's vars, hashes, skips and marks, --also live's and 0xAD18"
+    },
+    {
       "key": "live_p1w",
       "file": "build/live_p1w.json",
       "required": true,
@@ -167,6 +173,12 @@
       "file": "build/callio_ac27.json",
       "required": true,
       "note": "oracle for Main_Game_Loop's dispatch $AC27 after the demo's fourth stage (Num_Players 0: JR Z to $AC09, a new demo) to its first $AE29: python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29 --frames 12000 with demo_ac3c's blinds (the text cells, D5)"
+    },
+    {
+      "key": "start_ac27",
+      "file": "build/callio_ac27_1up.json",
+      "required": true,
+      "note": "oracle for $AC27 with Num_Players 1 (the demo quit by key 1): Start_1UP_Game $AC3E, Reset_Score, the setup's tune and rest, CALL $AD18, to the game's first $AE29: python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29 --frames 4000 --keys 1 --per 1 with setup_ac5f's blinds (the text cells, D5)"
     },
     {
       "key": "demo_abcb",

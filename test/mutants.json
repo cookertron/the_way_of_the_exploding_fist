@@ -4194,8 +4194,8 @@
  {
   "file": "template.html",
   "label": "ABB9: Fist.demoNextPass: the scenery at stage 2's factor",
-  "old": "(u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];",
-  "new": "(u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[2];",
+  "old": "    let t = u.at === 0xAE29 ? (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]] : u.t;",
+  "new": "    let t = u.at === 0xAE29 ? (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[2] : u.t;",
   "increment": "ABB9"
  },
  {
@@ -4247,10 +4247,10 @@
  {
   "file": "template.html",
   "label": "ac27: Num_Players ignored",
-  "old": "  if (m[0x9C2C]) return { t: 0, at: 0xAC27 };",
+  "old": "  if (n > 1) return { t: 0, at: 0xAC27 };",
   "new": "  if (false) return { t: 0, at: 0xAC27 };",
   "increment": "AC27",
-  "kills": "...and Num_Players 1 or 2 (a game started, not ported: D7) stays at $AC27"
+  "kills": "...and Num_Players 2 (Start_2UP_Game, not ported: D7) stays at $AC27"
  },
  {
   "file": "template.html",
@@ -4262,8 +4262,120 @@
  {
   "file": "template.html",
   "label": "ac27: the new demo charged unscaled",
-  "old": "    const t = u.at === 0xAC27 ? u.t : (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);\n    this.demoNext = null;",
-  "new": "    const t = u.at === 0xAC27 || this.m[0xB05F] === 0 ? u.t : (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);\n    this.demoNext = null;",
+  "old": "    let t = u.at === 0xAE29 ? (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]] : u.t;",
+  "new": "    let t = u.at === 0xAE29 && this.m[0xB05F] !== 0 ? (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]] : u.t;",
   "increment": "AC27"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: Num_Players 1 taken as a new demo",
+  "old": "  if (!n) return { t: 13 + 4 + 12 + mainLoop",
+  "new": "  if (n < 2) return { t: 13 + 4 + 12 + mainLoop",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: Also_Rank left",
+  "old": "  m[0xAA80] = m[0xB05F] = m[0xAA06]",
+  "new": "  m[0xB05F] = m[0xAA06]",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: P2's points left",
+  "old": "m[0xAA08] = m[0xAA48] = 0;\n  m[0xAF35]",
+  "new": "m[0xAA08] = 0;\n  m[0xAF35]",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: $AA46 left",
+  "old": "  m[0xAF35] = m[0xAA46] = 1;",
+  "new": "  m[0xAF35] = 1;",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: $AA3C left",
+  "old": "m[0xAA3C] = m[0xAF34] = 2;",
+  "new": "m[0xAF34] = 2;",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: the start's stage 1",
+  "old": "m[0xAA3C] = m[0xAF34] = 2;",
+  "new": "m[0xAA3C] = 2; m[0xAF34] = 1;",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: Reset_Score one byte short",
+  "old": "m.fill(0, 0xB02D, 0xB033);",
+  "new": "m.fill(0, 0xB02D, 0xB032);",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: the M1 recount's old error",
+  "old": "  M1.m1 += 3 + 13;",
+  "new": "  M1.m1 += 3 + 12;",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: LDIR's last iteration at 21",
+  "old": "4 * 21 + 16 + 10; M1.m1",
+  "new": "5 * 21 + 10; M1.m1",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up: CP 1's JR Z at 7",
+  "old": "13 + 4 + 7 + 7 + 12 + 17 + 4",
+  "new": "13 + 4 + 7 + 7 + 7 + 17 + 4",
+  "increment": "AC27 1UP",
+  "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up live: a quit pass's $BF13 T left undefined",
+  "old": "cost: { dec: 0, copy: 0, ldir: 0, t: 0 } };",
+  "new": "cost: { dec: 0, copy: 0, ldir: 0 } };",
+  "increment": "AC27 1UP",
+  "kills": "1UP: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round, the pose, the demo and the game started"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up live: round_loop still the demo's after the start",
+  "old": "if (u.at === 0xAC5F){ this.demo = false; t += this.music('start', t); }",
+  "new": "if (u.at === 0xAC5F){ t += this.music('start', t); }",
+  "increment": "AC27 1UP",
+  "kills": "1UP: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up live: the start's tune not played",
+  "old": "if (u.at === 0xAC5F){ this.demo = false; t += this.music('start', t); }",
+  "new": "if (u.at === 0xAC5F){ this.demo = false; this.setup = { how: 'start', stage: true }; }",
+  "increment": "AC27 1UP",
+  "kills": "1UP: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27 1up live: the start stops the engine",
+  "old": "    else if (u.at === 0xAE29) this.stage = true;",
+  "new": "    else if (u.at === 0xAE29) this.stage = true;\n    if (u.at === 0xAC5F) this.exit = { exit: 'start', at: 0xAC5F, r: this.r, t };",
+  "increment": "AC27 1UP",
+  "kills": "1UP: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  }
 ]

@@ -1598,9 +1598,29 @@ function demoEntry(fx, run){
   const fx = P.assets.demo_ac27;
   check("gameDispatch matches the real $AC27 (Num_Players 0: JR Z, a new demo) to its first $AE29: bytes, text cells, T and R exactly",
         demoEntry(fx, (m, r) => { const d = P.gameDispatch(m, r); return d.at === 0xAE29 ? d.t : -1; }), [0, '']);
-  const m = new Uint8Array(0x10000); m[0x9C2C] = 1;
+  const m = new Uint8Array(0x10000); m[0x9C2C] = 2;
   let d; try { d = P.gameDispatch(m, 0); } catch (e){ d = e.message; }
-  check('...and Num_Players 1 or 2 (a game started, not ported: D7) stays at $AC27', d, { t: 0, at: 0xAC27 });
+  check('...and Num_Players 2 (Start_2UP_Game, not ported: D7) stays at $AC27', d, { t: 0, at: 0xAC27 });
+}
+/* python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29 --keys 1
+   (port.json start_ac27: the demo quit by key 1, Num_Players 1).
+   gameDispatch to $AC5F, then setupMusic, setupRest and roundIn as the live
+   engine runs them: demoIn's gate, and the tune's $FE writes at their T. */
+{
+  const fx = P.assets.start_ac27;
+  const outs = [], all = [];
+  check("gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly",
+        demoEntry(fx, (m, r) => {
+          const d = P.gameDispatch(m, r);
+          if (d.at !== 0xAC5F) return -1;
+          outs.length = 0;
+          const s = P.setupMusic(m, outs);
+          all.push(JSON.stringify(outs.map(([u, v]) => [u + d.t, v])));
+          return d.t + s.t + P.setupRest(m, s.stage) + P.roundIn(m, r);
+        }), [0, '']);
+  check("...and the tune's $FE writes at their T from $AC27, on every case",
+        [all.length, fx.cases.every((c, i) => all[i] === JSON.stringify(c.outs || [])), fx.cases.map(c => (c.outs || []).length)],
+        [fx.cases.length, true, [3422]]);
 }
 
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
@@ -1617,7 +1637,9 @@ function demoEntry(fx, run){
    first point wins for P1, the pose $AE8E, the time bonus $AD6E, out won)
    and live_time (Time poked to 1: no point, the round end $AE67 and its
    loop $AD0B, the draw at $AD44 and both posing again at $AD0B, out at
-   $AC5F to the next bout). */
+   $AC5F to the next bout); and live_1up (live's, with key 1 pressed in the
+   demo: its quit to $ABB9, $AC27 with Num_Players 1, the 1UP game's tune
+   and setup to the CALL $AD18, sampled there, and the game played on). */
 function liveGate(L, who, how){
   const fnv = (m, lo, hi) => { let h = 0x811C9DC5;
     for (let a = lo; a <= hi; a++){
@@ -1638,8 +1660,9 @@ function liveGate(L, who, how){
   check(`${who}: the engine starts from the first row the machine sampled`, row(g.m, g.r), want(L.rows[0]));
   /* the machine's samples in order: each row's --also rows (sample.py: the
      victory pose's loop top $AEB2) before it */
-  const seq = [], setupAt = r => r.m.includes(0xACA6);
-  /* $AD18 is sampled after the setup and inside every point played on
+  const seq = [], setupAt = r => r.m.includes(0xACA6) || r.m.includes(0xAC27);
+  /* $AD18 is sampled after the setup (a bout's end, or a game's start at
+     $AC27) and inside every point played on
      ($AD42 JR Z): the second is mid-pass in pointPath, so dropped, its T
      carried into the sample after it */
   const subsOf = r => (r.s || []).filter(x => x.pc !== 0xAD18 || setupAt(r));
@@ -1698,7 +1721,7 @@ function liveGate(L, who, how){
     }
     if (g.exit){ exit = g.exit.exit; at = seq[k].p; break; }   // stopped where the machine was sampled: the row compared first
   }
-  const what = { won: ', the victory pose and the time bonus', lost: ' and the victory pose', draw: ', the round end and the draw' }[how];
+  const what = { won: ', the victory pose and the time bonus', lost: ' and the victory pose', start: ' and the victory pose', draw: ', the round end and the draw' }[how];
   check(`${who}: roundPass${what} follow the machine sample for sample over keyed 1P play until the bout ends`, first, '');
   /* lost: the high score checked, sampled at $AC3C; Main_Game_Loop's rows
      and Demo_Mode (demoIn, a pass of its own) into the demo's $AE29, the
@@ -1706,6 +1729,27 @@ function liveGate(L, who, how){
      (the machine's returns from $AE26 to $ABCB), its poses to $ABB9 and
      on into the next stage by demoOn, to the fixture's last row */
   const demoRet = L.rows.map((r, i) => i > out && r.m.includes(0xABCB) ? i : -1).filter(i => i >= 0);
+  const startAt = L.rows.findIndex((r, i) => i > out && r.m.includes(0xAC27));
+  if (how === 'start'){
+    /* the demo quit by key 1 (sample.py's script: one pass), RET M to
+       $ABB9 and out to $AC27, Num_Players 1: gameDispatch's 1UP start and
+       the tune in that pass, the setup's rest to the CALL $AD18 (sampled
+       there), roundIn into the game's first $AE29; the game played on
+       with no keys, P2 winning it back into the demo */
+    const lostAt = L.rows.findIndex((r, i) => i > startAt && r.m.includes(0xACA6));
+    const wantIn = L.rows.map((r, i) => subsOf(r).some(x => x.pc === 0xAD18) ? i : -1).filter(i => i >= 0);
+    check(`${who}: ...and leave the bout into the demo, quit it by key 1 to $ABB9 and $AC27 (row ${startAt}), start the 1UP game there through its tune and setup to the CALL $AD18 and on into its first $AE29, and play the game on, lost to P2 back into the demo (row ${lostAt}), to the fixture's last row with no way out`,
+          [demoP, at, exit, k, startAt > out, wantIn[0] === startAt, enters[0] === startAt, L.rows[startAt].m.includes(0xABCB), lostAt > startAt, L.rows[lostAt].m.includes(0xAC09), g.demo],
+          [out, -1, null, seq.length, true, true, true, true, true, true, true]);
+    /* the start's pass is mostly the tune and the scenery, as the won
+       bout's (D4's SETUP_K and SCEN_K, measured there) */
+    check(`${who}: ...and the pass from $ABB9 through the start's tune and setup is charged within 0.05% of the contended machine, the tune's edges inside it`,
+          [Math.abs(setupT / setupM - 1) < 0.0005, edges], [true, 3422]);
+    /* roundIn: 8020 T uncontended, gated exact; the machine 8152 here
+       (1.6% over), 8080 and 8020 after the won and drawn bouts */
+    check(`${who}: ...and the pass from the CALL $AD18 into the game's first $AE29 is charged within 2% of the contended machine`,
+          enterT.map(x => Math.abs(x - 1) < 0.02), [true]);
+  }
   if (how === 'lost'){
     check(`${who}: ...and leave the bout on the sample the machine left (P2 wins, out to $ACA6 lost, the high score checked at $AC3C), into the demo by Main_Game_Loop and Demo_Mode on that row, and play the demo through its points (returns to $ABCB on rows ${demoRet.join(', ')}) to the fixture's last row with no way out`,
           [demoP, at, exit, k, demoRet.length > 0, g.demo, g.demoAt, g.win, g.bonus, g.both, g.setup, L.rows[out].m.includes(0xAC09)],
@@ -1729,7 +1773,7 @@ function liveGate(L, who, how){
           [stageAt, poses, stageT.map((x, j) => Math.abs(x - 1) < (wantStage[j] < newDemo ? 0.002 : 0.007)), wantStage.map(i => L.rows[i].m.includes(0xAC27))],
           [wantStage, [[0xAEB2], [0xAE8E], [0xAE8E], [0xAE8E], [0xAEB2]], wantStage.map(() => true), [false, false, false, true, false]]);
   }
-  else {
+  else if (how !== 'start'){
     /* the machine's samples at the CALL $AD18: the setup's ends */
     const wantIn = L.rows.map((r, i) => subsOf(r).some(x => x.pc === 0xAD18) ? i : -1).filter(i => i >= 0);
     check(`${who}: ...and ${how === 'draw' ? 'out at $AC5F drawn' : 'P1 wins, out to $ACA6 won, on to $AC5F'}, the setup to the CALL $AD18 and on into the next bout at $AE29, to the fixture's last row with no way out (CALL $AD18 sampled on rows ${wantIn.join(', ')})`,
@@ -1740,27 +1784,28 @@ function liveGate(L, who, how){
   const end = how === 'draw' ? sub.findIndex(x => x.t > 1e6) : 0;   // the round end's loop: to the delays
   check(`${who}: ...which the script reaches ${how === 'draw' ? 'by the clock, no point played, the round end loop then' : 'through points played on, the way out the last, after'} 66 passes of the pose${how === 'won' ? ' and a pass a second' : ''}`,
         [marked.filter(i => i <= out).length, outKind, subs, sub.filter(x => x.pc !== 0xAD6E).length - end, sub.filter(x => x.pc === 0xAD6E).length > 1, end],
-        { won: [1, 'won', sub.length, 66, true, 0], lost: [2, 'lost', sub.length, 66, false, 0], draw: [1, 'draw', sub.length, 66, false, 3] }[how]);
-  if (how !== 'lost')
+        { won: [1, 'won', sub.length, 66, true, 0], lost: [2, 'lost', sub.length, 66, false, 0], start: [2, 'start', sub.length, 66, false, 0], draw: [1, 'draw', sub.length, 66, false, 3] }[how]);
+  if (how === 'won' || how === 'draw')
     /* the draw's segment is mostly the pose's last pass, at the D4 means:
        0.16% off; the won one is mostly the tune and the scenery: 0.007%.
        The tune ends on a rest after its last write: 76022 T uncontended
        (build/callio_ac5f.json case 0: T 12260038 at the RET, 12184016) */
     check(`${who}: ...and the pass to $AC5F with ${how === 'won' ? 'the tune (a new stage: the scenery after)' : 'no tune (no new stage)'} and the setup's rest are charged within ${how === 'won' ? '0.05' : '0.2'}% of the contended machine, the tune's edges inside the first, its last at the end of the pass`,
           [Math.abs(setupT / setupM - 1) < (how === 'won' ? 0.0005 : 0.002), edges, how === 'won' ? tail > 70000 && tail < 80000 : tail], [true, how === 'won' ? 3422 : 0, how === 'won' ? true : -1]);
-  if (how !== 'lost')
+  if (how === 'won' || how === 'draw')
     /* roundIn is pointPath's tail, its uncontended T gated exact there
        (build/callio_ad1b.json); the machine's $AD18 to $AE29: 8080 T (P1,
        0.74% over) and 8020 (time, equal) */
     check(`${who}: ...and the pass from the CALL $AD18 into the next bout's $AE29 is charged within 1% of the contended machine`,
           enterT.map(x => Math.abs(x - 1) < 0.01), [true]);
   const sum = ratio.reduce((a, b) => a + b, 0) / ratio.length, worst = Math.max(...ratio.map(x => Math.abs(x - 1)));
-  checkTrue(`${who}: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round${{ won: ', the pose and the bonus', lost: ' and the pose', draw: ', the round end and the draw' }[how]}`,
+  checkTrue(`${who}: the 7.2 charge (uncontended T, $BF13 at the D4 means) is within 0.5% of the contended machine over the round${{ won: ', the pose and the bonus', lost: ' and the pose', start: ', the pose, the demo and the game started', draw: ', the round end and the draw' }[how]}`,
             Math.abs(sum - 1) < 0.005, `mean ${sum.toFixed(5)}, worst pass ${(worst * 100).toFixed(2)}% off`);
 }
 liveGate(P.assets.live, 'P2', 'lost');
 liveGate(P.assets.live_p1w, 'P1', 'won');
 liveGate(P.assets.live_time, 'time', 'draw');
+liveGate(P.assets.live_1up, '1UP', 'start');
 
 /* bouts at dans 2-8, from the user's snapshots (in the new stage's tune
    after a won bout; optional fixtures, absent from a fresh clone): the
