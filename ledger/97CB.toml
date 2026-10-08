@@ -75,5 +75,5 @@ by     = "python tools/callio.py --check --state s1 --fixture build/callio_97cb.
 
 [[fact]]
 kind   = "gated"
-says   = "live at dans 2-8 (the user's snapshots, $9057 cheat undone): the engine follows each bout 400 passes row for row, Also_Rank 2-8, dan 6 P2 winning into the demo; 7.2 charge within 0.5%; a402's index mutated fails dans 3-8"
-by     = "node test/kit.test.js (followGate, dan 2-8)"
+says   = "live at dans 2-10 and past the top (Also_Rank 9, 10; the user's snapshots, $9057 undone): each bout followed 400 passes row for row, dan 6 P2 into the demo; 7.2 within 0.5%; dans 9+ reach no new code ($A614 9/10 in the demo)"
+by     = "node test/kit.test.js (followGate, dan 2-10, top1-2)"

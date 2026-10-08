@@ -265,6 +265,30 @@
       "note": "live rows for a bout at dan 8, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/7th_dan_to_8th_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan8; then python tools/sample.py --state dan8 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
     },
     {
+      "key": "live_dan9",
+      "file": "build/live_dan9.json",
+      "required": false,
+      "note": "live rows for a bout at dan 9, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/8th_dan_to_9th_dan.szx with the user's cheat at $9057 (RET) put back to $3A (SkoolKit snapmod.py -p 0x9057,0x3A), python tools/snapimport.py --save dan9; then python tools/sample.py --state dan9 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_dan10",
+      "file": "build/live_dan10.json",
+      "required": false,
+      "note": "live rows for a bout at dan 10, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/9th_dan_to_10th_dan.szx with the user's cheat at $9057 (RET) put back to $3A (SkoolKit snapmod.py -p 0x9057,0x3A), python tools/snapimport.py --save dan10; then python tools/sample.py --state dan10 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_top1",
+      "file": "build/live_top1.json",
+      "required": false,
+      "note": "live rows for a bout past the top rank (10th dan won again: rank $10 kept, Also_Rank 7+(R AND 3) = 9), TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/10th_dan_1.szx with the user's cheat at $9057 (RET) put back to $3A (SkoolKit snapmod.py -p 0x9057,0x3A), python tools/snapimport.py --save dan10a; then python tools/sample.py --state dan10a --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
+      "key": "live_top2",
+      "file": "build/live_top2.json",
+      "required": false,
+      "note": "live rows for a bout past the top rank (10th dan won again: Also_Rank 10), TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/10th_dan_2.szx with the user's cheat at $9057 (RET) put back to $3A (SkoolKit snapmod.py -p 0x9057,0x3A), python tools/snapimport.py --save dan10b; then python tools/sample.py --state dan10b --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
+    },
+    {
       "key": "live_boot",
       "file": "build/live_boot.json",
       "required": true,

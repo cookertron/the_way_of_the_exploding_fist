@@ -1717,7 +1717,12 @@ function liveGate(L, who, how, menuWay){
   }
   let menuReads = 0, menuSteps = 0, logStart = -1;   // logStart: the sound log's length as the menu closes
   const menuPaid = [];
-  if (L.reads) g.menuRead = n => { kb.releaseAll(); for (const x of rplan[n] || []) kb.press(x); menuReads = n + 1; };
+  /* a menu that never sees its key polls without end once the plan runs
+     out: 64 reads past it, throw -- the pass's catch below fails the row */
+  if (L.reads) g.menuRead = n => {
+    if (n > rplan.length + 64) throw new Error(`menu read ${n} past the ${rplan.length} planned`);
+    kb.releaseAll(); for (const x of rplan[n] || []) kb.press(x); menuReads = n + 1;
+  };
   /* boot: the start is the tape's hand-over at $8800 (sample.py
      --start-here), and row 0 the demo's first $AE29: bootPass runs to it */
   const bootT = how === 'boot' ? g.pass(kb) / L.rows[0].t : 1, bootBorder = g.border;
@@ -2073,10 +2078,13 @@ function followGate(L, who){
         [first, k], ['', seq.length]);
   checkTrue(`${who}: ...and the 7.2 charge is within 0.5% of the contended machine`, Math.abs(sum / k - 1) < 0.005, `mean ${(sum / k).toFixed(5)}`);
 }
-for (let n = 2; n <= 8; n++){
-  const L = P.assets[`live_dan${n}`];
-  if (L) followGate(L, `dan ${n}`);
-  else console.log(`  note  live_dan${n} absent (the user's snapshot, not in the repository): its gate not run`);
+/* dans 2-10, and past the top: 10th dan won again keeps rank $10 and draws
+   Also_Rank 7 + (R AND 3) ($ACA6) -- 9 in top1, 10 in top2 */
+for (const [key, who] of [...[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => [`live_dan${n}`, `dan ${n}`]),
+                          ['live_top1', 'past the top (Also_Rank 9)'], ['live_top2', 'past the top (Also_Rank 10)']]){
+  const L = P.assets[key];
+  if (L) followGate(L, who);
+  else console.log(`  note  ${key} absent (the user's snapshot, not in the repository): its gate not run`);
 }
 
 /* the demo's ways on that live play has not reached yet (its bouts so far
