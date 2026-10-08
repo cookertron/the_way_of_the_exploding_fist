@@ -3,6 +3,6 @@
 
 Unit:     gate helpers, part 2: move the remaining fixture gates (sprdec, 9C6F, 97CB, 976F, 9745, AE26 onward) onto rig.gate.replay, with the corrupt and masked rows
 Step:     first ledger/8C54.toml open 1: cap the port reads in the menu replay so the two crashing menu mutants FAIL a row; then one block at a time, row names kept (mutants.json kills by name)
-Then:     world builders and the on/off identity gate (map: gate, 38 BUILD); per-verdict stamps and pruning for mutants.py (6.12 steps 4, 6); byte-usage map and roster (12.5, 12.6); brief.py, verify_claims.py (12.7)
+Then:     audit gaps: dans 9-10 and past the top rank (2-8 need the user's snapshots); RET M at $AD1C (AD1B, AD44 opens); menu options 97CB's cases reach (Sinclair, Kempston, P2 keys, default). Then world builders, stamps, roster
 Blocked:  none
-Notes:    mutation runs use --jobs 4 (D8). Last full run 2026-10-08 17:10: 605/608 killed, 0 survivors, 0 timeouts, 3 crashes (boot LDIR; the two 8C54 menu cases). rig.gate returns verdicts; blocks keep their check() rows
+Notes:    audit 2026-10-08 found no unported code. Mutation runs use --jobs 4 (D8); last full run 605/608 killed, 0 survivors, 3 crashes (boot LDIR, two 8C54 menu). rig.gate returns verdicts
