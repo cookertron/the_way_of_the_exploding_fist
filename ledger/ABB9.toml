@@ -29,6 +29,11 @@ kind   = "measured"
 says   = "the scenery's contention differs by stage: CALL $9200 to its return 677772/555494 (stage 1), 679719/556840 (2), 685206/557964 (3) T; the old mean left stage 3 0.6% short -- now SCEN_K"
 by     = "python tools/sample.py (live's arguments, --also 0xAB9A --also 0xAB9D, 1500 passes) ; scenery() per stage"
 
+[[fact]]
+kind   = "measured"
+says   = "the machine's contended T for an identical stage pass spreads 0.55% (rows 801, 2830: 744631, 740536; 614767 uncontended, same PCs): the stage pass gate is 0.7%"
+by     = "python tools/callio.py --capture --state p1 --call 0xABB9 0xAE29,0xAC27 --frames 15000 --per 10 (scratch)"
+
 [[open]]
 ask    = "the demo's time up, round end ($AE67 into $ACF0, endPass by demoPoint) and the quit through roundPass -- not yet reached by live play"
 tried  = "live_p1's 1500 rows end both demo bouts by a pose; Fist.demoOut is wiring-checked only"

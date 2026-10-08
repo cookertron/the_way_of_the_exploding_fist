@@ -1553,8 +1553,7 @@ const mockCtx = (state) => ({
    one played, the rest derived with R at the JR set, so the two draws for
    the demo's ranks take each value).  demoIn: every byte outside the stack
    frames and the text cells (D5), the text cells written, T and R. */
-{
-  const fx = P.assets.demo_ac3c;
+function demoEntry(fx, run){
   const inBlind = a => fx.blind.some(([lo, hi]) => lo <= a && a <= hi);
   let bad = 0, first = '';
   for (let i = 0; i < fx.cases.length; i++){
@@ -1564,7 +1563,7 @@ const mockCtx = (state) => ({
     const want = m.slice(); for (const [a, h] of c.out) want.set(Buffer.from(h, 'hex'), a);
     P.M1.m1 = 0;
     let t;
-    try { t = P.demoIn(m, c.r); }
+    try { t = run(m, c.r); }
     catch (e){ if (!bad++) first = `case ${i}: ${e.message}`; continue; }
     let diff = -1;
     for (let x = 0; x < 0x10000; x++){
@@ -1579,12 +1578,29 @@ const mockCtx = (state) => ({
     if (JSON.stringify(got) !== JSON.stringify(wnt) && !bad++)
       first = `case ${i}: T, R, first bad byte, text cells ${JSON.stringify(got)} want ${JSON.stringify(wnt)}`;
   }
+  return [bad, first];
+}
+{
+  const fx = P.assets.demo_ac3c;
   check("demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly",
-        [bad, first], [0, '']);
+        demoEntry(fx, P.demoIn), [0, '']);
   const outAt = (c, x) => { for (const [a, h] of c.out) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
   check('...and the cases draw each demo rank 7-10 for both sides ($AA94, Also_Rank $AA80), R at the JR 94 played, 95, 96, 97 and $7F derived',
         [[0xAA94, 0xAA80].map(x => [...new Set(fx.cases.map(c => outAt(c, x)))].sort()), fx.cases.map(c => c.r)],
         [[[10, 7, 8, 9], [10, 7, 8, 9]], [94, 95, 96, 97, 127]]);
+}
+
+/* ---- Main_Game_Loop's dispatch $AC27 after the demo's RET ------------
+   python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29
+   (port.json demo_ac27: the demo's fourth stage over, Num_Players 0, the
+   JR Z to $AC09 and a new demo).  gameDispatch as demoIn's gate. */
+{
+  const fx = P.assets.demo_ac27;
+  check("gameDispatch matches the real $AC27 (Num_Players 0: JR Z, a new demo) to its first $AE29: bytes, text cells, T and R exactly",
+        demoEntry(fx, (m, r) => { const d = P.gameDispatch(m, r); return d.at === 0xAE29 ? d.t : -1; }), [0, '']);
+  const m = new Uint8Array(0x10000); m[0x9C2C] = 1;
+  let d; try { d = P.gameDispatch(m, 0); } catch (e){ d = e.message; }
+  check('...and Num_Players 1 or 2 (a game started, not ported: D7) stays at $AC27', d, { t: 0, at: 0xAC27 });
 }
 
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
@@ -1697,14 +1713,21 @@ function liveGate(L, who, how){
     /* the demo's pass is mostly the scenery: 640994 T uncontended
        (build/callio_ac3c.json), 768438 on the machine */
     check(`${who}: ...and the pass from $AC3C into the demo's $AE29 is charged within 0.2% of the contended machine`, Math.abs(demoT - 1) < 0.002, true);
-    /* the machine's samples at $ABB9: P2's pose (row 801) and P1's (1407),
-       each on into the next stage (demoOn, a pass of its own, mostly the
-       scenery: charged as demoPass) */
+    /* the machine's samples at $ABB9: P2's pose (row 801) and P1's (1407,
+       2142), each on into the next stage (demoOn, a pass of its own, mostly
+       the scenery: charged as demoPass); at 2543 the demo's fourth, the RET
+       to $AC27 and a new demo (gameDispatch), whose first pose is 2830.
+       0.7%: the machine itself takes 744631 and 740536 T for the identical
+       stage-3 pass of rows 801 and 2830 (614767 T uncontended, the same PCs:
+       python tools/callio.py --capture --call 0xABB9 0xAE29,0xAC27 --frames
+       15000), the contention phase's spread, which D4's means cannot follow;
+       the first demo's stage rows, before it, are held to 0.2% */
     const wantStage = L.rows.map((r, i) => (r.s || []).some(x => x.pc === 0xABB9) ? i : -1).filter(i => i >= 0);
+    const newDemo = wantStage.find(i => L.rows[i].m.includes(0xAC27)) + 1;
     const poses = wantStage.map(i => [...new Set(L.rows[i].s.map(x => x.pc))].filter(x => x !== 0xABB9));
-    check(`${who}: ...and leave the demo's bouts by both poses (sampled at $ABB9 on rows ${wantStage.join(', ')}) on into the next demo stage at $AE29, the stage pass charged within 0.2% of the contended machine`,
-          [stageAt, poses, stageT.map(x => Math.abs(x - 1) < 0.002)],
-          [wantStage, [[0xAEB2], [0xAE8E]], [true, true]]);
+    check(`${who}: ...and leave the demo's bouts by both poses (sampled at $ABB9 on rows ${wantStage.join(', ')}) on into the next demo stage at $AE29 (at the fourth through $AC27 into a new demo), the stage pass charged within 0.2% of the contended machine (0.7% in the new demo)`,
+          [stageAt, poses, stageT.map((x, j) => Math.abs(x - 1) < (wantStage[j] < newDemo ? 0.002 : 0.007)), wantStage.map(i => L.rows[i].m.includes(0xAC27))],
+          [wantStage, [[0xAEB2], [0xAE8E], [0xAE8E], [0xAE8E], [0xAEB2]], wantStage.map(() => true), [false, false, false, true, false]]);
   }
   else {
     /* the machine's samples at the CALL $AD18: the setup's ends */

@@ -3953,16 +3953,16 @@
  {
   "file": "template.html",
   "label": "AC09: demoIn: JR Main_Game_Loop T",
-  "old": "  let t = 12; M1.m1 += 1;                          // JR Main_Game_Loop",
-  "new": "  let t = 10; M1.m1 += 1;                          // JR Main_Game_Loop",
+  "old": "  return 12 + mainLoop(m, r, cost);",
+  "new": "  return 10 + mainLoop(m, r, cost);",
   "increment": "AC09",
   "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
  },
  {
   "file": "template.html",
   "label": "AC09: demoIn: JR Main_Game_Loop M1",
-  "old": "  let t = 12; M1.m1 += 1;                          // JR Main_Game_Loop",
-  "new": "  let t = 12; M1.m1 += 2;                          // JR Main_Game_Loop",
+  "old": "  M1.m1 += 1;                                      // JR Main_Game_Loop",
+  "new": "  M1.m1 += 2;                                      // JR Main_Game_Loop",
   "increment": "AC09",
   "kills": "demoIn matches the real $AC3C (Main_Game_Loop's rows, Demo_Mode) to the demo's first $AE29 on every case: bytes, text cells, T and R exactly"
  },
@@ -4227,5 +4227,43 @@
   "new": "  const b = m[0xA614] ? m[0xA614] - 1 : 0, at = base =>",
   "increment": "DAN",
   "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27: the JR Z's T as not taken",
+  "old": "return { t: 13 + 4 + 12 + mainLoop",
+  "new": "return { t: 13 + 4 + 7 + mainLoop",
+  "increment": "AC27",
+  "kills": "gameDispatch matches the real $AC27 (Num_Players 0: JR Z, a new demo) to its first $AE29: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27: the dispatch's M1 dropped",
+  "old": "  M1.m1 += 3;                                      // LD A,(Num_Players): AND A: JR Z",
+  "new": "  M1.m1 += 2;                                      // LD A,(Num_Players): AND A: JR Z",
+  "increment": "AC27",
+  "kills": "gameDispatch matches the real $AC27 (Num_Players 0: JR Z, a new demo) to its first $AE29: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27: Num_Players ignored",
+  "old": "  if (m[0x9C2C]) return { t: 0, at: 0xAC27 };",
+  "new": "  if (false) return { t: 0, at: 0xAC27 };",
+  "increment": "AC27",
+  "kills": "...and Num_Players 1 or 2 (a game started, not ported: D7) stays at $AC27"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27: demoNextPass stops at $AC27 as before",
+  "old": "      const d = gameDispatch(this.m, this.r, cost);\n      u.t += d.t; u.at = d.at;",
+  "new": "      const d = { t: 0, at: 0xAC27 };\n      u.t += d.t; u.at = d.at;",
+  "increment": "AC27"
+ },
+ {
+  "file": "template.html",
+  "label": "ac27: the new demo charged unscaled",
+  "old": "    const t = u.at === 0xAC27 ? u.t : (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);\n    this.demoNext = null;",
+  "new": "    const t = u.at === 0xAC27 || this.m[0xB05F] === 0 ? u.t : (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);\n    this.demoNext = null;",
+  "increment": "AC27"
  }
 ]

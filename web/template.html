@@ -2737,7 +2737,22 @@ function setupRest(m, stage, cost){                // on to $AD18, with the CALL
    --call 0xAC3C 0xAE29 (build/callio_ac3c.json).  cost.scen gets the
    scenery's T, as setupRest's. */
 function demoIn(m, r, cost){
-  let t = 12; M1.m1 += 1;                          // JR Main_Game_Loop
+  M1.m1 += 1;                                      // JR Main_Game_Loop
+  return 12 + mainLoop(m, r, cost);
+}
+/* $AC27, Main_Game_Loop's dispatch after Demo_Mode's RET: Num_Players 0
+   (the demo ran out, or its menu key) is the JR Z to $AC09 and a new demo,
+   to its first $AE29; 1 or 2 start a game (not ported yet: D7), at $AC27
+   with T 0.  Gated against python tools/callio.py --capture --state p1
+   --call 0xAC27 0xAE29 (build/callio_ac27.json).  cost.scen as demoIn's. */
+function gameDispatch(m, r, cost){
+  if (m[0x9C2C]) return { t: 0, at: 0xAC27 };
+  M1.m1 += 3;                                      // LD A,(Num_Players): AND A: JR Z
+  return { t: 13 + 4 + 12 + mainLoop(m, r, cost), at: 0xAE29 };
+}
+/* $AC09 Main_Game_Loop to the demo's first $AE29 */
+function mainLoop(m, r, cost){
+  let t = 0;
   for (const [pos, de] of [[0x0022, 0xB060], [0x0019, 0xB060], [0x0222, 0xB039]]){ t += 20 + printString(m, pos, de, M1); M1.m1 += 2; }
   m[0xB05F] = 0; m[0x9C2C] = 0;
   t += 17 + 4 + 13 + 13; M1.m1 += 4;               // CALL Demo_Mode: XOR A: LD (Current_Rank),A: LD (Num_Players),A
@@ -2857,10 +2872,15 @@ class Fist {
     return t;
   }
   /* $ABB9 on: demoOn, the next demo stage charged as demoPass, or out to
-     $AC27 (Main_Game_Loop's dispatch, not ported yet: D7) */
+     $AC27: with Num_Players 0 gameDispatch's new demo, charged the same;
+     a game started (not ported yet: D7) stops the engine there */
   demoNextPass(){
     M1.m1 = 0;
     const cost = { scen: 0 }, a = this.demoNext, u = demoOn(this.m, a, this.r, cost);
+    if (u.at === 0xAC27){                          // the RET to $AC27: a new demo the same pass
+      const d = gameDispatch(this.m, this.r, cost);
+      u.t += d.t; u.at = d.at;
+    }
     const t = u.at === 0xAC27 ? u.t : (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.demoNext = null;
@@ -3075,5 +3095,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, demoOn, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, demoIn, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, demoOn, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, demoIn, gameDispatch, mainLoop, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

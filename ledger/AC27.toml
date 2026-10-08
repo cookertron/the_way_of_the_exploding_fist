@@ -3,3 +3,17 @@
 
 name     = "main_game_dispatch"
 entries  = ["$AC27"]
+oracle   = "tools/callio.py"
+fixtures = ["demo_ac27", "live"]
+port     = "gameDispatch"
+manual   = ["7.2"]
+
+[[fact]]
+kind   = "measured"
+says   = "gameDispatch matches the machine $AC27 to the next demo's first $AE29 (Num_Players 0, after the demo's rank-4 RET): bytes outside the text cells (D5), T 641011 (demoIn's less the JR, plus 13+4+12), R exactly"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac27.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "live (P2 lost) follows the demo through its rank-4 RET at row 2543, $AC27 to $AC09 and a new demo in the same pass (0.998 of the machine), on row for row to row 3000"
+by     = "node test/kit.test.js (live block, the ABB9 stage row)"

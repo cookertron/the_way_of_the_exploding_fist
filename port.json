@@ -163,6 +163,12 @@
       "note": "oracle for Main_Game_Loop's text rows and Demo_Mode $AB70 to the demo's first $AE29, after a lost 1UP bout: python tools/callio.py --capture --state p1 --call 0xAC3C 0xAE29 --frames 3000 with setup_ac5f's text cells blinded (D5)"
     },
     {
+      "key": "demo_ac27",
+      "file": "build/callio_ac27.json",
+      "required": true,
+      "note": "oracle for Main_Game_Loop's dispatch $AC27 after the demo's fourth stage (Num_Players 0: JR Z to $AC09, a new demo) to its first $AE29: python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29 --frames 12000 with demo_ac3c's blinds (the text cells, D5)"
+    },
+    {
       "key": "demo_abcb",
       "file": "build/callio_abcb.json",
       "required": true,
@@ -220,7 +226,7 @@
       "key": "live",
       "file": "build/live_p1.json",
       "required": true,
-      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --also 0xAC3C --also 0xAE8E --also 0xAD0B --also 0xABB9 --mark 0xAC09 --mark 0xAC27 --passes 1500 --hash 0x4800-0x5AFF --json build/live_p1.json (the script, vars, marks and ranges are stored in the file; $4800- is below the demo's text rows, D5)"
+      "note": "start state and differential rows for round_loop $AE26, TAPE-DERIVED (RAM image: gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --also 0xAEB2 --also 0xAC3C --also 0xAE8E --also 0xAD0B --also 0xABB9 --mark 0xAC09 --mark 0xAC27 --passes 3000 --hash 0x4800-0x5AFF --json build/live_p1.json (the script, vars, marks and ranges are stored in the file; $4800- is below the demo's text rows, D5)"
     }
   ],
   "tape": {
