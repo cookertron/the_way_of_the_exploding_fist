@@ -130,7 +130,7 @@ on this card that it now enforces.
 
 - After an increment: `python tools/mutants.py --affected` -- its new
   cases, and older ones whose anchor lines or killing blocks it changed.
-- A full run with `python tools/mutants.py --background`: at each milestone,
+- A full run with `python tools/mutants.py --background --jobs 4`: at each milestone,
   after any change to the harness, rig, build or runner (`status.py` warns
   when one is due), and before a release.  It writes a one-line summary to
   `build/mutants/summary.txt`; never wait on it or poll it.
@@ -185,4 +185,4 @@ body stays within 15 lines.
 
 ## Additional
 
-Use only 20 workers when run mutation battery runs
+Use 4 workers for mutation battery runs (`--jobs 4`; docs/DECISIONS.md D8).
