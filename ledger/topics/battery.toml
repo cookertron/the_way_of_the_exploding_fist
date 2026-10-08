@@ -68,11 +68,6 @@ kind   = "measured"
 says   = "chain live in every saved state: bout loop $AC3E/$AB70 -> $AD18/$ABC8 -> $AE26 -> play_pass $9745 -> $BF13 -> $C1A2 -> $C34F -> $C36E -> $C2B5 -> $8803; the bout frames return only at round end / game over"
 by     = "python tools/stackscan.py --state p1 --frames 15000 ; same for s1, p1b"
 
-[[fact]]
-kind   = "measured"
-says   = "at 15-20 workers every case times out at 180 s (suite alone 54 s); the same 15 cases on 8 workers: 3.9 min, 14 killed, no timeouts. The 184 timeouts of the 2026-10-08 full run (20 workers) are contention"
-by     = "python tools/mutants.py --match \"<the 15 labels>\" --jobs 8 (2026-10-08 13:24) against --affected --jobs 20 (13:18)"
-
 [[open]]
 ask    = "does a P1 bout WIN (dan progression, bonus stage) or 2P play use a stack-unwinding idiom?"
 tried  = "Q19 over p1, s1, p1b -- every window has P1 losing; no won bout, no bonus stage, no 2P state"

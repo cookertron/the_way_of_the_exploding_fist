@@ -59,3 +59,8 @@ by     = "python tools/build.py ; node test/kit.test.js"
 kind   = "reasoned"
 says   = "no live fixture for the other ways: 3 is the start state; P2's write $8BE6 (read in 2UP only); Sinclair/Kempston are pointers read by controls() $8B1F via io.in -- all gated on callio_97cb"
 by     = "python tools/adis.py 0x8C54 120 ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"
+
+[[open]]
+ask    = "why do the mutants \"menu: Get_Key reads the next row\" and \"menu: sound off tests key 3\" crash Node natively (row \"11: 00007FF70D8ED4BA\") instead of failing a row"
+tried  = "run alone on 2 workers: CRASH in 112 s and 110 s (on 8 workers: TIMEOUT at 180 s). Likely a menu loop that never sees its key, growing a log until the heap runs out"
+settle = "cap the port reads in the controlPass/menu replay so a run past the machine's count FAILS the ports row; re-run both cases, expect KILLED"
