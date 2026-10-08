@@ -4,7 +4,7 @@
 name     = "game_configs"
 entries  = ["$8C54"]
 oracle   = "tools/callio.py"
-fixtures = ["control97cb", "live_menu"]
+fixtures = ["control97cb", "live_menu", "live_msound"]
 manual   = ["5.1", "7.2"]
 
 [[fact]]
@@ -44,3 +44,18 @@ by     = "python tools/build.py ; node test/kit.test.js"
 kind   = "measured"
 says   = "menu from the demo (key 0, visit 400) runs inside one pass; RET with A=$80 to $ABCB, $ABB9, $AC27, Num_Players 0, a new demo by gameDispatch -- no new engine path; 118 reads for P1, 4, nine keys"
 by     = "python tools/sample.py (port.json live_menu note) --reads-at 0x8C54 --reads ..."
+
+[[fact]]
+kind   = "measured"
+says   = "Clear_Screen $8E4C contended 189552, 178968, 185855 T at $8C54/$8CDB/$8D99 (145215 uncontended; 3% spread by frame phase); main screen's prints 128935 over 122606 -- MENU_K, charged live only (io.menuK)"
+by     = "python tools/sample.py (live_menu's and live_msound's arguments, --passes 403) --also 0x8c54 --also 0x8c57 --also 0x8cdb --also 0x8cde --also 0x8d99 --also 0x8d9c ; PORT_CONTENDED=0 for the uncontended"
+
+[[fact]]
+kind   = "gated"
+says   = "sound off from the demo (key 4, fifth read): $B2FA 0, RET $80 to $ABB9, $AC27, a silent new demo row for row to 700 (live_msound); its one-screen pass 0.984 of the machine (bound 2%: the clear's spread)"
+by     = "python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "reasoned"
+says   = "no live fixture for the other ways: 3 is the start state; P2's write $8BE6 (read in 2UP only); Sinclair/Kempston are pointers read by controls() $8B1F via io.in -- all gated on callio_97cb"
+by     = "python tools/adis.py 0x8C54 120 ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"

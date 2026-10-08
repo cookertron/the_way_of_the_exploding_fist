@@ -175,6 +175,12 @@
       "note": "live rows for the options menu $8C54 opened from the demo, TAPE-DERIVED (gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --passes 700 --json build/live_menu.json with live's script and ',165:,1:0' after it (key 0 at visit 400, in the demo), --reads-at 0x8C54 --reads '1:1,4:,1:4,10:,1:Q,10:,1:W,13:,1:P,14:,1:L,9:,1:A,8:,1:Z,13:,1:O,11:,1:1,15:,1:SPACE' (P1, reconfigure keyboard, Q W P L A Z O 1 SPACE, each on its row's read of Get_Key's second scan), live's vars, hashes, skips and marks, --also live's and 0xAD18"
     },
     {
+      "key": "live_msound",
+      "file": "build/live_msound.json",
+      "required": true,
+      "note": "live rows for the options menu $8C54 opened from the demo, sound turned off, TAPE-DERIVED (gitignored, rule 7): live_menu's command with --reads '4:,1:4' (key 4 on the menu's fifth read: Flag_Sound $B2FA 0) and --json build/live_msound.json; the new demo after it is silent"
+    },
+    {
       "key": "live_2up",
       "file": "build/live_2up.json",
       "required": true,

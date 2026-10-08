@@ -1715,7 +1715,7 @@ function demoEntry(fx, run){
    own time ups, from a start inside the demo); and live_1up (live's, with key 1 pressed in the
    demo: its quit to $ABB9, $AC27 with Num_Players 1, the 1UP game's tune
    and setup to the CALL $AD18, sampled there, and the game played on). */
-function liveGate(L, who, how){
+function liveGate(L, who, how, menuWay){
   const fnv = (m, lo, hi) => { let h = 0x811C9DC5;
     for (let a = lo; a <= hi; a++){
       if (L.skip.some(([s, e]) => s <= a && a <= e)) continue;
@@ -1739,7 +1739,7 @@ function liveGate(L, who, how){
     const [n, keys] = seg.split(':');
     for (let i = 0; i < +n; i++) rplan.push(keys ? keys.split('+') : []);
   }
-  let menuReads = 0, menuSteps = 0;
+  let menuReads = 0, menuSteps = 0, logStart = -1;   // logStart: the sound log's length as the menu closes
   const menuPaid = [];
   if (L.reads) g.menuRead = n => { kb.releaseAll(); for (const x of rplan[n] || []) kb.press(x); menuReads = n + 1; };
   /* boot: the start is the tape's hand-over at $8800 (sample.py
@@ -1796,6 +1796,7 @@ function liveGate(L, who, how){
       cost = g.pass(kb);
       if (g.menu){                                 // the menu up: run it step by step, as the frames would
         while (g.menu){ cost += g.pass(kb); menuSteps++; }
+        logStart = g.sound.log.length;
         menuPaid.push([seq[k].p, cost / seq[k].t]);
       }
     } catch (e){ first = `row ${seq[k].p}: the pass threw: ${e.message}`; break; }
@@ -1862,36 +1863,43 @@ function liveGate(L, who, how){
        (MenuSuspend) and runs the menu a step at a time, each step to its
        next port read or past a Configs_Delay, as the live frames would;
        then the whole pass again, its reads replayed.  The menu's keys come
-       by read (sample.py --reads): P1, 4 (reconfigure), nine keys.  At its
-       RET, $80: RET M to $ABB9, Num_Players still 0, out to $AC27 and a
-       new demo by gameDispatch, played on to the fixture's last row */
-    const want = [...[0xFB01, 0xFB02, 0xDF01, 0xBF02, 0xFD01, 0xFE02, 0xDF02, 0xF701, 0x7F01].flatMap(v => [v & 0xFF, v >> 8])];
-    check(`${who}: ...and leave the bout into the demo, open the options menu by key 0 (row ${startAt}), run it across ${menuSteps} steps with its keys by port read (${L.reads_used} reads), P1's keyboard reconfigured, out by $ABB9 to $AC27 into a new demo, played on to the fixture's last row with no way out`,
-          [demoP, at, exit, k, startAt > out, menuPaid.map(([p]) => p), menuReads, menuSteps > 100, L.rows[startAt].m.includes(0xABCB), (L.rows[startAt].s || []).map(x => x.pc), g.demo, g.menu,
-           [...g.m.subarray(0x8BD2, 0x8BD4)], [...g.m.subarray(0x8BD4, 0x8BD4 + 18)]],
+       by read (sample.py --reads), per fixture (menuWay): P1, 4
+       (reconfigure), nine keys -- or 4 alone, the sound off (Flag_Sound
+       $B2FA 0: the new demo silent, its passes shorter by the effects).
+       At its RET, $80: RET M to $ABB9, Num_Players still 0, out to $AC27
+       and a new demo by gameDispatch, played on to the fixture's last row */
+    const want = menuWay.keys ? [0xD4, 0x8B, ...[0xFB01, 0xFB02, 0xDF01, 0xBF02, 0xFD01, 0xFE02, 0xDF02, 0xF701, 0x7F01].flatMap(v => [v & 0xFF, v >> 8])]
+      : [...new P.Fist(L.start).m.subarray(0x8BD2, 0x8BD4 + 18)];
+    check(`${who}: ...and leave the bout into the demo, open the options menu by key 0 (row ${startAt}), run it across ${menuSteps} steps with its keys by port read (${L.reads_used} reads), ${menuWay.what}, out by $ABB9 to $AC27 into a new demo, played on to the fixture's last row with no way out`,
+          [demoP, at, exit, k, startAt > out, menuPaid.map(([p]) => p), menuReads, menuSteps > menuWay.steps, L.rows[startAt].m.includes(0xABCB), (L.rows[startAt].s || []).map(x => x.pc), g.demo, g.menu,
+           [...g.m.subarray(0x8BD2, 0x8BD4 + 18)], g.m[0xB2FA], g.sound.log.length > logStart],
           [out, -1, null, seq.length, true, [startAt], L.reads_used, true, true, [0xABB9], true, null,
-           [0xD4, 0x8B], want]);
+           want, menuWay.sound, !!menuWay.sound]);
     /* the menu's pass is the delays' (uncontended code above $8000) and
-       the screens' (the clears and prints into contended RAM, at the
-       listing's T) */
-    check(`${who}: ...and the menu's pass is charged within 0.5% of the contended machine, its steps charged to the clock as they ran`,
-          menuPaid.map(([, x]) => Math.abs(x - 1) < 0.005 ? '' : `ratio ${x}`), ['']);
-    /* the page's own frames: the script to key 0's pass, then step() as
-       the loop calls it, no keys held -- the menu stays up, a frame's T
-       spent per frame (it polls, DI), the keyboard read live; E, then
-       one frame: its RET, the pass replayed, on to $ABB9 */
-    const f = new P.Fist(L.start), kf = new S.Keyboard();
-    for (let n = 0; n <= startAt - 1 && !f.menu; ){
-      if (!f.win && !f.bonus && !f.both && !f.setup && !f.enter && !f.demoAt && f.demoNext === null){ kf.releaseAll(); for (const x of plan[n] || []) kf.press(x); n++; }
-      f.pass(kf);
+       the screens' (the clears and prints into contended RAM, at MENU_K's
+       means).  The sound off's is one screen and no delay, mostly its
+       clear: 189552 T on the machine, the slow end of the clear's 3% spread
+       by frame phase (MENU_K), 1.5% of the pass -- its bound is 2% */
+    check(`${who}: ...and the menu's pass is charged within ${menuWay.tol * 100}% of the contended machine, its steps charged to the clock as they ran`,
+          menuPaid.map(([, x]) => Math.abs(x - 1) < menuWay.tol ? '' : `ratio ${x}`), ['']);
+    if (menuWay.frames){                          // once: the frames are the same whatever the menu's way
+      /* the page's own frames: the script to key 0's pass, then step() as
+         the loop calls it, no keys held -- the menu stays up, a frame's T
+         spent per frame (it polls, DI), the keyboard read live; E, then
+         one frame: its RET, the pass replayed, on to $ABB9 */
+      const f = new P.Fist(L.start), kf = new S.Keyboard();
+      for (let n = 0; n <= startAt - 1 && !f.menu; ){
+        if (!f.win && !f.bonus && !f.both && !f.setup && !f.enter && !f.demoAt && f.demoNext === null){ kf.releaseAll(); for (const x of plan[n] || []) kf.press(x); n++; }
+        f.pass(kf);
+      }
+      const up = !!f.menu, sim0 = f.simT, passes0 = f.passes;
+      kf.releaseAll();
+      for (let i = 0; i < 100; i++) f.step(kf);
+      const held = [!!f.menu, Math.abs((f.simT - sim0) / P.T_FRAME - 100) <= 1, f.passes === passes0];
+      kf.press('E'); f.step(kf); kf.releaseAll();
+      check(`${who}: ...and on the page's frames the menu opened by key 0 stays up over 100 frames with no key (a frame's T each, no pass completed), and E closes it in a frame, out to $ABB9`,
+            [up, ...held, f.menu, f.demoNext === 0x80 || f.passes > passes0], [true, true, true, true, null, true]);
     }
-    const up = !!f.menu, sim0 = f.simT, passes0 = f.passes;
-    kf.releaseAll();
-    for (let i = 0; i < 100; i++) f.step(kf);
-    const held = [!!f.menu, Math.abs((f.simT - sim0) / P.T_FRAME - 100) <= 1, f.passes === passes0];
-    kf.press('E'); f.step(kf); kf.releaseAll();
-    check(`${who}: ...and on the page's frames the menu opened by key 0 stays up over 100 frames with no key (a frame's T each, no pass completed), and E closes it in a frame, out to $ABB9`,
-          [up, ...held, f.menu, f.demoNext === 0x80 || f.passes > passes0], [true, true, true, true, null, true]);
   }
   if (how === 'start2'){
     /* the demo quit by key 2, out to $AC27, Num_Players 2: gameDispatch's
@@ -2030,7 +2038,8 @@ liveGate(P.assets.live_time, 'time', 'draw');
 liveGate(P.assets.live_dtime, 'demo time', 'dtime');
 liveGate(P.assets.live_1up, '1UP', 'start');
 liveGate(P.assets.live_2up, '2UP', 'start2');
-liveGate(P.assets.live_menu, 'menu', 'menu');
+liveGate(P.assets.live_menu, 'menu', 'menu', { keys: true, sound: 1, steps: 100, frames: true, tol: 0.005, what: "P1's keyboard reconfigured" });
+liveGate(P.assets.live_msound, 'menu sound off', 'menu', { keys: false, sound: 0, steps: 4, frames: false, tol: 0.02, what: 'the sound turned off (Flag_Sound $B2FA 0), the new demo silent' });
 liveGate(P.assets.live_boot, 'boot', 'boot');
 
 /* bouts at dans 2-8, from the user's snapshots (in the new stage's tune

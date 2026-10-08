@@ -1514,8 +1514,8 @@
  {
   "file": "template.html",
   "label": "menu: clear last LDIR at 21 T",
-  "old": "21 * 0x2FF - 5 + 10,",
-  "new": "21 * 0x2FF + 10,",
+  "old": "21 * 0x2FF - 5 + 10) * K.clear,",
+  "new": "21 * 0x2FF + 10) * K.clear,",
   "increment": "8C54",
   "kills": "controlPass tallies the uncontended T of every case exactly"
  },
@@ -1674,8 +1674,8 @@
  {
   "file": "template.html",
   "label": "menu: print M1 loses Print_String's",
-  "old": "function ps(pos, de){ const c = { m1: 0 }; k(printString(m, pos, de, c), c.m1); }",
-  "new": "function ps(pos, de){ const c = { m1: 0 }; k(printString(m, pos, de, c), 0); }",
+  "old": "k(printString(m, pos, de, c) * K.print, c.m1); }",
+  "new": "k(printString(m, pos, de, c) * K.print, 0); }",
   "increment": "8C54",
   "kills": "controlPass counts R to the value the real $97CB left (the AI draws)"
  },
@@ -4701,5 +4701,37 @@
   "new": "res = pointPath(this.m, e.a, this.r);",
   "increment": "ABB9",
   "kills": "demo time: roundPass, the demo, its round end and time up follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: the menu's clear charged uncontended live",
+  "old": "- 5 + 10) * K.clear,",
+  "new": "- 5 + 10) * 1,",
+  "increment": "8C54",
+  "kills": "menu sound off: ...and the menu's pass is charged within 2% of the contended machine, its steps charged to the clock as they ran"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: the menu's prints charged uncontended live",
+  "old": "k(printString(m, pos, de, c) * K.print, c.m1);",
+  "new": "k(printString(m, pos, de, c), c.m1);",
+  "increment": "8C54",
+  "kills": "menu sound off: ...and the menu's pass is charged within 2% of the contended machine, its steps charged to the clock as they ran"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: Fist's pass gives controlPass no MENU_K",
+  "old": "menu: !replay, menuK: MENU_K, cost:",
+  "new": "menu: !replay, cost:",
+  "increment": "8C54",
+  "kills": "menu sound off: ...and the menu's pass is charged within 2% of the contended machine, its steps charged to the clock as they ran"
+ },
+ {
+  "file": "template.html",
+  "label": "8C54: roundPass drops io.menuK on the way to controlPass",
+  "old": "menu: io.menu, menuK: io.menuK });",
+  "new": "menu: io.menu });",
+  "increment": "8C54",
+  "kills": "menu sound off: ...and the menu's pass is charged within 2% of the contended machine, its steps charged to the clock as they ran"
  }
 ]

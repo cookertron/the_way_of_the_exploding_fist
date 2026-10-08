@@ -216,8 +216,11 @@ def check(ctx):
             warn.append('the last commit message body is %d lines (budget %d)'
                         % (n, R.BUDGET['commit_body_lines']))
 
+    src = ctx['tests'] + ctx['web']
     for key, a in ctx['assets'].items():
-        if not re.search(r'\b%s\b' % re.escape(key), ctx['tests'] + ctx['web']):
+        stem = key.rstrip('0123456789')            # a numbered family read by name: `live_dan${n}`
+        if not (re.search(r'\b%s\b' % re.escape(key), src)
+                or (stem != key and re.search(r'\b%s\$\{' % re.escape(stem), src))):
             warn.append('asset %r is read by nothing in test/ or web/ (TRAPS #116)' % key)
 
     have = addresses(ctx)

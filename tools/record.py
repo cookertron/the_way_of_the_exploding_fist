@@ -271,13 +271,27 @@ def port_assets():
         return {}
 
 
+def built_page():
+    """The page build.py writes (port.json "out"): generated, not source."""
+    try:
+        with open(os.path.join(ROOT, 'port.json'), encoding='utf-8') as f:
+            out = json.load(f).get('out')
+    except (OSError, ValueError):
+        return None
+    return os.path.normcase(os.path.join(ROOT, out)) if out else None
+
+
 def source_text(folder, exts):
+    """The text of every source file under folder.  The built page is left
+    out: it is the template again plus every fixture's payload (megabytes),
+    and searching it made status.py outrun the session hook's 30 s."""
     parts = []
     d = os.path.join(ROOT, folder)
+    skip = built_page()
     for dirpath, dirs, files in os.walk(d):
         dirs[:] = [x for x in dirs if x not in ('node_modules', '__pycache__')]
         for fn in files:
-            if fn.endswith(exts):
+            if fn.endswith(exts) and os.path.normcase(os.path.join(dirpath, fn)) != skip:
                 try:
                     with open(os.path.join(dirpath, fn), encoding='utf-8', errors='replace') as f:
                         parts.append(f.read())
