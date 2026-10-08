@@ -5,4 +5,4 @@ Unit:     gate helpers, part 2: move the remaining fixture gates (sprdec, 9C6F, 
 Step:     first ledger/8C54.toml open 1: cap the port reads in the menu replay so the two crashing menu mutants FAIL a row; then one block at a time, row names kept (mutants.json kills by name)
 Then:     world builders and the on/off identity gate (map: gate, 38 BUILD); per-verdict stamps and pruning for mutants.py (6.12 steps 4, 6); byte-usage map and roster (12.5, 12.6); brief.py, verify_claims.py (12.7)
 Blocked:  none
-Notes:    mutation runs use --jobs 4 (D8). A full run is due (rig.js, mutants.py changed): python tools/mutants.py --background --jobs 4. rig.gate returns verdicts; blocks keep their check() rows. sprdec fills with 0 today: try the poison
+Notes:    mutation runs use --jobs 4 (D8). Last full run 2026-10-08 17:10: 605/608 killed, 0 survivors, 0 timeouts, 3 crashes (boot LDIR; the two 8C54 menu cases). rig.gate returns verdicts; blocks keep their check() rows
