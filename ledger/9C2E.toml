@@ -1,0 +1,27 @@
+# ledger/9C2E.toml -- current truth about game_start (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "game_start"
+entries  = ["$9C2E"]
+oracle   = "tools/sample.py"
+fixtures = ["live_boot"]
+port     = "gameStart"
+manual   = ["7.2"]
+
+[[fact]]
+kind   = "insn"
+at     = "$9C43"
+says   = "Game_Start moves $6000-$80FF down to $5F00 (LDIR HL=$6000 DE=$5F00 BC=$2100): the scenery code and data run at $5F00; then $C423-$C426 cleared, JP $AC05 Num_Players 0 into Main_Game_Loop"
+by     = "python tools/adis.py 0x9C2E 20 ; python tools/adis.py 0xB138 4 ; python tools/adis.py 0xAC05 2"
+
+[[fact]]
+kind   = "measured"
+at     = "$9C43"
+says   = "from $8800 to $9C45 the machine takes 228219 T, 50665 over uncontended: the LDIR through RAM below $8000 at +5.997 T a byte (BOOT_LDIR)"
+by     = "python tools/sample.py --state boot --start-here --at 0x9C45 --var np=0x9C2C --passes 1 --json scratch/b2.json"
+
+[[fact]]
+kind   = "gated"
+at     = "$8800"
+says   = "bootPass (gameStart, mainLoop) reaches the machine's first $AE29 from boot (vars, R, hashes below the text rows; SP $5BF9) charged within 0.3%, and live follows the demo row for row over all 1500 rows through 3 stages"
+by     = "python tools/build.py ; node test/kit.test.js (live block, boot rows)"

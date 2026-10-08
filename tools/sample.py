@@ -37,12 +37,16 @@ either kind, so the engine can charge each sub-loop pass its own T.
 start no saved state holds (P1 one point from the bout).  The JSON records
 them as "poked"; the start state is constructed, so say so.
 
+--start-here takes the JSON's start state as resumed, before play (with its
+"pc"), not at the first visit, and times row 0 from there: the engine runs
+from the start to the first visit itself (the boot: --state boot, $8800).
+
 Usage:
     python tools/sample.py --state NAME --at PC --var NAME=ADDR [--var ...]
                            [--passes 1000] [--changes] [--keys D+W]
                            [--script "40:,60:D"] [--json FILE]
                            [--hash LO-HI ...] [--skip LO-HI ...] [--mark PC ...]
-                           [--also PC ...] [--poke ADDR=VAL,...]
+                           [--also PC ...] [--poke ADDR=VAL,...] [--start-here]
     python tools/sample.py --state s1 --at 0x9745 --var time=0x9CA5 --var cnt=0x9CA6 --changes
 """
 import json
@@ -86,7 +90,7 @@ def main():
     target = parse_target(args)
     at, passes, changes, keys, vars_ = None, 1000, False, None, []
     script, out, hashes, skip, marks, also = None, None, [], [], [], []
-    pokes = {}
+    pokes, here = {}, False
     i = 0
     while i < len(args):
         a = args[i]
@@ -115,6 +119,8 @@ def main():
                 pa, pv = kv.split('=')
                 pokes[int(pa, 0)] = int(pv, 0)
             i += 2
+        elif a == '--start-here':
+            here = True; i += 1
         elif a == '--skip':
             skip.append(parse_range(args[i + 1])); i += 2
         else:
@@ -137,6 +143,9 @@ def main():
           + (f', keys {keys}' if keys else '') + (f', script {script}' if script else ''))
     m = h.memobj.m
     prev, rows, start, t0 = None, [], None, None
+    if here:                                # the state as resumed, before play: row 0's t is from here
+        start = {'ram': bytes(m[0x4000:0x10000]).hex(), 'r': h.regs[R], 'sp': h.regs[SP], 'pc': h.pc()}
+        t0 = h.tstates()
     hit, sub = [], []                       # marks and --also rows since the previous visit
     for p in range(passes):
         while True:

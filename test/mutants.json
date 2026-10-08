@@ -4377,5 +4377,53 @@
   "new": "    else if (u.at === 0xAE29) this.stage = true;\n    if (u.at === 0xAC5F) this.exit = { exit: 'start', at: 0xAC5F, r: this.r, t };",
   "increment": "AC27 1UP",
   "kills": "1UP: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
+ },
+ {
+  "file": "template.html",
+  "label": "boot: no M1 for the JP at $8800",
+  "old": "  M1.m1 += 1 + 14 + 2 * 0x2100 + 8;",
+  "new": "  M1.m1 += 14 + 2 * 0x2100 + 8;",
+  "increment": "boot",
+  "kills": "boot: the engine reaches the first row the machine sampled"
+ },
+ {
+  "file": "template.html",
+  "label": "boot: LDIR the wrong way",
+  "old": "  m.copyWithin(0x5F00, 0x6000, 0x8100);",
+  "new": "  m.copyWithin(0x6000, 0x5F00, 0x8000);",
+  "increment": "boot",
+  "kills": "boot: the engine reaches the first row the machine sampled"
+ },
+ {
+  "file": "template.html",
+  "label": "boot: LDIR uncharged",
+  "old": "const BOOT_LDIR = 5.997;",
+  "new": "const BOOT_LDIR = 0;",
+  "increment": "boot",
+  "kills": "boot: ...and the boot pass is charged within 0.5% of the contended machine"
+ },
+ {
+  "file": "template.html",
+  "label": "boot: gameStart under SETUP_K",
+  "old": "    const t = g + (u - cost.scen) * SETUP_K.rest",
+  "new": "    const t = g * SETUP_K.rest + (u - cost.scen) * SETUP_K.rest",
+  "increment": "boot",
+  "kills": "boot: ...and the boot pass is charged within 0.5% of the contended machine"
+ },
+ {
+  "file": "template.html",
+  "label": "boot: Game_Init skipped",
+  "old": "  m[0xB153] = 1; m[0xB151] = m[0xB152] = 0xFF;",
+  "new": "",
+  "increment": "boot",
+  "kills": "boot: the engine reaches the first row the machine sampled"
+ },
+ {
+  "file": "template.html",
+  "label": "boot: border 2",
+  "old": "  out.push([10 + 4 + 7, 5]);",
+  "new": "  out.push([10 + 4 + 7, 2]);",
+  "increment": "boot",
+  "kills": "boot: ...from $8800 through Game_Start (border 5), Main_Game_Loop and Demo_Mode into the demo's first $AE29 (row 0), the demo played on through its stages (sampled at $ABB9 on rows 486, 1029, 1467) to the fixture's last row with no way out"
  }
 ]

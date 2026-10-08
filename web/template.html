@@ -2762,6 +2762,28 @@ function gameDispatch(m, r, cost){
   t += 10 + 10 + 10 + 6 + 10 + 4 * 21 + 16 + 10; M1.m1 += 5 + 2 * 5 + 1;
   return { t, at: 0xAC5F };
 }
+/* $8800 JP Game_Start $9C2E (the tape's USR 34816) to $AC09: DI, border
+   5, SP $5BFF, Game_Init $B138 ($B153 = 1, $B151 = $FFFF), the $2100 bytes
+   at $6000 moved down to Background_Reference $5F00 (the scenery's code and
+   data run there), $C423-$C426 cleared, JP
+   Main_Game $AC05: Num_Players 0, on into Main_Game_Loop.  From the listing
+   (python tools/adis.py 0x9C2E 20 ; 0xB138 4 ; 0xAC05 2).  Uncontended T
+   but the LDIR's, through contended RAM below $8000: +BOOT_LDIR T a byte,
+   measured from $8800 to $9C45 (python tools/sample.py --state boot
+   --start-here --at 0x9C45: 228219 T, 50665 over uncontended).  The
+   border's OUT in out.  Gated with mainLoop by the boot's live rows
+   (build/live_boot.json). */
+const BOOT_LDIR = 5.997;
+function gameStart(m, out){
+  out.push([10 + 4 + 7, 5]);                       // JP: DI: LD A,5: OUT ($FE),A
+  m[0xB153] = 1; m[0xB151] = m[0xB152] = 0xFF;
+  m.copyWithin(0x5F00, 0x6000, 0x8100);            // LDIR (HL) to (DE), DE below HL: a plain move down
+  m[0xC423] = m[0xC424] = m[0xC425] = m[0xC426] = 0;
+  m[0x9C2C] = 0;
+  M1.m1 += 1 + 14 + 2 * 0x2100 + 8;
+  return 10 + 4 + 7 + 11 + 10 + 6 + 17 + 7 + 13 + 10 + 16 + 10 + 10 + 10 + 10 + (21 + BOOT_LDIR) * 0x2100 - 5
+       + 7 + 4 + 7 + 16 + 16 + 10 + 4 + 13;
+}
 /* $AC09 Main_Game_Loop to the demo's first $AE29 */
 function mainLoop(m, r, cost){
   let t = 0;
@@ -2794,9 +2816,10 @@ function demoStage(m, r, cost){
 }
 
 /* ---- the live game: round_loop on the 7.2 accumulator ------------------
-   Starts from the machine at the CALL at $AE29 (build/live_p1.json, from
-   python tools/sample.py --json: a mid-bout state, scaffolding until the
-   boot and menu are ported, D7) and runs whole passes against a T budget
+   The page starts from the tape's hand-over at $8800 (build/live_boot.json,
+   python tools/sample.py --start-here: bootPass runs Game_Start into the
+   attract demo); the gates also start from mid-bout states at the CALL at
+   $AE29.  It runs whole passes against a T budget
    of one 48K frame (69888 T) a video frame.  Each pass is charged its
    uncontended T with $BF13's contention means (rfPlayT, D4) and the effect's
    $FE writes go to the beeper log at their T.  A way out of the loop that
@@ -2821,6 +2844,7 @@ class Fist {
     this.demoAt = false;                           // at $AC3C after a lost bout: demoIn the next pass, to $AE29
     this.demo = false;                             // round_loop called by the demo's $ABC8: its points played by demoPoint
     this.demoNext = null;                          // at $ABB9 with this A: demoOn the next pass, a new stage or out to $AC27
+    this.boot = st.pc === 0x8800;                  // the tape's hand-over: bootPass the first pass, to the demo's $AE29
     this.frame = 0; this.lvl = 0; this.border = 0;
     this.sound = { log: [] };
     this.scr = new SpecScreen();
@@ -2829,6 +2853,7 @@ class Fist {
   get simFrame(){ return this.simT / T_FRAME; }
   /* one pass with these keys; returns its charged T */
   pass(kb){
+    if (this.boot) return this.bootPass();
     if (this.setup) return this.setupPass();
     if (this.enter) return this.enterPass();
     if (this.demoAt) return this.demoPass();
@@ -3007,6 +3032,22 @@ class Fist {
   /* $AC3C to the demo's first $AE29: demoIn, charged as setupPass (the
      scenery at SCEN_K, the rest at SETUP_K.rest); its text rows are in the
      font (D5), .stage says so; round_loop is then the demo's */
+  /* the tape's JP $8800: gameStart and mainLoop to the demo's first $AE29,
+     at SP $5BF9 (Demo_Mode's, $ABC8's and $AE26's CALLs below $5BFF;
+     sample.py --state boot --at 0xAE29).  mainLoop charged as demoPass,
+     gameStart with its own LDIR charge. */
+  bootPass(){
+    M1.m1 = 0;
+    const out = [], cost = { scen: 0 };
+    const g = gameStart(this.m, out), u = mainLoop(this.m, this.r, cost);
+    const t = g + (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];
+    for (const [, v] of out) this.border = v & 7;
+    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
+    this.sp = 0x5BF9;
+    this.boot = false; this.demo = true; this.stage = true;
+    this.simT += t; this.passes++;
+    return t;
+  }
   demoPass(){
     M1.m1 = 0;
     const cost = { scen: 0 }, u = demoIn(this.m, this.r, cost);
@@ -3087,7 +3128,7 @@ class Demo {
 /* ---- driver ---------------------------------------------------------- */
 const cvs = document.getElementById('scr'), ctx = cvs.getContext('2d');
 const demo = new Demo();
-const game = new Fist(A.live.start);
+const game = new Fist(A.live_boot.start);          // the tape's hand-over at $8800: Game_Start into the attract demo
 /* created here, STARTED from the first gesture -- a browser will not run an
    AudioContext before one */
 const sound = new SoundOut();
@@ -3110,5 +3151,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, demoOn, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, demoIn, gameDispatch, mainLoop, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, demoOn, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, demoIn, gameDispatch, mainLoop, gameStart, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

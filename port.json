@@ -235,6 +235,12 @@
       "note": "live rows for a bout at dan 8, TAPE-DERIVED and from the user's snapshot (gitignored, rule 7): snapshots/7th_dan_to_8th_dan.szx with the user's cheat at $9057 (RET) put back to $3A, python tools/snapimport.py --save dan8; then python tools/sample.py --state dan8 --at 0xAE29 --passes 400 with live's script, vars (and rank=0xAA80), hashes, skips and marks, --also live's and 0xAE8E 0xAD0B 0xAD6E 0xAD18 0xABB9"
     },
     {
+      "key": "live_boot",
+      "file": "build/live_boot.json",
+      "required": true,
+      "note": "live rows for the boot: Game_Start from the tape's hand-over $8800 into the attract demo, TAPE-DERIVED (gitignored, rule 7): python tools/sample.py --state boot --start-here --at 0xAE29 --passes 1500 with live's vars, --also, --skip and hashes, marks $ABCB $AD1B $AE17 $AE67 $ACA6 $AC09 $AC27, no keys; also the page's start state (D7 retired)"
+    },
+    {
       "key": "live",
       "file": "build/live_p1.json",
       "required": true,
