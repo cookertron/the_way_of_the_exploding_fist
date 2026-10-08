@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     $AD9C Start_2UP_Game -- Num_Players 2 at $AC27 (the demo quit by key 2), its own loop to its first $AE29
-Step:     python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29 --frames 4000 --keys 2 --per 1 with setup_ac5f's blinds; gameDispatch's n > 1 branch stays at $AC27 until then
+Unit:     $AE17 the 2UP game's ways on -- time up and a point return from $AE26 to $AE17; next round by $AE1F JR Z $AE14, bout won at $ADE2
+Step:     python tools/adis.py 0xAE14 20 ; sample.py live_2up past row 816 (machine re-enters $AE14 at rows 816, 1237); capture $AE17 with callio, key 2 in the demo
 Then:     the options menu $8C54 (key 0 in the demo: 8C54 open 1); the demo's time up and round end (ABB9 open 1)
 Blocked:  none
-Notes:    the page now boots at $8800 into the attract demo (bootPass, live_boot gated 1500 rows; D7 ended); key 2 and key 0 in the demo still stop the engine (.exit) until ported; mutation runs use --jobs 20 at most (CLAUDE.md)
+Notes:    2UP start ported (AD9C): the engine stops at $AE17 (.exit, D7) on the 2UP game's first way out; key 0 in the demo still stops the engine; mutation runs use --jobs 20 at most (CLAUDE.md)

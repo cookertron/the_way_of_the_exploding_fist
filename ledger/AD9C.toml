@@ -1,0 +1,35 @@
+# ledger/AD9C.toml -- current truth about Start_2UP_Game (manual 12.2, 12.11).
+# Written with tools/record.py; history is in git.
+
+name     = "Start_2UP_Game"
+entries  = ["$AD9C"]
+oracle   = "tools/callio.py"
+fixtures = ["start2_ac27", "live_2up"]
+port     = "stage2"
+manual   = ["7.2"]
+
+[[fact]]
+kind   = "measured"
+says   = "Num_Players 2: gameDispatch to $ADB1, Intro_Music, start2Rest, stage2, roundIn match the machine $AC27 to the 2UP game's first $AE29: bytes outside the text cells (D5), T 12911903, R, the tune's 3422 $FE writes exactly"
+by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac27_2up.json ; node test/kit.test.js"
+
+[[fact]]
+kind   = "insn"
+at     = "$AD9C"
+says   = "Start_2UP_Game: rank, demo flag, $AA46, points cleared, stage 2, Intro_Music always, New_Round, Reset_Score; $ADBA the per-bout stage (both scores, high score from $B038); CALL $AE14, out to $AE17"
+by     = "python tools/adis.py 0xAD9C 60"
+
+[[fact]]
+kind   = "gated"
+says   = "live_2up follows the machine row for row: key 2 quits the demo at row 401, tune and setup within 0.05%, $AE14 to $AE29 within 2%, unkeyed to time up at row 816, the engine stopped at $AE17 there (D7)"
+by     = "node test/kit.test.js (live block, the 2UP rows)"
+
+[[open]]
+ask    = "the 2UP game's ways on from $AE17: round end, point, next round via $AE1F JR Z $AE14, bout won ($ADE2 on), high score at $ADF3"
+tried  = "live_2up runs to row 1500: the machine re-enters $AE14 at rows 816 and 1237 after each time up"
+settle = "python tools/callio.py --capture --state p1 --call 0xAE17 0xAE29,0xAC34 with key 2 in the demo; sample.py live_2up past row 816"
+
+[[open]]
+ask    = "mutant 'ad9c: Fist: the 2UP game's points played as 1UP' survives: no gate scores a 2UP point yet (live_2up ends at time up)"
+tried  = "affected run 2026-10-08: survived; live_2up has no keys after the start, so roundTail's first exit is 'end'"
+settle = "a 2UP live fixture with P1 keyed to score a point after key 2 (unit AE17), then python tools/mutants.py --match \"ad9c: Fist\""

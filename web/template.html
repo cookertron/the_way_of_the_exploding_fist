@@ -2081,13 +2081,14 @@ function playPass(m, io, sp){
    a point (the RET NZ at $AE60 on $9C28), pointPath's own: the point is
    played on into the next $AE29 in the same pass -- by demoPoint when the
    CALL was the demo's at $ABC8 (demo set), which takes the quit on through
-   $ABCB to $ABB9 too.  roundTail is
+   $ABCB to $ABB9 too; with two set (the 2UP game's $AE14) every way out
+   is returned as roundTail's.  roundTail is
    the body from $AE2C alone, A and R there, gated exactly against python
    tools/callio.py --capture --call 0xAE2C 0xAE29 (build/callio_ae2c.json). */
-function roundPass(m, io, sp, demo){
+function roundPass(m, io, sp, demo, two){
   const p = playPass(m, io, sp), b = roundTail(m, p.a, p.r);
   b.t += p.t;
-  if (b.exit !== 'ret' && !(demo && b.exit === 'quit')) return b;
+  if (two || b.exit !== 'ret' && !(demo && b.exit === 'quit')) return b;
   const q = (demo ? demoPoint : pointPath)(m, b.a, b.r);   // a point (or the demo's quit): on to the next $AE29, or out
   q.t += b.t;
   return q;
@@ -2745,22 +2746,63 @@ function demoIn(m, r, cost){
    to its first $AE29; 1 is CALL Start_1UP_Game $AC3E: rank, demo flag and
    points cleared, $AF35 = $AA46 = 1, $AA3C = $AF34 = 2, Reset_Score $AF0B
    (the six bytes from $B02D), on to $AC5F, the setup the next bout's is
-   (setupMusic, setupRest, roundIn); 2 (Start_2UP_Game $AD9C, not ported
-   yet: D7) stays at $AC27 with T 0.  Gated against python tools/callio.py
-   --capture --state p1 --call 0xAC27 0xAE29 (build/callio_ac27.json; with
-   --keys 1, build/callio_ac27_1up.json).  cost.scen as demoIn's. */
+   (setupMusic, setupRest, roundIn); 2 is CALL Start_2UP_Game $AD9C: rank,
+   demo flag, $AA46 and points cleared, the stage $AF34 = 2, to its CALL
+   Intro_Music $ADB1 (then start2Rest, stage2, roundIn).  Gated against
+   python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29
+   (build/callio_ac27.json; with --keys 1, build/callio_ac27_1up.json;
+   --keys 2, build/callio_ac27_2up.json).  cost.scen as demoIn's. */
 function gameDispatch(m, r, cost){
   const n = m[0x9C2C];
-  if (n > 1) return { t: 0, at: 0xAC27 };
+  if (n > 1){                                      // LD A,(Num_Players): AND A: JR Z: CP 1: JR Z: CALL $AD9C
+    m[0xB05F] = m[0xAA06] = m[0xAA46] = m[0xAA08] = m[0xAA48] = 0;
+    m[0xAF34] = 2;
+    M1.m1 += 6 + 1 + 5 + 2;                        // XOR A: five LD (nn),A: LD A,2: LD ($AF34),A
+    return { t: 13 + 4 + 7 + 7 + 7 + 17 + 4 + 5 * 13 + 7 + 13, at: 0xADB1 };
+  }
   M1.m1 += 3;                                      // LD A,(Num_Players): AND A: JR Z
   if (!n) return { t: 13 + 4 + 12 + mainLoop(m, r, cost), at: 0xAE29 };
   m[0xAA80] = m[0xB05F] = m[0xAA06] = m[0xAA08] = m[0xAA48] = 0;
   m[0xAF35] = m[0xAA46] = 1; m[0xAA3C] = m[0xAF34] = 2;
   M1.m1 += 3 + 13;                                 // CP 1: JR Z: CALL $AC3E .. CALL Reset_Score
-  let t = 13 + 4 + 7 + 7 + 12 + 17 + 4 + 5 * 13 + 4 + 2 * 13 + 4 + 2 * 13 + 17;
+  const t = 13 + 4 + 7 + 7 + 12 + 17 + 4 + 5 * 13 + 4 + 2 * 13 + 4 + 2 * 13 + 17;
+  return { t: t + resetScore(m), at: 0xAC5F };
+}
+function resetScore(m){                            // Reset_Score $AF0B without its CALL: the six bytes from $B02D
   m.fill(0, 0xB02D, 0xB033);                       // LD HL: LD (HL),0: LD DE: INC DE: LD BC,5: LDIR: RET
-  t += 10 + 10 + 10 + 6 + 10 + 4 * 21 + 16 + 10; M1.m1 += 5 + 2 * 5 + 1;
-  return { t, at: 0xAC5F };
+  M1.m1 += 5 + 2 * 5 + 1;
+  return 10 + 10 + 10 + 6 + 10 + 4 * 21 + 16 + 10;
+}
+/* Start_2UP_Game after its tune: CALL New_Round, CALL Reset_Score, on to
+   $ADBA (python tools/adis.py 0xAD9C 30) */
+function start2Rest(m){
+  M1.m1 += 2;                                      // CALL New_Round: CALL Reset_Score
+  return 17 + newRound(m, M1) + 17 + resetScore(m);
+}
+/* $98BF with its CALL: Num_Players and PLAYER, the rows at $0019, $0319 */
+function players(m){
+  let t = 17 + 10 + 7 + populate(m, 0x9C2C, 1) + 17; M1.m1 += 4;   // CALL $98BF: LD HL,Num_Players: LD B,1: ..CALL Zero_To_Space
+  t += zeroToSpace(m, 0xB026) + 20 + printString(m, 0x0019, 0xB024, M1) + 20 + printString(m, 0x0319, 0xB03E, M1) + 10; M1.m1 += 5;
+  return t;
+}
+/* $ADBA, a 2UP bout's stage to the CALL $AE14 (roundIn's CALL $AE26 is
+   the next): the scenery, players, both scores ($AF52, $AF97 with B 0),
+   the high score from $B038, players again, Init_Time, $9C2B cleared.
+   From the listing (python tools/adis.py 0xADBA 20).  cost.scen as
+   setupRest's. */
+function stage2(m, cost){
+  const sc = 13 + scenery(m, m[0xAF34]);           // LD A,($AF34): CALL $9200
+  if (cost) cost.scen = sc;
+  let t = sc + players(m); M1.m1 += 1;
+  t += 7 + 17 + awardTail(m, 0, SIDE1); M1.m1 += 2;   // LD B,0: CALL $AF52
+  t += 7 + 17 + awardTail(m, 0, SIDE2); M1.m1 += 2;   // LD B,0: CALL $AF97
+  t += 10 + 17 + 7 + scoreBuffer(m, 0xB038) + 20 + printString(m, 0x0A19, 0xB024, M1) + 10; M1.m1 += 6;   // Print_HighScore
+  t += players(m);
+  m[0x9CA5] = 0x1E;
+  t += 17 + 7 + 13 + printTime(m) + 10; M1.m1 += 4;   // CALL Init_Time: LD A,30: LD (Time),A: .. RET
+  m[0x9C2B] = 0;
+  t += 4 + 13 + 17; M1.m1 += 3;                    // XOR A: LD ($9C2B),A: CALL $AE14
+  return t;
 }
 /* $8800 JP Game_Start $9C2E (the tape's USR 34816) to $AC09: DI, border
    5, SP $5BFF, Game_Init $B138 ($B153 = 1, $B151 = $FFFF), the $2100 bytes
@@ -2843,6 +2885,7 @@ class Fist {
     this.stage = false;                            // ...with a new stage's text rows drawn (D5)
     this.demoAt = false;                           // at $AC3C after a lost bout: demoIn the next pass, to $AE29
     this.demo = false;                             // round_loop called by the demo's $ABC8: its points played by demoPoint
+    this.two = false;                              // ...by the 2UP game's $AE14: its ways out not ported, the engine stops at $AE17
     this.demoNext = null;                          // at $ABB9 with this A: demoOn the next pass, a new stage or out to $AC27
     this.boot = st.pc === 0x8800;                  // the tape's hand-over: bootPass the first pass, to the demo's $AE29
     this.frame = 0; this.lvl = 0; this.border = 0;
@@ -2862,14 +2905,15 @@ class Fist {
     if (this.both) return this.endPass();
     this.stage = false;
     const io = { r: this.r, out: [], in: p => specPort(kb, p), cost: { dec: 0, copy: 0, ldir: 0, t: 0 } };   // t stays 0 if the pass leaves before $BF13 (a quit)
-    const res = roundPass(this.m, io, this.sp, this.demo);
+    const res = roundPass(this.m, io, this.sp, this.demo, this.two);
     let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
     if (this.demo) cost += this.demoOut(res);       // the demo's ways on
+    else if (this.two){ if (res.exit) res.at = 0xAE17; }   // the RET to $AE17 (a point, the quit) or $AE67's round end: D7
     else if (res.exit === 'end'){                      // $AE67: time up, on into the round end's loop top $AD0B
       M1.m1 = 0; cost += endStart(this.m);
       res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null; this.both = 'end';
     }
-    if (!this.demo) cost += this.onward(res);       // the game's ways on; the demo's are its own
+    if (!this.demo && !this.two) cost += this.onward(res);       // the game's ways on; the demo's are its own
     for (const [t, v] of io.out){
       this.border = v & 7;
       const lv = (v >> 4) & 1;
@@ -2911,8 +2955,8 @@ class Fist {
   /* $ABB9 on: demoOn, the next demo stage charged as demoPass, or out to
      $AC27: with Num_Players 0 gameDispatch's new demo, charged the same;
      1, the 1UP game's start to $AC5F and its tune in this pass, as next()'s
-     (the setup and roundIn the passes after); 2 (not ported yet: D7) stops
-     the engine there */
+     (the setup and roundIn the passes after); 2, Start_2UP_Game to its
+     tune, the tune in this pass the same way (stage2 and roundIn after) */
   demoNextPass(){
     M1.m1 = 0;
     const cost = { scen: 0 }, a = this.demoNext, u = demoOn(this.m, a, this.r, cost);
@@ -2922,6 +2966,7 @@ class Fist {
     }
     let t = u.at === 0xAE29 ? (u.t - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]] : u.t;
     if (u.at === 0xAC5F){ this.demo = false; t += this.music('start', t); }
+    else if (u.at === 0xADB1){ this.demo = false; this.two = true; t += this.music('2up', t); }
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.demoNext = null;
     if (u.at === 0xAC27) this.exit = { exit: a & 0x80 ? 'quit' : 'over', at: 0xAC27, r: this.r, t };
@@ -2997,7 +3042,7 @@ class Fist {
      border and the sound log at their T; setupRest is the next pass.  Both
      at the measured means of SETUP_K */
   music(how, t){
-    const outs = [], s = setupMusic(this.m, outs);
+    const outs = [], s = how === '2up' ? { t: introMusic(this.m, outs, 0), stage: true } : setupMusic(this.m, outs);
     for (let [u, v] of outs){
       u *= SETUP_K.tune;
       this.border = v & 7;
@@ -3012,7 +3057,7 @@ class Fist {
      rows were drawn there (D5) */
   setupPass(){
     M1.m1 = 0;
-    const cost = { scen: 0 }, u = setupRest(this.m, this.setup.stage, cost);
+    const cost = { scen: 0 }, u = this.setup.how === '2up' ? start2Rest(this.m) + stage2(this.m, cost) : setupRest(this.m, this.setup.stage, cost);
     const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];
     this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);
     this.stage = this.setup.stage; this.setup = null; this.enter = true;
@@ -3151,5 +3196,5 @@ installThemeButton('theme', 'spec-port-theme');
 loop.start();
 
 /* the test hook: test/kit.test.js loads the BUILT file and drives this */
-globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, demoOn, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, demoIn, gameDispatch, mainLoop, gameStart, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
+globalThis.__PORT__ = { Demo, demo, Fist, game, roundPass, roundTail, pointPath, demoPoint, demoOn, roundIn, winStart, winPass, winEnd, boutNext, checkHighScore, setupMusic, setupRest, introMusic, start2Rest, stage2, demoIn, gameDispatch, mainLoop, gameStart, scenery, bonusStart, bonusPass, endStart, endTail, timeUp, drawStart, specPort, T_FRAME, sound, keyboard, loop, assets: A, spriteDecode, renderFighters, rfPlayT, fighterStep, fighterPost, boutTimer, p2HitsP1, p1HitsP2, fighterMotion, controlPass, yinYang2P, soundEffect, playPass, font, fontMiss, M1 };
 </script>

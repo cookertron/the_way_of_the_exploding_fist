@@ -2962,7 +2962,7 @@
  {
   "file": "template.html",
   "label": "AD1B point: round: a point stops the engine again",
-  "old": "  if (b.exit !== 'ret' && !(demo && b.exit === 'quit')) return b;",
+  "old": "  if (two || b.exit !== 'ret' && !(demo && b.exit === 'quit')) return b;",
   "new": "  if (1) return b;",
   "increment": "AD1B-point",
   "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
@@ -3754,8 +3754,8 @@
  {
   "file": "template.html",
   "label": "AC5F live: Fist.setupPass: R not advanced by the rest's M1",
-  "old": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
-  "new": "u = setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];",
+  "old": "setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];\n    this.r = (this.r & 0x80) | ((this.r + M1.m1) & 0x7F);",
+  "new": "setupRest(this.m, this.setup.stage, cost);\n    const t = (u - cost.scen) * SETUP_K.rest + cost.scen * SCEN_K[this.m[0xAF34]];",
   "increment": "AC5F-live",
   "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -3778,8 +3778,8 @@
  {
   "file": "template.html",
   "label": "AC5F live: Fist.setupPass: the setup run with no new stage",
-  "old": "const cost = { scen: 0 }, u = setupRest(this.m, this.setup.stage, cost);",
-  "new": "const cost = { scen: 0 }, u = setupRest(this.m, false, cost);",
+  "old": " : setupRest(this.m, this.setup.stage, cost);",
+  "new": " : setupRest(this.m, false, cost);",
   "increment": "AC5F-live",
   "kills": "P1: roundPass, the victory pose and the time bonus follow the machine sample for sample over keyed 1P play until the bout ends"
  },
@@ -4246,14 +4246,6 @@
  },
  {
   "file": "template.html",
-  "label": "ac27: Num_Players ignored",
-  "old": "  if (n > 1) return { t: 0, at: 0xAC27 };",
-  "new": "  if (false) return { t: 0, at: 0xAC27 };",
-  "increment": "AC27",
-  "kills": "...and Num_Players 2 (Start_2UP_Game, not ported: D7) stays at $AC27"
- },
- {
-  "file": "template.html",
   "label": "ac27: demoNextPass stops at $AC27 as before",
   "old": "      const d = gameDispatch(this.m, this.r, cost);\n      u.t += d.t; u.at = d.at;",
   "new": "      const d = { t: 0, at: 0xAC27 };\n      u.t += d.t; u.at = d.at;",
@@ -4333,8 +4325,8 @@
  {
   "file": "template.html",
   "label": "ac27 1up: LDIR's last iteration at 21",
-  "old": "4 * 21 + 16 + 10; M1.m1",
-  "new": "5 * 21 + 10; M1.m1",
+  "old": "  return 10 + 10 + 10 + 6 + 10 + 4 * 21 + 16 + 10;",
+  "new": "  return 10 + 10 + 10 + 6 + 10 + 5 * 21 + 10;",
   "increment": "AC27 1UP",
   "kills": "gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
  },
@@ -4425,5 +4417,157 @@
   "new": "  out.push([10 + 4 + 7, 2]);",
   "increment": "boot",
   "kills": "boot: ...from $8800 through Game_Start (border 5), Main_Game_Loop and Demo_Mode into the demo's first $AE29 (row 0), the demo played on through its stages (sampled at $ABB9 on rows 486, 1029, 1467) to the fixture's last row with no way out"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Num_Players 2 taken as 1",
+  "old": "  if (n > 1){                                      // LD A,(Num_Players)",
+  "new": "  if (n > 2){                                      // LD A,(Num_Players)",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Also_Rank cleared too",
+  "old": "    m[0xB05F] = m[0xAA06] = m[0xAA46] = m[0xAA08] = m[0xAA48] = 0;\n    m[0xAF34] = 2;",
+  "new": "    m[0xB05F] = m[0xAA06] = m[0xAA46] = m[0xAA08] = m[0xAA48] = m[0xAA80] = 0;\n    m[0xAF34] = 2;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: $AA46 kept",
+  "old": "    m[0xB05F] = m[0xAA06] = m[0xAA46] = m[0xAA08] = m[0xAA48] = 0;\n    m[0xAF34] = 2;",
+  "new": "    m[0xB05F] = m[0xAA06] = m[0xAA08] = m[0xAA48] = 0;\n    m[0xAF34] = 2;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: stage 1",
+  "old": "    m[0xAF34] = 2;\n    M1.m1 += 6 + 1 + 5 + 2;",
+  "new": "    m[0xAF34] = 1;\n    M1.m1 += 6 + 1 + 5 + 2;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: an M1 short",
+  "old": "    M1.m1 += 6 + 1 + 5 + 2;",
+  "new": "    M1.m1 += 6 + 1 + 5 + 1;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: the head's T four short",
+  "old": "    return { t: 13 + 4 + 7 + 7 + 7 + 17 + 4 + 5 * 13 + 7 + 13, at: 0xADB1 };",
+  "new": "    return { t: 13 + 4 + 7 + 7 + 7 + 17 + 5 * 13 + 7 + 13, at: 0xADB1 };",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: New_Round skipped",
+  "old": "  return 17 + newRound(m, M1) + 17 + resetScore(m);",
+  "new": "  return 17 + 0 + 17 + resetScore(m);",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: players' second row skipped",
+  "old": "+ 20 + printString(m, 0x0319, 0xB03E, M1) + 10; M1.m1 += 5;\n  return t;",
+  "new": "+ 20 + 0 + 10; M1.m1 += 5;\n  return t;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: P2's score not shown",
+  "old": "  t += 7 + 17 + awardTail(m, 0, SIDE2); M1.m1 += 2;",
+  "new": "  t += 7 + 17; M1.m1 += 2;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: the high score from $B035",
+  "old": "scoreBuffer(m, 0xB038) + 20",
+  "new": "scoreBuffer(m, 0xB035) + 20",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: players drawn once",
+  "old": "  t += players(m);\n  m[0x9CA5] = 0x1E;",
+  "new": "  m[0x9CA5] = 0x1E;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Time 29",
+  "old": "  t += players(m);\n  m[0x9CA5] = 0x1E;",
+  "new": "  t += players(m);\n  m[0x9CA5] = 0x1D;",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: the CALL $AE14's T missing",
+  "old": "  t += 4 + 13 + 17; M1.m1 += 3;                    // XOR A: LD ($9C2B),A: CALL $AE14",
+  "new": "  t += 4 + 13; M1.m1 += 3;                    // XOR A: LD ($9C2B),A: CALL $AE14",
+  "increment": "AD9C",
+  "kills": "gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Fist: no 2UP start pass",
+  "old": "    else if (u.at === 0xADB1){ this.demo = false; this.two = true; t += this.music('2up', t); }",
+  "new": "",
+  "increment": "AD9C",
+  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Fist: the 2UP tune skipped",
+  "old": "s = how === '2up' ? { t: introMusic(this.m, outs, 0), stage: true }",
+  "new": "s = how === '2up' ? { t: 0, stage: true }",
+  "increment": "AD9C",
+  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Fist: the 2UP setup as the 1UP's",
+  "old": "u = this.setup.how === '2up' ? start2Rest(this.m) + stage2(this.m, cost) :",
+  "new": "u = false ? start2Rest(this.m) + stage2(this.m, cost) :",
+  "increment": "AD9C",
+  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Fist: the 2UP game's points played as 1UP",
+  "old": "  if (two || b.exit !== 'ret'",
+  "new": "  if (b.exit !== 'ret'",
+  "increment": "AD9C",
+  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Fist: the 2UP round end played as 1UP",
+  "old": "    else if (this.two){ if (res.exit) res.at = 0xAE17; }",
+  "new": "    else if (false){ if (res.exit) res.at = 0xAE17; }",
+  "increment": "AD9C",
+  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
+ },
+ {
+  "file": "template.html",
+  "label": "ad9c: Fist: the stop at $AE14",
+  "old": "if (res.exit) res.at = 0xAE17; }",
+  "new": "if (res.exit) res.at = 0xAE14; }",
+  "increment": "AD9C",
+  "kills": "2UP: ...and leave the bout into the demo, quit it by key 2"
  }
 ]
