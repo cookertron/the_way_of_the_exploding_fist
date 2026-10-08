@@ -39,7 +39,8 @@ Configuration, in port.json:
               "diagnostic": "BB_"}
 Cases are a JSON list of {"file", "label", "old", "new"} (plus, ideally,
 "increment" and "kills"), or a Python file holding MUTS = [(file, label, old,
-new), ...].  A file ending in .test.js lives in test/, everything else in web/.
+new), ...].  A file ending in .test.js, and rig.js, live in test/; everything
+else in web/.
 """
 import ast
 import datetime
@@ -108,7 +109,8 @@ def load_cases(path):
 
 
 def src_path(fn, root):
-    return os.path.join(root, 'test' if fn.endswith('.test.js') else 'web', fn)
+    # the suites and the rig they load live in test/; the page's sources in web/
+    return os.path.join(root, 'test' if fn.endswith('.test.js') or fn == 'rig.js' else 'web', fn)
 
 
 # ---------------------------------------------------------------------------

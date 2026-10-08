@@ -471,6 +471,46 @@ const mockCtx = (state) => ({
 }
 
 /* =======================================================================
+   THE GATE HELPERS (rig.gate)
+   Each is fed a world it must reject (T100) beside one it must pass.
+   ======================================================================= */
+{
+  const G = rig.gate;
+  /* a synthetic fixture: the call reads $8000 and $8001, writes $9000-$9001
+     from them and $9002 := $A5 over a byte it never read */
+  const fx = { cases: [{ site: 0x1234, in: [[0x8000, '1122']], out: [[0x9000, '1122a5']], t: 40 }] };
+  const good = m => { m[0x9000] = m[0x8000]; m[0x9001] = m[0x8001]; m[0x9002] = 0xA5; return { t: 40 }; };
+  const exp = { expect: { t: c => c.t } };
+  const r = G.replay(fx, good, exp);
+  check('replay passes an engine that writes exactly the case\'s bytes', [r.n, r.bytes, r.t], [1, [0, ''], [0, '']]);
+  check('replay sees a missed store', G.replay(fx, m => { good(m); m[0x9001] = 0xA5; return { t: 40 }; }, exp).bytes[0], 1);
+  check('replay sees a stray write outside the case (the cells and no others)',
+        G.replay(fx, m => { good(m); m[0x7FFF] = 0; return { t: 40 }; }, exp).bytes[1], 'case 0 ($1234): $7fff = 0 want 165');
+  check('replay sees a wrong observation', G.replay(fx, m => { good(m); return { t: 41 }; }, exp).t[0], 1);
+  check('replay counts a store of the poison over an unread byte as masked', [r.masked, r.still], [1, 0]);
+  check('replay skips what opts.skip steps over, and only that',
+        [G.replay(fx, m => { good(m); m[0x7FFF] = 0; }, { skip: a => a === 0x7FFF ? 0x8000 : a }).bytes[0],
+         G.replay(fx, m => { good(m); m[0x7FFE] = 0; }, { skip: a => a === 0x7FFF ? 0x8000 : a }).bytes[0]], [0, 1]);
+  check('corrupt makes the passing engine fail on that case', G.replay(G.corrupt(fx), good).bytes[0], 1);
+  check('corrupt leaves the fixture it copies unchanged', fx.cases[0].out[0][1], '1122a5');
+  check('corrupt skips a case that writes nothing',
+        (() => { try { return G.corrupt({ cases: [{ in: [], out: [] }, fx.cases[0]] }).cases.map(c => c.out[0][1]); }
+                 catch (e) { return String(e); } })(), ['1022a5']);
+  const throws = f => { try { f(); return false; } catch (e) { return /T110/.test(e.message); } };
+  check('an empty measurement throws (replay, ran, missing, distinct, unnamed)',
+        [throws(() => G.replay({ cases: [] }, good)), throws(() => G.ran([])), throws(() => G.missing([], new Set())),
+         throws(() => G.distinct([])), throws(() => G.unnamed([], [1]))], [true, true, true, true, true]);
+  const pcs = G.ran([{ sig: '12349abc' }, { sig: '1234' }]);
+  check('ran collects every PC of every case\'s sig', [...pcs].sort((a, b) => a - b), [0x1234, 0x9ABC]);
+  check('missing names the required PCs not run, in hex', G.missing([0x1234, 0x5678], pcs), ['5678']);
+  check('distinct counts a uniform table as one value', [G.distinct([7, 7, 7]), G.distinct([[1, 2], [1, 2], [2, 1]])], [1, 2]);
+  check('sameSource sees one capture on both sides', [G.sameSource({ a: [1] }, { a: [1] }), G.sameSource([1], [2])], [true, false]);
+  check('unnamed reports both directions', G.unnamed([1, 2, 0x1F], [2, 3]), [['1', '1f'], ['3']]);
+  const m = new Uint8Array(16).fill(0xA5); m[3] = 0; m[5] = 1;
+  check('untouched names a changed cell not in the written set', G.untouched(m, 0, 15, 0xA5, [3]), ['$5']);
+}
+
+/* =======================================================================
    THE GAME: The Way of the Exploding Fist
    ======================================================================= */
 
@@ -575,79 +615,52 @@ const mockCtx = (state) => ({
 }
 
 /* ---- fighter_step $97BB against its frozen oracle (callio) -----------
-   Every case is replayed in a blank 64K holding only the bytes the real
-   call read; the whole of memory must then equal the bytes it left, and the
-   T its uncontended T from the CALL to the return (python tools/callio.py
-   --capture --call 0x9763 0x9766 --call 0x976C 0x976F). */
+   Every case is replayed in a poisoned 64K holding only the bytes the real
+   call read (rig.gate.replay); the whole of memory must then equal the
+   bytes it left, and the T its uncontended T from the CALL to the return
+   (python tools/callio.py --capture --call 0x9763 0x9766 --call 0x976C 0x976F). */
 {
-  const fx = P.assets.step97bb;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const fx = P.assets.step97bb, G = rig.gate;
   const iC = fx.regs.indexOf(3);                 // SkoolKit index of C
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    P.M1.m1 = 0;
-    const t = P.fighterStep(m, c.regs[iC]);
-    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++)
-      firstBytes = `case ${i} ($${c.site.toString(16)}): $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i} ($${c.site.toString(16)}): T ${t} want ${c.t}`;
-  }
-  check('fighterStep writes every byte the real $97BB wrote (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('fighterStep tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const run = (m, c) => { P.M1.m1 = 0; const t = P.fighterStep(m, c.regs[iC]); return { t, m1: P.M1.m1 & 0x7F }; };
   /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
-  check('fighterStep counts the M1 cycles of every case as R advanced in the real $97BB', [badM1, firstM1], [0, '']);
+  const r = G.replay(fx, run, { expect: { t: c => c.t, m1: c => (c.rx - c.r) & 0x7F } });
+  check('fighterStep writes every byte the real $97BB wrote (callio cases)', r.bytes, [0, '']);
+  check('fighterStep tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('fighterStep counts the M1 cycles of every case as R advanced in the real $97BB', r.m1, [0, '']);
+  check('the fighterStep gate fails on a case with one byte corrupted (T100)',
+        G.replay(G.corrupt(fx), run).bytes[0], 1);
+  check('no fighterStep case stores the poison over a byte it never read (T131)', r.masked, 0);
   /* every exit of every callee, play or derived (callio.py --derive: the
      real code on a constructed input, e.g. both fighters facing one way) */
-  const ran = new Set();
-  for (const c of fx.cases) for (let j = 0; j < c.sig.length; j += 4) ran.add(parseInt(c.sig.slice(j, j + 4), 16));
   check('the callio cases reach every exit of $9920 $9994 $9AA1 $9BA7',
-        [0x992F, 0x9989, 0x998D, 0x9990, 0x9993, 0x993A, 0x9945, 0x9951, 0x9954, 0x995C, 0x9963, 0x9985,
+        G.missing([0x992F, 0x9989, 0x998D, 0x9990, 0x9993, 0x993A, 0x9945, 0x9951, 0x9954, 0x995C, 0x9963, 0x9985,
          0x99BE, 0x99CC, 0x99D1, 0x99DC, 0x99DF, 0x99EB, 0x99FA, 0x99FC, 0x9A18, 0x9A1A, 0x9A1D, 0x9A26,
          0x9A3A, 0x9A3C, 0x9A6F, 0x9A8A, 0x9A8C, 0x9AA0, 0x9AB8, 0x9ACC, 0x9AD6,
-         0x9BF1, 0x9BF4, 0x9C18, 0x9C1F, 0x9C23, 0x9C27].filter(a => !ran.has(a)).map(a => a.toString(16)), []);
+         0x9BF1, 0x9BF4, 0x9C18, 0x9C1F, 0x9C23, 0x9C27], G.ran(fx.cases)), []);
   check('the callio cases call $97BB for both fighters (C = 0 and $40)',
-        [0, 0x40].filter(v => !fx.cases.some(c => c.regs[iC] === v)), []);
+        G.missing([0, 0x40], v => fx.cases.some(c => c.regs[iC] === v)), []);
 }
 
 /* ---- fighter_post $9AD7 + $9B9D against its frozen oracle (callio) ---
    As above, the pair bracketed from the CALL at $979A/$97A6 to $97A0/$97AC
    (python tools/callio.py --capture --call 0x979A 0x97A0 --call 0x97A6 0x97AC). */
 {
-  const fx = P.assets.post9ad7;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+  const fx = P.assets.post9ad7, G = rig.gate;
   const iC = fx.regs.indexOf(3);
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    P.M1.m1 = 0;
-    const t = P.fighterPost(m, c.regs[iC]);
-    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++)
-      firstBytes = `case ${i} ($${c.site.toString(16)}): $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i} ($${c.site.toString(16)}): T ${t} want ${c.t}`;
-  }
-  check('fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('fighterPost tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const run = (m, c) => { P.M1.m1 = 0; const t = P.fighterPost(m, c.regs[iC]); return { t, m1: P.M1.m1 & 0x7F }; };
   /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
-  check('fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D', [badM1, firstM1], [0, '']);
-  const ran = new Set();
-  for (const c of fx.cases) for (let j = 0; j < c.sig.length; j += 4) ran.add(parseInt(c.sig.slice(j, j + 4), 16));
+  const r = G.replay(fx, run, { expect: { t: c => c.t, m1: c => (c.rx - c.r) & 0x7F } });
+  check('fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)', r.bytes, [0, '']);
+  check('fighterPost tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('fighterPost counts the M1 cycles of every case as R advanced in the real $9AD7+$9B9D', r.m1, [0, '']);
+  check('the fighterPost gate fails on a case with one byte corrupted (T100)',
+        G.replay(G.corrupt(fx), run).bytes[0], 1);
+  check('no fighterPost case stores the poison over a byte it never read (T131)', r.masked, 0);
   check('the callio cases reach every exit and branch of $9AD7',
-        [0x9AE3, 0x9AF4, 0x9AFD, 0x9B09, 0x9B0E, 0x9B1E, 0x9B23, 0x9B67, 0x9B71, 0x9B8A]
-          .filter(a => !ran.has(a)).map(a => a.toString(16)), []);
+        G.missing([0x9AE3, 0x9AF4, 0x9AFD, 0x9B09, 0x9B0E, 0x9B1E, 0x9B23, 0x9B67, 0x9B71, 0x9B8A], G.ran(fx.cases)), []);
   check('the callio cases call $9AD7 for both fighters (C = 0 and $40)',
-        [0, 0x40].filter(v => !fx.cases.some(c => c.regs[iC] === v)), []);
+        G.missing([0, 0x40], v => fx.cases.some(c => c.regs[iC] === v)), []);
 }
 
 /* ---- bout_timer $9C6F and its printer against its frozen oracle (callio) -
@@ -691,8 +704,7 @@ const mockCtx = (state) => ({
   /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
   check('boutTimer counts the M1 cycles of every case as R advanced in the real $9C6F', [badM1, firstM1], [0, '']);
   check('each printed cell shows the lookalike glyph of its $932C character', [badGlyph, firstGlyph], [0, '']);
-  const pcs = fx.cases.map(c => { const s = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  const pcs = fx.cases.map(c => rig.gate.ran([c]));
   /* each RET of $9C6F: a case that passed the PC before it and not the one after */
   check('the callio cases take every early return of $9C6F',
         [[0x9C6F, 0x9C74], [0x9C74, 0x9C7C], [0x9C7C, 0x9C82], [0x9C82, 0x9C87]]
@@ -707,28 +719,17 @@ const mockCtx = (state) => ({
    --capture --call 0x9748 0x974B); derived cases reach the branches driven
    play did not (ledger/9ED2.toml). */
 {
-  const fx = P.assets.hit9ed2;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    P.M1.m1 = 0;
-    const t = P.p2HitsP1(m);
-    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
-  }
-  check('p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('p2HitsP1 tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const fx = P.assets.hit9ed2, G = rig.gate;
+  const run = m => { P.M1.m1 = 0; const t = P.p2HitsP1(m); return { t, m1: P.M1.m1 & 0x7F }; };
   /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
-  check('p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2', [badM1, firstM1], [0, '']);
-  const pcs = fx.cases.map(c => { const s = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  const r = G.replay(fx, run, { expect: { t: c => c.t, m1: c => (c.rx - c.r) & 0x7F } });
+  check('p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)', r.bytes, [0, '']);
+  check('p2HitsP1 tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('p2HitsP1 counts the M1 cycles of every case as R advanced in the real $9ED2', r.m1, [0, '']);
+  check('the p2HitsP1 gate fails on a case with one byte corrupted (T100)',
+        G.replay(G.corrupt(fx), run).bytes[0], 1);
+  check('no p2HitsP1 case stores the poison over a byte it never read (T131)', r.masked, 0);
+  const pcs = fx.cases.map(c => rig.gate.ran([c]));
   /* each early RET: a case that passed the PC before it and not the one after */
   check('the callio cases take every early return of $9ED2',
         [[0x9ED2, 0x9EDF], [0x9EDF, 0x9EE4], [0x9EE4, 0x9EE9], [0x9EE9, 0x9EEE], [0x9EEE, 0x9EFA],
@@ -747,28 +748,17 @@ const mockCtx = (state) => ({
    is $9ED2's, $19D lower, so the PC lists are $9ED2's moved down
    (ledger/9D29.toml). */
 {
-  const fx = P.assets.hit9d29;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    P.M1.m1 = 0;
-    const t = P.p1HitsP2(m);
-    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
-  }
-  check('p1HitsP2 writes every byte the real $9D29 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('p1HitsP2 tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const fx = P.assets.hit9d29, G = rig.gate;
+  const run = m => { P.M1.m1 = 0; const t = P.p1HitsP2(m); return { t, m1: P.M1.m1 & 0x7F }; };
   /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
-  check('p1HitsP2 counts the M1 cycles of every case as R advanced in the real $9D29', [badM1, firstM1], [0, '']);
-  const pcs = fx.cases.map(c => { const s = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  const r = G.replay(fx, run, { expect: { t: c => c.t, m1: c => (c.rx - c.r) & 0x7F } });
+  check('p1HitsP2 writes every byte the real $9D29 wrote (callio cases)', r.bytes, [0, '']);
+  check('p1HitsP2 tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('p1HitsP2 counts the M1 cycles of every case as R advanced in the real $9D29', r.m1, [0, '']);
+  check('the p1HitsP2 gate fails on a case with one byte corrupted (T100)',
+        G.replay(G.corrupt(fx), run).bytes[0], 1);
+  check('no p1HitsP2 case stores the poison over a byte it never read (T131)', r.masked, 0);
+  const pcs = fx.cases.map(c => rig.gate.ran([c]));
   /* each early RET: a case that passed the PC before it and not the one after */
   check('the callio cases take every early return of $9D29',
         [[0x9D35, 0x9D42], [0x9D42, 0x9D47], [0x9D47, 0x9D4C], [0x9D4C, 0x9D51], [0x9D51, 0x9D5D],
@@ -787,28 +777,17 @@ const mockCtx = (state) => ({
    and the fixture keeps its ROM reads as addresses (D5), so the port
    reads no ROM: the poison there would show (ledger/95D4.toml). */
 {
-  const fx = P.assets.motion95d4;
-  const put = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
-  let badBytes = 0, badT = 0, firstBytes = '', firstT = '', badM1 = 0, firstM1 = '';
-  for (let i = 0; i < fx.cases.length; i++){
-    const c = fx.cases[i];
-    const m = new Uint8Array(0x10000).fill(0xA5);   // unread bytes poisoned: a stray 0 shows
-    put(m, c.in);
-    const want = m.slice(); put(want, c.out);
-    P.M1.m1 = 0;
-    const t = P.fighterMotion(m);
-    if ((P.M1.m1 & 0x7F) !== ((c.rx - c.r) & 0x7F) && !badM1++) firstM1 = `case ${i}: M1 ${P.M1.m1} want ${(c.rx - c.r) & 0x7F} mod 128`;
-    let diff = -1;
-    for (let a = 0; a < 0x10000; a++) if (m[a] !== want[a]){ diff = a; break; }
-    if (diff >= 0 && !badBytes++) firstBytes = `case ${i}: $${diff.toString(16)} = ${m[diff]} want ${want[diff]}`;
-    if (t !== c.t && !badT++) firstT = `case ${i}: T ${t} want ${c.t}`;
-  }
-  check('fighterMotion writes every byte the real $95D4 wrote (callio cases)', [badBytes, firstBytes], [0, '']);
-  check('fighterMotion tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
+  const fx = P.assets.motion95d4, G = rig.gate;
+  const run = m => { P.M1.m1 = 0; const t = P.fighterMotion(m); return { t, m1: P.M1.m1 & 0x7F }; };
   /* R: the fixture's R at the CALL and the return (callio.py --check --stamp-r) */
-  check('fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4', [badM1, firstM1], [0, '']);
-  const pcs = fx.cases.map(c => { const s = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  const r = G.replay(fx, run, { expect: { t: c => c.t, m1: c => (c.rx - c.r) & 0x7F } });
+  check('fighterMotion writes every byte the real $95D4 wrote (callio cases)', r.bytes, [0, '']);
+  check('fighterMotion tallies the uncontended T of every case exactly', r.t, [0, '']);
+  check('fighterMotion counts the M1 cycles of every case as R advanced in the real $95D4', r.m1, [0, '']);
+  check('the fighterMotion gate fails on a case with one byte corrupted (T100)',
+        G.replay(G.corrupt(fx), run).bytes[0], 1);
+  check('no fighterMotion case stores the poison over a byte it never read (T131)', r.masked, 0);
+  const pcs = fx.cases.map(c => rig.gate.ran([c]));
   check('the callio cases reach every branch of $95D4 and its swap $971E',
         [0x95EE, 0x9605, 0x960F, 0x9613, 0x961F, 0x9623, 0x962A, 0x9639, 0x963F, 0x9642, 0x9648, 0x9658, 0x965C,
          0x971E, 0x9697, 0x96B7, 0x96BA, 0x96BE, 0x96C9, 0x96CC, 0x96CE, 0x96F3, 0x96FC, 0x9714, 0x9717]
@@ -903,8 +882,7 @@ const mockCtx = (state) => ({
      fall), $A094 fall ($AA03/$AA43 are 0 whenever the AI is called),
      $A49F fall ($A614 < 7 on its only way in), $98A2 fall (no bit 5 from
      $8B1F) (ledger/97CB.toml). */
-  const pcs = fx.cases.map(c => { const s = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  const pcs = fx.cases.map(c => rig.gate.ran([c]));
   check('the callio cases reach every branch of $97CB, its controls $8B1F, the menu $8C54 and the AI $A090',
         [0x8B24, 0x8B2A, 0x8B3D, 0x8B42, 0x8B4C, 0x8B4E, 0x8B56, 0x8B5A, 0x8B62, 0x8B64, 0x8B6C, 0x8B70,
          0x8B78, 0x8B7A, 0x8B82, 0x8B86, 0x8B8E, 0x8B90, 0x8B98, 0x8B9C, 0x8BA4, 0x8BA6, 0x8BBA, 0x8BBF,
@@ -963,8 +941,7 @@ const mockCtx = (state) => ({
   check('yinYang2P tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
   /* R: the fixture's R at $976F and at $978D (callio.py --check --stamp-r) */
   check('yinYang2P counts the M1 cycles of every case as R advanced in the real $976F-$978D', [badM1, firstM1], [0, '']);
-  const pcs = fx.cases.map(c => { const s = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  const pcs = fx.cases.map(c => rig.gate.ran([c]));
   check('the callio cases reach every branch of $976F, $900E and its copy $9255',
         [0x9776, 0x977C, 0x9783, 0x9015, 0x901E, 0x9028, 0x9036, 0x904D, 0x905C, 0x9065, 0x906F, 0x907D, 0x9094,
          0x922F, 0x9235, 0x9239]
@@ -1080,8 +1057,7 @@ const mockCtx = (state) => ({
   check('playPass tallies the uncontended T of every case exactly', [badT, firstT], [0, '']);
   check('playPass returns the A the real $9745 returned (the RET M at $AE2D)', [badA, firstA], [0, '']);
   check('playPass counts R to the value the real $9745 left (the AI draws carried)', [badR, firstR], [0, '']);
-  const pcs = fx.cases.map(c => { const s = new Set();
-    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16)); return s; });
+  const pcs = fx.cases.map(c => rig.gate.ran([c]));
   check('the pass cases cover 1P, 2P, a timer print, an effect and both fighter draws',
         [0x975C, 0x9776, 0x9C93, 0xB15C, 0x9790, 0x97A6].filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
   check('the pass cases take the RET M at $975B (the quit)',

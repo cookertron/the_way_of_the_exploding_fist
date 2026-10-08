@@ -4733,5 +4733,101 @@
   "new": "menu: io.menu });",
   "increment": "8C54",
   "kills": "menu sound off: ...and the menu's pass is charged within 2% of the contended machine, its steps charged to the clock as they ran"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: memory not poisoned",
+  "old": "const m = new Uint8Array(0x10000).fill(fill);",
+  "new": "const m = new Uint8Array(0x10000);",
+  "increment": "gate-helpers",
+  "kills": "replay sees a stray write outside the case (the cells and no others)"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: unchanged-store census inverted",
+  "old": "if (v === read[a]) { if (v === fill",
+  "new": "if (v !== read[a]) { if (v === fill",
+  "increment": "gate-helpers",
+  "kills": "replay counts a store of the poison over an unread byte as masked"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: skip result discarded",
+  "old": "if (opts.skip) { a = opts.skip(a, c);",
+  "new": "if (opts.skip) { opts.skip(a, c);",
+  "increment": "gate-helpers",
+  "kills": "replay skips what opts.skip steps over, and only that"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate replay: observation unread",
+  "old": "const w = expect[k](c), g = got[k];",
+  "new": "const w = expect[k](c), g = w;",
+  "increment": "gate-helpers",
+  "kills": "replay sees a wrong observation"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate corrupt: no bit flipped",
+  "old": "(parseInt(h.slice(0, 2), 16) ^ 1)",
+  "new": "(parseInt(h.slice(0, 2), 16) ^ 0)",
+  "increment": "gate-helpers",
+  "kills": "corrupt makes the passing engine fail on that case"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate corrupt: takes a silent case",
+  "old": "const c = fx.cases.find(c => c.out.length);",
+  "new": "const c = fx.cases[0];",
+  "increment": "gate-helpers",
+  "kills": "corrupt skips a case that writes nothing"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate nonEmpty: never throws",
+  "old": "if (!n) throw new Error(",
+  "new": "if (false) throw new Error(",
+  "increment": "gate-helpers",
+  "kills": "an empty measurement throws (replay, ran, missing, distinct, unnamed)"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate missing: inverted",
+  "old": "return required.filter(v => !has(v))",
+  "new": "return required.filter(v => has(v))",
+  "increment": "gate-helpers",
+  "kills": "missing names the required PCs not run, in hex"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate ran: first PC only",
+  "old": "for (let j = 0; j < c.sig.length; j += 4) s.add(",
+  "new": "for (let j = 0; j < 4; j += 4) s.add(",
+  "increment": "gate-helpers",
+  "kills": "ran collects every PC of every case's sig"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate unnamed: stale side dropped",
+  "old": "named.filter(v => !f.has(v))",
+  "new": "named.filter(v => false)",
+  "increment": "gate-helpers",
+  "kills": "unnamed reports both directions"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate untouched: written set ignored",
+  "old": "if (m[a] !== v && !w.has(a)) bad.push(a);",
+  "new": "if (m[a] !== v) bad.push(a);",
+  "increment": "gate-helpers",
+  "kills": "untouched names a changed cell not in the written set"
+ },
+ {
+  "file": "rig.js",
+  "label": "gate distinct: counts entries",
+  "old": "return new Set(Array.from(values, v => JSON.stringify(v))).size;",
+  "new": "return values.length;",
+  "increment": "gate-helpers",
+  "kills": "distinct counts a uniform table as one value"
  }
 ]

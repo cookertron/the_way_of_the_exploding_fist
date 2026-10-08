@@ -93,6 +93,10 @@ record up loses nothing.
   and source written through shell heredocs, a consistency check at the
   end of every response, a note when the context passes the handover mark,
   and a short block for every sub-agent.
+- `rig.gate` in `test/rig.js` — replay a frozen fixture in a poisoned 64K
+  with the whole of memory compared, corrupt it for the negative control,
+  coverage from the machine's sig; an empty measurement throws.  A new
+  fixture gate uses it, and keeps its own check() rows.
 - `tools/mutants.py` — the mutation battery's runner (manual 6.12): each
   case runs only the gate blocks its anchor reaches, killing block first,
   stopping at the first failure; survivors are confirmed against the whole
@@ -114,7 +118,7 @@ each must prevent.
 
 | Tool | Replaces |
 |---|---|
-| gate helpers in `test/rig.js` | remembering how gates fail (map: `gate`) |
+| the rest of the gate helpers: world builders (boundaries, wraps, both instances, every field seeded), the on/off identity gate | remembering how gates fail (map: `gate`, the BUILD rows) |
 | per-verdict stamps and pruning, for the runner (manual 6.12 steps 4, 6) | re-running unchanged verdicts at milestones; keeping redundant cases (map: `battery`) |
 | the byte-usage map and roster manifest | backward-decode verdicts; guessing how saved states differ (12.5, 12.6) |
 | `tools/brief.py`, `tools/verify_claims.py` | re-reading a range to check a sub-agent (12.7) |

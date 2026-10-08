@@ -131,9 +131,152 @@ function loadBuilt(file) {
   return { S, P, sandbox, html };
 }
 
+/* ---------- gate helpers (CLAUDE.md's still-to-build table; map: gate) -
+   They COMPUTE and return what a row asserts; the block keeps its own
+   check() calls, because tools/mutants.js finds a block by the check calls
+   written in it, and mutants.json names the rows that kill.  Each helper
+   makes one failure from docs/TRAPS.md unwritable, named beside it; each
+   is gated against a known-wrong input in kit.test.js (T100).
+
+   An empty measurement THROWS rather than returning a pass (T110): a
+   coverage list with no addresses, a replay with no cases, a table of
+   nothing.  A throw is a crash, and a crash is never green. */
+const POISON = 0xA5;
+function nonEmpty(what, n) {
+  if (!n) throw new Error(`gate: ${what} is empty -- a check over nothing passes (T110)`);
+  return n;
+}
+const putRuns = (m, runs) => { for (const [a, h] of runs) m.set(Buffer.from(h, 'hex'), a); };
+const hex = v => '$' + v.toString(16);
+
+/* replay(fx, run, opts) -- every case of a frozen oracle fixture (callio,
+   sprdec: cases of {in, out} byte runs) replayed in a POISONED 64K (T125,
+   T140, T159): memory holds only the bytes the real call read, every other
+   byte is the poison, and afterwards the WHOLE of memory must equal in+out
+   -- the cells it wrote and no others (T133, T140).
+     run(m, c, i)   drives the engine; returns an object of observations
+     opts.expect    { name: c => wanted } compared with run's observation
+     opts.skip      a => next address to compare (the call's own stack, a
+                    scratch range); return a unchanged to compare it
+     opts.base      (m, c) => seeds shared tables before the case's bytes
+     opts.only      case indices to replay
+     opts.fill      the poison (0xA5); opts.stop stops at the first bad case
+   Returns { n, bytes: [bad, first], <name>: [bad, first], masked, still }.
+     masked  out bytes the call wrote over a byte it never read, equal to
+             the poison: an engine that skips that store still passes (T131)
+     still   out bytes equal to the in byte they overwrote: a store whose
+             target already agreed, invisible to the diff (T131, T140) */
+function replay(fx, run, opts = {}) {
+  const fill = opts.fill === undefined ? POISON : opts.fill;
+  const expect = opts.expect || {};
+  const idx = opts.only || fx.cases.map((_, i) => i);
+  nonEmpty('replay: the fixture\'s cases', idx.length);
+  const res = { n: 0, bytes: [0, ''], masked: 0, still: 0 };
+  for (const k in expect) res[k] = [0, ''];
+  for (const i of idx) {
+    const c = fx.cases[i];
+    const m = new Uint8Array(0x10000).fill(fill);
+    if (opts.base) opts.base(m, c);
+    putRuns(m, c.in);
+    const read = m.slice(), want = m.slice();
+    putRuns(want, c.out);
+    for (const [a0, h] of c.out) for (let k = 0; k < h.length / 2; k++) {
+      const a = a0 + k, v = parseInt(h.substr(2 * k, 2), 16);
+      if (v === read[a]) { if (v === fill && !inRuns(c.in, a)) res.masked++; else res.still++; }
+    }
+    const got = run(m, c, i) || {};
+    res.n++;
+    let bad = false;
+    for (let a = 0; a < 0x10000; a++) {
+      if (opts.skip) { a = opts.skip(a, c); if (a > 0xFFFF) break; }
+      if (m[a] !== want[a]) {
+        if (!res.bytes[0]++) res.bytes[1] = `case ${i}${c.site !== undefined ? ' (' + hex(c.site) + ')' : ''}: ${hex(a)} = ${m[a]} want ${want[a]}`;
+        bad = true; break;
+      }
+    }
+    for (const k in expect) {
+      const w = expect[k](c), g = got[k];
+      if (JSON.stringify(g) !== JSON.stringify(w)) {
+        if (!res[k][0]++) res[k][1] = `case ${i}: ${k} ${JSON.stringify(g)} want ${JSON.stringify(w)}`;
+        bad = true;
+      }
+    }
+    if (bad && opts.stop) break;
+  }
+  return res;
+}
+function inRuns(runs, a) {
+  return runs.some(([a0, h]) => a0 <= a && a < a0 + h.length / 2);
+}
+
+/* corrupt(fx) -- a one-case copy of fx: its first case that writes, with
+   the first out byte's bit 0 flipped.  A replay of it must report
+   bytes[0] = 1 (T100: feed the gate a value known wrong and require it to
+   fail).  Throws when no case writes anything. */
+function corrupt(fx) {
+  const c = fx.cases.find(c => c.out.length);
+  if (!c) nonEmpty('corrupt: the writes of the cases', 0);
+  const [a0, h] = c.out[0];
+  const out = c.out.slice();
+  out[0] = [a0, (parseInt(h.slice(0, 2), 16) ^ 1).toString(16).padStart(2, '0') + h.slice(2)];
+  return Object.assign({}, fx, { cases: [Object.assign({}, c, { out })] });
+}
+
+/* ran(cases) -- the set of PCs a fixture's cases executed (each case's
+   sig, four hex digits a PC); missing(required, have) -- the required
+   addresses (or values) not in have, as hex strings, [] when all are.
+   Coverage is measured against what the MACHINE ran (T175), and the list
+   must be non-empty (T110, T138). */
+function ran(cases) {
+  nonEmpty('ran: the cases', cases.length);
+  const s = new Set();
+  for (const c of cases)
+    for (let j = 0; j < c.sig.length; j += 4) s.add(parseInt(c.sig.slice(j, j + 4), 16));
+  return s;
+}
+function missing(required, have) {
+  nonEmpty('missing: the required list', required.length);
+  const has = typeof have === 'function' ? have : v => have.has(v);
+  return required.filter(v => !has(v)).map(v => v.toString(16));
+}
+
+/* distinct(values) -- how many different values a lookup produced: a
+   table whose output does not vary with its index is not a lookup (T122).
+   A row asserts distinct(...) >= the count the source holds. */
+function distinct(values) {
+  nonEmpty('distinct: the values', values.length);
+  return new Set(Array.from(values, v => JSON.stringify(v))).size;
+}
+
+/* sameSource(a, b) -- true when a gate's two sides are one capture: a row
+   asserts it false before comparing them (T104). */
+function sameSource(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/* unnamed(found, named) -- a category enumerated IN CODE against the list
+   a row names (T169): [found but unnamed, named but not found], both []
+   when the list is the category. */
+function unnamed(found, named) {
+  nonEmpty('unnamed: the enumeration', found.length);
+  const f = new Set(found), n = new Set(named);
+  return [found.filter(v => !n.has(v)).map(v => v.toString(16)),
+          named.filter(v => !f.has(v)).map(v => v.toString(16))];
+}
+
+/* untouched(m, lo, hi, v, wrote) -- after poisoning lo..hi with v (T125),
+   the addresses in the range that changed but are not in wrote (T140). */
+function untouched(m, lo, hi, v, wrote) {
+  const w = new Set(wrote), bad = [];
+  for (let a = lo; a <= hi; a++) if (m[a] !== v && !w.has(a)) bad.push(a);
+  return bad.map(hex);
+}
+
+const gate = { POISON, replay, corrupt, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty };
+
 module.exports = {
   ROOT, sandbox, els, drawCalls, listeners, localStorageStore,
-  check, checkTrue, done, loadBuilt, builtPath,
+  check, checkTrue, done, loadBuilt, builtPath, gate,
   record(on) { recording = on; if (on) drawCalls.length = 0; },
   raf() { return rafCallback; },
   fire(type, ev) { for (const fn of (listeners[type] || [])) fn(ev); },
