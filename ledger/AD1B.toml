@@ -44,3 +44,8 @@ by     = "port.json live_quit (python tools/sample.py --state p1 --script 10:,15
 kind   = "measured"
 says   = "point guard ($AA03 XOR $AA43) AND $10: worlds added for P2 scoring 1 and 2 ($AA43=$16, $AA03=0) and both bits set -- cases 18-20 derived, no new PCs (a value gap coverage missed); a guard on $AA03 alone is now killed"
 by     = "python tools/callio.py --derive --state p1 --fixture build/callio_ad1b.json --case 0 --set 0xAA03=0,0xAA43=0x16,0xAA48=1 (=2; and 0xAA43=0x16) ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "every pointPath store seeded (G.unseeded []): 2 cases derived by callio --seed (21 from 0: $AA00/$AA06..., 22 from 3 with $9C2B), the rest follow two inputs; $9CAE guards itself under $AD3E (case 10, $9C2B=1 alone); pointPath matches all 23"
+by     = "python tools/callio.py --seed --state p1 --fixture build/callio_ad1b.json ; python tools/callio.py --check --state p1 --fixture build/callio_ad1b.json ; node test/kit.test.js"

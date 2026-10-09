@@ -5005,5 +5005,45 @@
   "new": "v !== (was === undefined ? v ^ 1 : was)",
   "increment": "worlds",
   "kills": "unseeded names a store that left what was there in every case, the poison included"
+ },
+ {
+  "file": "rig.js",
+  "label": "unseeded: one value written back counts as following",
+  "old": "(follows.get(a) || new Set()).size < 2",
+  "new": "(follows.get(a) || new Set()).size < 1",
+  "increment": "seed",
+  "kills": "unseeded passes a store seen writing back two different bytes it read, not one twice"
+ },
+ {
+  "file": "rig.js",
+  "label": "unseeded: a derive of two bytes counts as a guard",
+  "old": "set.length !== 1 ||",
+  "new": "set.length < 1 ||",
+  "increment": "seed",
+  "kills": "unseeded passes a store a one-byte derive shows guarding itself, and nothing less"
+ },
+ {
+  "file": "rig.js",
+  "label": "unseeded: a derive with R or ports counts as a guard",
+  "old": "Object.keys(d).some(k => !['from', 'set', 'up'].includes(k))",
+  "new": "false",
+  "increment": "seed",
+  "kills": "unseeded passes a store a one-byte derive shows guarding itself, and nothing less"
+ },
+ {
+  "file": "rig.js",
+  "label": "unseeded: a derive giving callers' returns is no guard",
+  "old": "['from', 'set', 'up'].includes(k)",
+  "new": "['from', 'set'].includes(k)",
+  "increment": "seed",
+  "kills": "unseeded passes a store a one-byte derive shows guarding itself, and nothing less"
+ },
+ {
+  "file": "rig.js",
+  "label": "unseeded: a derive that set the same byte counts as a guard",
+  "old": "if (writes(p, a) && caseByte(c, a) !== caseByte(p, a)) guards.add(a);",
+  "new": "if (writes(p, a)) guards.add(a);",
+  "increment": "seed",
+  "kills": "unseeded passes a store a one-byte derive shows guarding itself, and nothing less"
  }
 ]

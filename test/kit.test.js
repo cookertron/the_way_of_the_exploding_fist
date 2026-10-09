@@ -556,6 +556,14 @@ const mockCtx = (state) => ({
   check('worlds does not count a byte the case never read as held', G.worlds(wf, [{ 0x8001: 0xA5 }]), ['0x8001=0xA5']);
   check('unseeded names a store that left what was there in every case, the poison included',
         [G.unseeded(wf), G.unseeded({ cases: [wf.cases[0]] })], [['$9001'], ['$9000', '$9001']]);
+  const id = v => ({ in: [[0x9002, v]], out: [[0x9002, v]] });
+  check('unseeded passes a store seen writing back two different bytes it read, not one twice',
+        [G.unseeded({ cases: [id('01'), id('02')] }), G.unseeded({ cases: [id('01'), id('01')] })], [[], ['$9002']]);
+  const gone = (set, more, v = '01') => ({ in: [[0x9002, v]], out: [], derived: { from: 0, set, ...more } });
+  check('unseeded passes a store a one-byte derive shows guarding itself, and nothing less',
+        [G.unseeded({ cases: [id('00'), gone({ '9002': 1 })] }), G.unseeded({ cases: [id('00'), gone({ '9002': 1, '9004': 0 })] }),
+         G.unseeded({ cases: [id('00'), gone({ '9002': 1 }, { r: 3 })] }), G.unseeded({ cases: [id('00'), gone({ '9002': 1 }, { up: [0xABB9] })] }),
+         G.unseeded({ cases: [id('00'), gone({ '9002': 0 }, {}, '00')] })], [[], ['$9002'], ['$9002'], [], ['$9002']]);
   check('an empty world list, an empty world or a fixture with no writes throws (T110)',
         [throws(() => G.worlds(wf, [])), throws(() => G.worlds(wf, [{}])), throws(() => W.both([], 0, 1, 2)),
          throws(() => W.cross([], [{}])), throws(() => G.unseeded({ cases: [{ in: [], out: [] }] }))], [true, true, true, true, true]);

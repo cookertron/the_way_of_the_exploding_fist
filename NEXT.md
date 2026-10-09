@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     seed builder -- callio --derive that sets every byte a case reads then rewrites unchanged to another value, until G.unseeded is [] per fixture
-Step:     node scratchpad census (G.unseeded over build/callio_*.json): 598 stores in 20 fixtures never seen changing a byte, worst 97cb 59, ad1b 59, ae17 58, roundIn's reset block shared; start with ad1b
-Then:     on/off identity gate, engine-step helper (T197), per-verdict stamps, roster; apply G.worlds to the other guard-bearing gates (demoPoint $ABCB has the same XOR guard)
+Unit:     seed builder -- seed the other 24 fixtures (callio.py --seed), make their gates green, then a block: G.unseeded under $A5 and $5A is [] for every callio asset
+Step:     --seed each (state from its _stamp); ac39 ac5f abb9 abcb 97cb ae29 ac3c ac27* need case-list checks extended; ad5f ae17 ae67 ad44 ad44d aca6 hit ledger/AD5F.toml open 1
+Then:     on/off identity gate, engine-step helper (T197), per-verdict stamps, roster; apply G.worlds to the other guard-bearing gates (demoPoint $ABCB)
 Blocked:  none
-Notes:    full battery started after the worlds commit (rig.js changed): read build/mutants/summary.txt. Affected run at worlds: 24/24 killed, 29.0 min. Runs --jobs 4 (D8)
+Notes:    unseeded passes stores following two inputs and self-guarding ones; a never-read poison store is T131's ($5A replay). Full battery still due; one runner at a time (a foreign --jobs 20 run collided today). --jobs 4 (D8)

@@ -23,3 +23,8 @@ by     = "python tools/callio.py --check --state p1 --fixture build/callio_ad5f.
 kind   = "gated"
 says   = "Fist follows live_p1w (P1 count poked to 4) sample for sample: 168 round passes, the point, 66 pose passes ($AE8E), 22 bonus seconds ($AD6E), out 'won' at $ACA6; charge 0.24% under over 256, bonus 0.60% under, worst 2.42%"
 by     = "node test/kit.test.js (live block, P1)"
+
+[[open]]
+ask    = "why does the port write $0000-$0007 where the machine drops the write (ROM), in seeded worlds of ad5f, ae17, ae67, ad44, ad44d, aca6 -- all with $C42C-$C433 XOR $FF?"
+tried  = "callio --seed on every fixture, then node test/kit.test.js: replay fails case N \"$0 = 241 want 165\" / \"$7 = 174 want 165\"; seeds reverted except ad1b"
+settle = "python tools/callio.py --seed --state p1 --fixture build/callio_ad5f.json, then trace the engine store that lands below $4000 and gate it dropped as on the machine"

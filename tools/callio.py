@@ -88,6 +88,17 @@ how many reads were fetches.
              returns through its callers -- the replay's stack is the
              target's, not play's.  It must extend the parent's own "up";
              a derive that pops stack bytes no case recorded is refused.
+  --seed     derive the cases that seed every store of a fixture (T44,
+             T91, T131; test/rig.js unseeded): a store no case saw change
+             a byte, nor write back two different bytes it read, nor a
+             one-byte derive saw guard itself.  Each case's unseeded bytes
+             are changed at once (XOR $FF), halved until a derive seeds
+             one; a lone byte also tries XOR 1 and 0/1; then each left is
+             changed with the bytes the case read holding its value (a
+             copy's source).  A derive that fails, or writes more than
+             twice its parent's bytes, is dropped.  --max N cases (40),
+             --dry lists the stores only.  A store of the poison over a
+             byte never read cannot be set: the gate's $5A replay sees it.
   --cover    shrink a fixture in place to a greedy cover of its PC sets:
              the fewest cases (most new PCs first) that still reach every
              PC some case reached, plus every derived case.  For a call
@@ -113,6 +124,7 @@ Usage:
     python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --r 0x15
     python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 3 --script "4:0,2:,2:E"
     python tools/callio.py --cover --fixture build/callio_ae29.json
+    python tools/callio.py --seed --state p1 --fixture build/callio_ad1b.json [--max 40] [--dry]
 """
 import json
 import os
@@ -547,16 +559,41 @@ def derive(args):
         sys.exit('callio: --derive needs --fixture FILE --case N --set ADDR=VAL[,ADDR=VAL...]')
     h = boot_target(t, 'callio')
     fx = json.load(open(fixture))
+    try:
+        new, pcs = derive_case(h, fx, base, sets, rset, rsets, psets, script, up)
+    except DeriveError as e:
+        sys.exit(f'callio: {e}')
+    old = sigset(fx)
+    fx['cases'].append(new)
+    stamps.step(fx, 'derive')
+    with open(fixture, 'w') as f:
+        json.dump(fx, f, separators=(',', ':'))
+    print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {new["t"]}; PCs no case reached before: '
+          + (' '.join(f'${a:04X}' for a, _ in runs(pcs - old)) if pcs - old else 'none'))
+
+
+class DeriveError(Exception):
+    pass
+
+
+def sigset(fx):
+    return {a for s in (x['sig'] for x in fx['cases']) for a in (int(s[i:i + 4], 16) for i in range(0, len(s), 4))}
+
+
+def derive_case(h, fx, base, sets, rset=None, rsets={}, psets={}, script=None, up=None, limit=20_000_000):
+    """Replay case BASE over the target image with the changes asked for;
+    return the new case (marked derived) and its PC set, and widen fx's code
+    runs.  Raises DeriveError where --derive would refuse."""
     c = fx['cases'][base]
     ins = unruns(c['in'])
     missing = [a for a in sets if a not in ins]     # never a ROM byte: those are not inputs to set
     if missing:
-        sys.exit('callio: --set may only change bytes the case read: not '
-                 + ' '.join(f'${a:04X}' for a in missing))
+        raise DeriveError('--set may only change bytes the case read: not '
+                          + ' '.join(f'${a:04X}' for a in missing))
     if up is not None:                             # the callers' returns from SP up: ways out through them
         uh = bytes(b for w in up for b in (w & 0xFF, w >> 8)).hex()
         if not uh.startswith(c.get('up', '')) or len(uh) <= len(c.get('up', '')):
-            sys.exit('callio: --up must extend the "up" of the case: ' + repr(c.get('up', '')))
+            raise DeriveError('--up must extend the "up" of the case: ' + repr(c.get('up', '')))
         c = {**c, 'up': uh}
     mem = bytearray(h.memobj.m)                    # the target, for code the case never fetched
     for a, v in {**ins, **sets}.items():
@@ -572,34 +609,36 @@ def derive(args):
         regs[R] = c['r']
     if rset is not None:
         if 'r' not in c:
-            sys.exit('callio: --r needs a fixture that records R (r, rx)')
+            raise DeriveError('--r needs a fixture that records R (r, rx)')
         regs[R] = rset
     if any(i not in fx['regs'] for i in rsets):
-        sys.exit(f'callio: --reg takes the SkoolKit indices the fixture records: {fx["regs"]}')
+        raise DeriveError(f'--reg takes the SkoolKit indices the fixture records: {fx["regs"]}')
     for i, v in rsets.items():
         regs[i] = v
     ports = [list(p) for p in c.get('ports', [])]
     if any(not 0 <= i < len(ports) for i in psets):
-        sys.exit(f'callio: --port indexes the parent\'s {len(ports)} logged reads')
+        raise DeriveError(f'--port indexes the parent\'s {len(ports)} logged reads')
     for i, v in psets.items():                     # the value the machine answers; the port stays
         ports[i][1] = v
     if script is not None:
         pl = PortLog(live=ScriptPorts(parse_script(script), h.frame_duration))
     else:
         pl = PortLog(logged=ports)
-    dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], ports=pl)
+    try:
+        dt, pcs = run_alone(lm, regs, dict((s, e) for s, e in fx['calls'])[c['site']], limit, ports=pl)
+    except SystemExit as e:                        # never returned within the limit
+        raise DeriveError(str(e).removeprefix('callio: ')) from None
     known = len(bytes.fromhex(c.get('up', '')))  # bytes above SP the case vouches for: up, then its inputs
     guess = sorted(a for a in lm.popped if a >= sp + known and a in lm.reads and a not in ins)
     if guess:                                      # it popped the target's returns, not play's
-        sys.exit('callio: the derived case pops past the entry SP into bytes no case recorded ('
-                 + ' '.join(f'${a:04X}' for a in guess) + '): give the returns of the callers with --up WORD[,WORD]')
+        raise DeriveError('the derived case pops past the entry SP into bytes no case recorded ('
+                          + ' '.join(f'${a:04X}' for a in guess) + '): give the returns of the callers with --up WORD[,WORD]')
     if pl.bad:                                     # stopping early is fine: the case keeps its own log
-        sys.exit('callio: the derived case reads the ports differently from its parent; derive another way')
+        raise DeriveError('the derived case reads the ports differently from its parent; derive another way')
     sig = ''.join(f'{a:04x}' for a in sorted(pcs))
-    old = {a for s in (x['sig'] for x in fx['cases']) for a in (int(s[i:i + 4], 16) for i in range(0, len(s), 4))}
     code = {a for lo, hi in fx['code'] for a in range(lo, hi + 1)} | lm.fetched | pcs
     fx['code'] = [[lo, hi] for lo, hi in runs(code)]
-    fx['cases'].append({'site': c['site'], 'sp': sp, 'regs': [regs[k] for k in fx['regs']],
+    return ({'site': c['site'], 'sp': sp, 'regs': [regs[k] for k in fx['regs']],
                         **case_io(mem, lm, fx.get('blind', [])),
                         **({'up': c['up']} if 'up' in c else {}),
                         'exit': [lm.exit[k] for k in fx['regs']],
@@ -612,12 +651,133 @@ def derive(args):
                                     **({'reg': {str(i): v for i, v in rsets.items()}} if rsets else {}),
                                     **({'port': {str(i): v for i, v in psets.items()}} if psets else {}),
                                     **({'script': script} if script is not None else {}),
-                                    **({'up': up} if up is not None else {})}})
-    stamps.step(fx, 'derive')
-    with open(fixture, 'w') as f:
-        json.dump(fx, f, separators=(',', ':'))
-    print(f'callio: case {len(fx["cases"]) - 1} derived from case {base}: T {dt}; PCs no case reached before: '
-          + (' '.join(f'${a:04X}' for a, _ in runs(pcs - old)) if pcs - old else 'none'))
+                                    **({'up': up} if up is not None else {})}}, pcs)
+
+
+POISON = 0xA5                                      # test/rig.js POISON: what an unread out byte held
+
+
+def unseeded(fx, fill=POISON):
+    """test/rig.js unseeded(): the out addresses no case wrote over a
+    different value -- every store left what was there (T44, T91, T131) --
+    that no two cases saw writing back two different bytes it read, and
+    that no one-byte derive shows guarding itself (gone when it changed)."""
+    seen, follows = {}, {}
+    for c in fx['cases']:
+        ins = unruns(c['in'])
+        for a, v in unruns(c['out']).items():
+            seen[a] = seen.get(a, False) or v != ins.get(a, fill)
+            if v == ins.get(a):
+                follows.setdefault(a, set()).add(v)
+    guards = set()                                 # a one-byte derive whose parent's store is gone
+    for c in fx['cases']:
+        d = c.get('derived')
+        if not d or len(d.get('set', {})) != 1 or set(d) - {'from', 'set', 'up'}:
+            continue
+        a, p = int(next(iter(d['set'])), 16), fx['cases'][d['from']]
+        if a in unruns(p['out']) and unruns(c['in']).get(a) != unruns(p['in']).get(a):
+            guards.add(a)
+    return sorted(a for a, s in seen.items() if not s and len(follows.get(a, ())) < 2 and a not in guards)
+
+
+def seed(args):
+    t = parse_target(args)
+    fixture, most, dry = None, 40, False
+    while args:
+        if args[0] == '--fixture':
+            fixture = args[1]; del args[:2]
+        elif args[0] == '--max':
+            most = int(args[1]); del args[:2]
+        elif args[0] == '--dry':
+            dry = True; del args[:1]
+        else:
+            sys.exit(f'callio: unknown argument {args[0]}')
+    if not fixture:
+        sys.exit('callio: --seed needs --fixture FILE')
+    fx = json.load(open(fixture))
+    todo = set(unseeded(fx))
+    first = sorted(todo)
+    print(f'callio: {fixture}: {len(todo)} unseeded stores: ' + ' '.join(
+        f'${lo:04X}' if lo == hi else f'${lo:04X}-${hi:04X}' for lo, hi in runs(todo)))
+    if dry or not todo:
+        return
+    h = boot_target(t, 'callio')
+    made = []
+
+    def keep(base, sets):
+        """Derive BASE with SETS; keep the case if it seeds a store and stays
+        near the parent's size (a changed pointer can send it wild)."""
+        c = fx['cases'][base]
+        code = fx['code']
+        try:
+            new, _ = derive_case(h, fx, base, sets, limit=c['t'] + 200_000)
+        except DeriveError:
+            fx['code'] = code
+            return False
+        fx['cases'].append(new)
+        got = todo - set(unseeded(fx))
+        if not got or len(unruns(new['out'])) > 2 * len(unruns(c['out'])) + 64:
+            fx['cases'].pop()
+            fx['code'] = code
+            return False
+        todo.difference_update(got)
+        made.append((len(fx['cases']) - 1, base, sets, got))
+        return True
+
+    def attempt(base, group):
+        """The store itself: every byte of GROUP changed at once, halved
+        until a derive seeds something; a lone byte tries nearer values."""
+        group = [a for a in group if a in todo]
+        if not group or len(made) >= most:
+            return
+        ins = unruns(fx['cases'][base]['in'])
+        tries = [{a: ins[a] ^ 0xFF for a in group}]
+        if len(group) == 1:
+            a = group[0]
+            tries += [{a: ins[a] ^ 1}, {a: 0 if ins[a] else 1}]
+        for sets in tries:
+            if keep(base, sets):
+                attempt(base, group)               # what the case left unseeded
+                return
+        if len(group) > 1:
+            attempt(base, group[:len(group) // 2])
+            attempt(base, group[len(group) // 2:])
+
+    def source(base, a, cands):
+        """A store that writes what it read whatever that byte holds copies
+        it from elsewhere: change it with every other byte the case read
+        holding the same value, halving those until one is the source."""
+        if a not in todo or not cands or len(made) >= most:
+            return
+        ins = unruns(fx['cases'][base]['in'])
+        if keep(base, {a: ins[a] ^ 0xFF, **{s: ins[s] ^ 0xFF for s in cands}}):
+            return
+        if len(cands) > 1:
+            source(base, a, cands[:len(cands) // 2])
+            source(base, a, cands[len(cands) // 2:])
+
+    n = len(fx['cases'])
+    for i in range(n):
+        c = fx['cases'][i]
+        ins, outs = unruns(c['in']), unruns(c['out'])
+        attempt(i, sorted(a for a in todo if a in ins and a in outs))
+    for i in range(n):
+        c = fx['cases'][i]
+        ins, outs = unruns(c['in']), unruns(c['out'])
+        for a in sorted(a for a in todo if a in ins and a in outs):
+            source(i, a, sorted(s for s in ins if s != a and ins[s] == ins[a]))
+    for n, base, sets, got in made:
+        print(f'  case {n} from {base}: --set {",".join(f"0x{a:04X}=0x{v:02X}" for a, v in sorted(sets.items()))}'
+              f' seeds {len(got)}')
+    if made:
+        stamps.step(fx, 'derive')
+        with open(fixture, 'w') as f:
+            json.dump(fx, f, separators=(',', ':'))
+    left = sorted(todo)
+    read = {a for c in fx['cases'] for a in unruns(c['in'])}
+    print(f'callio: {len(made)} cases derived; {len(first) - len(left)} of {len(first)} stores seeded; '
+          f'{len(left)} left' + (': ' + ' '.join(f'${a:04X}' + ('' if a in read else '(never read)') for a in left)
+                                  if left else ''))
 
 
 def cover(args):
@@ -657,6 +817,8 @@ def main():
         return check(args[1:])
     if args[0] == '--derive':
         return derive(args[1:])
+    if args[0] == '--seed':
+        return seed(args[1:])
     t = parse_target(args)
     site = ret = None
     frames, keys, only, gap = 1500, [], None, None

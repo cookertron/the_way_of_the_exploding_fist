@@ -349,7 +349,15 @@ function untouched(m, lo, hi, v, wrote) {
    A world with no bytes, or a list with no worlds, throws (T110).
    unseeded(fx) -- the out addresses no case wrote over a different value:
    in every case the store left what was there (the byte read, else the
-   poison), so an engine that drops it passes every case (T44, T91, T131). */
+   poison), so an engine that drops it passes every case (T44, T91, T131).
+   A store seen writing back two different bytes it read is not named: it
+   follows its input, dropping it changes nothing, and the cases show it.
+   Nor is one a derived case shows guarding itself: that case changed only
+   this byte (no port, R or register; callers' returns above the entry SP,
+   which the parent never read, may be given) and its parent wrote it: if
+   that case stores it too, the rules above pass it; if not, it is made
+   only when the byte already holds it ($9CAE under $AD3E).
+   callio.py --seed derives all three kinds. */
 function caseByte(c, a) {
   for (const [a0, h] of c.in) if (a0 <= a && a < a0 + h.length / 2) return parseInt(h.substr(2 * (a - a0), 2), 16);
   return undefined;
@@ -391,14 +399,23 @@ function worlds(fx, want) {
 }
 function unseeded(fx, fill = POISON) {
   nonEmpty('unseeded: the fixture\'s cases', fx.cases.length);
-  const seen = new Map();
+  const seen = new Map(), follows = new Map();
   for (const c of fx.cases)
     for (const [a0, h] of c.out) for (let k = 0; k < h.length / 2; k++) {
       const a = a0 + k, v = parseInt(h.substr(2 * k, 2), 16), was = caseByte(c, a);
       seen.set(a, seen.get(a) || v !== (was === undefined ? fill : was));
+      if (v === was) follows.set(a, (follows.get(a) || new Set()).add(v));
     }
   nonEmpty('unseeded: the writes of the cases', seen.size);
-  return [...seen].filter(([, s]) => !s).map(([a]) => a).sort((x, y) => x - y).map(hex);
+  const writes = (c, a) => c.out.some(([a0, h]) => a0 <= a && a < a0 + h.length / 2), guards = new Set();
+  for (const c of fx.cases) {
+    const d = c.derived, set = d ? Object.keys(d.set || {}) : [];
+    if (!d || set.length !== 1 || Object.keys(d).some(k => !['from', 'set', 'up'].includes(k))) continue;
+    const a = parseInt(set[0], 16), p = fx.cases[d.from];
+    if (writes(p, a) && caseByte(c, a) !== caseByte(p, a)) guards.add(a);
+  }
+  return [...seen].filter(([a, s]) => !s && (follows.get(a) || new Set()).size < 2 && !guards.has(a))
+    .map(([a]) => a).sort((x, y) => x - y).map(hex);
 }
 
 const gate = { POISON, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty,
