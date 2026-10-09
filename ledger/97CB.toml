@@ -14,11 +14,6 @@ says   = "Num_Players $9C2C = 0 in s1 (demo): both fighters driven by the AI ($A
 by     = "python tools/callio.py --state s1 --gap 16 --frames 1500 --call 0x9757 0x975A"
 
 [[fact]]
-kind   = "gated"
-says   = "controlPass matches all 456 cases: same ports in order, every byte, exact uncontended T, A and R at the return; R is an M1 count from io.r (blockcost.py); a hand mutant (one LD A,R as 1 M1) fails bytes, T and R"
-by     = "python tools/build.py ; node test/kit.test.js"
-
-[[fact]]
 kind   = "insn"
 at     = "$97CB"
 says   = "control_pass -- demo: keys + Kempston tested, both fighters by the AI $A090 on copies (self $A5F1, AI state $A60B, foe $A62B); 1P/2P: quit keys 1+6, P1 from $8B1F via moves $98DD, P2 likewise or by AI; $909E/$8C54 are later units"
@@ -26,7 +21,7 @@ by     = "python tools/adis.py 0x97CB 80 ; python tools/adis.py 0x987A 60 ; pyth
 
 [[fact]]
 kind   = "measured"
-says   = "fixture build/callio_97cb.json: 456 cases, one per PC set (s1; p1 x 7 keys; p1b W), ports and R per case; --check 456/456, T 882-9393; play never reached $A096 $A2A6 $A49A-$A4C7 $A57B $A5C3-$A5EB, nor $909E/$8C54"
+says   = "fixture build/callio_97cb.json: 456 cases, one per PC set (s1; p1 x 7 keys; p1b W), ports and R per case (R an M1 count, io.r), all matched by controlPass; T 882-9393; play never reached $A096 $A2A6 $A49A-$A4C7 $A57B $A5C3-$A5EB, nor $909E/$8C54"
 by     = "python tools/callio.py --capture --state s1 --call 0x9757 0x975A --frames 6000 --per 2 --out build/callio_97cb.json (p1, p1b --append; one per PC set kept) ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"
 
 [[fact]]
@@ -77,3 +72,8 @@ by     = "python tools/callio.py --check --state s1 --fixture build/callio_97cb.
 kind   = "gated"
 says   = "live at dans 2-10 and past the top (Also_Rank 9, 10; the user's snapshots, $9057 undone): each bout followed 400 passes row for row, dan 6 P2 into the demo; 7.2 within 0.5%; dans 9+ reach no new code ($A614 9/10 in the demo)"
 by     = "node test/kit.test.js (followGate, dan 2-10, top1-2)"
+
+[[fact]]
+kind   = "gated"
+says   = "play runs under every control set the menu installs: P1 and P2 each default, Sinclair 1, Sinclair 2, Kempston, redefined keys; 13 constructed cases (6 derived, 7 poked), 702 in all; 3 table mutants survived on the 689-case fixture"
+by     = "python tools/callio.py --check --state s1 --fixture build/callio_97cb.json ; python tools/mutants.py --match \"controls: P1 reads the default||controls: P2 always||controls: Kempston for P1\""

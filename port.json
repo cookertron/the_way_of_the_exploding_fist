@@ -58,7 +58,7 @@
       "key": "control97cb",
       "file": "build/callio_97cb.json",
       "required": true,
-      "note": "oracle for control_pass $97CB and the AI $A090: python tools/callio.py --capture --call 0x9757 0x975A (port reads and R kept per case)"
+      "note": "oracle for control_pass $97CB and the AI $A090: python tools/callio.py --capture --call 0x9757 0x975A (port reads and R kept per case); the control sets each constructed: cases 689-694 --derive with --set of $8BD2/$8BE6 to Sinclair_1 $8C30, Sinclair_2 $8C1E, Kempston $8C42 and --script keys (P2 Kempston then --port fire+left $12), cases 695-701 --capture --append --per 3 --poke a redefined table ($8BD4 P1, keys W+H, state p1; $8BE8 P2 with 0x9C2C=2,0xAA46=0, keys K+M, state s1)"
     },
     {
       "key": "yy976f",

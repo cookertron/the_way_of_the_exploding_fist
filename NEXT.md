@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     audit gaps: which menu options the $97CB cases reach (Sinclair, Kempston, P2 keys, default)
-Step:     python tools/status.py 97CB; list the menu option paths its callio cases cover, derive a case for each one missing
-Then:     the boot LDIR mutant crash; then world builders (boundaries, wraps, both instances, every field seeded), per-verdict stamps, roster
+Unit:     the boot LDIR mutant crash (last full run: 3 crashes, boot LDIR and two 8C54 menu, the menu two since fixed)
+Step:     python tools/mutants.py --match "LDIR" to reproduce; find why the boot case crashes rather than failing a row
+Then:     world builders (boundaries, wraps, both instances, every field seeded), per-verdict stamps, roster; a full battery run is due after the gate-helper and fixture changes
 Blocked:  none
-Notes:    the 1UP quit (G+H) is now ported and live-gated (live_quit); AD1B and AD44 have no open questions left. Mutation runs --jobs 4 (D8)
+Notes:    every control set (P1/P2 x default, Sinclair 1/2, Kempston, redefined) is now played in callio_97cb (702 cases). Mutation runs --jobs 4 (D8)

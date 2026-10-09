@@ -4933,5 +4933,29 @@
   "new": "  if (a & 0x80 && 0) return (M1.m1 += 3,",
   "increment": "quit-1up",
   "kills": "quit: roundPass, the quit and the demo follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "controls: P1 reads the default table unless Kempston (Sinclair, redefined keys lost)",
+  "old": "if (p === 1){ hl = m[0x8BD2] | m[0x8BD3] << 8; k(17 + 26, 2 + 2); }",
+  "new": "if (p === 1){ hl = m[0x8BD2] | m[0x8BD3] << 8; if (hl !== 0x8C42) hl = 0x8BFA; k(17 + 26, 2 + 2); }",
+  "increment": "97CB-configs",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "controls: P2 always reads its default table",
+  "old": "else { hl = m[0x8BE6] | m[0x8BE7] << 8; k(17 + 16, 2 + 1); }",
+  "new": "else { hl = 0x8C0C; k(17 + 16, 2 + 1); }",
+  "increment": "97CB-configs",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "controls: Kempston for P1 only",
+  "old": "if (hl === 0x8C42){ m[0x900D] = 1; k(20, 2); }",
+  "new": "if (hl === 0x8C42 && p === 1){ m[0x900D] = 1; k(20, 2); }",
+  "increment": "97CB-configs",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
  }
 ]
