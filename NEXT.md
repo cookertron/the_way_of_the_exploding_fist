@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     the boot LDIR mutant crash (last full run: 3 crashes, boot LDIR and two 8C54 menu, the menu two since fixed)
-Step:     python tools/mutants.py --match "LDIR" to reproduce; find why the boot case crashes rather than failing a row
-Then:     world builders (boundaries, wraps, both instances, every field seeded), per-verdict stamps, roster; a full battery run is due after the gate-helper and fixture changes
+Unit:     the full mutation battery run that is due (gate-helper and fixture changes, the boot crash fix)
+Step:     python tools/mutants.py --background --jobs 4 ; read build/mutants/summary.txt when it lands -- expect 0 crashes
+Then:     world builders (boundaries, wraps, both instances, every field seeded), an engine-step helper that turns a throw into a named FAIL (T197), per-verdict stamps, roster
 Blocked:  none
-Notes:    every control set (P1/P2 x default, Sinclair 1/2, Kempston, redefined) is now played in callio_97cb (702 cases). Mutation runs --jobs 4 (D8)
+Notes:    last.json still holds pre-00:45 verdicts (25 SURVIVED, 4 TIMEOUT, incl. 'boot: $C425 not cleared') the full run will refresh; check that one if it times out again. Mutation runs --jobs 4 (D8)

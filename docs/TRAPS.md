@@ -3083,3 +3083,15 @@ its row in the map, and `python tools/selftest.py` checks that it has.
 
 <!-- budget: entries below this line are 20 lines at most, each with its row in
 docs/TRAPS-MAP.md (tools/status.py --check, tools/selftest.py). -->
+
+197. **AN ENGINE THROW OUTSIDE A CATCH IS A CRASH, NOT A KILL** (Exploding Fist,
+    boot, 2026-10-09).  The mutant `boot: LDIR the wrong way` left the scenery tables
+    shifted, and the engine threw its own diagnostic (`Change_Background: stage 2 jumps
+    to $0`) from inside the page's rAF frame, which the kit's loop block drives with no
+    catch -- and again from liveGate's boot `g.pass`, the one pass there without the
+    catch the others have.  Node died, no FAIL line was printed, and the runner (rightly,
+    TRAPS #107) filed a CRASH: a mutation the gates could have named, unnamed through a
+    full run.  The two 8C54 menu crashes before it were the same hole.
+    The rule: **every call that steps the engine inside a check goes through a catch
+    that fails a named row with the error's message**, so a throw is a kill the runner
+    can attribute.  A gate helper should own this, not each gate.

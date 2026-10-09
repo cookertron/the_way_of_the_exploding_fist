@@ -6,7 +6,7 @@ entries  = ["$9C2E"]
 oracle   = "tools/sample.py"
 fixtures = ["live_boot"]
 port     = "gameStart"
-manual   = ["7.2"]
+manual   = ["7.2", "T107", "T197"]
 
 [[fact]]
 kind   = "insn"
@@ -25,3 +25,9 @@ kind   = "gated"
 at     = "$8800"
 says   = "bootPass (gameStart, mainLoop) reaches the machine's first $AE29 from boot (vars, R, hashes below the text rows; SP $5BF9) charged within 0.3%, and live follows the demo row for row over all 1500 rows through 3 stages"
 by     = "python tools/build.py ; node test/kit.test.js (live block, boot rows)"
+
+[[fact]]
+kind   = "gated"
+at     = "$9C43"
+says   = "the mutant 'boot: LDIR the wrong way' (the engine throws on the shifted tables) is killed by named rows -- the page loop's 'never threw' and the boot first-row check -- not a node crash"
+by     = "python tools/build.py ; node test/kit.test.js, clean 406/406 and with the mutant 398/402"

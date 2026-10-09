@@ -457,7 +457,11 @@ const mockCtx = (state) => ({
   P.sound.on = true; P.sound.ctx = mockCtx(st); P.sound.gain = { connect() {} }; P.sound.chip = new S.BeeperChip(44100);
   /* the page runs the game now (round_loop $AE26): the same loop checks
      against it, the bridge fed with the engine's simulated frame */
-  const cb = rig.raf();
+  /* a throw from the engine inside the page's frame fails a row here
+     rather than taking node down (the mutant 'boot: LDIR the wrong way') */
+  const raf = rig.raf();
+  let threw = '';
+  const cb = t => { if (!threw) try { raf(t); } catch (e){ threw = e.message; } };
   const before = P.game.frame;
   cb(0);
   check('the first rAF only sets the clock', P.game.frame - before, 0);
@@ -468,6 +472,7 @@ const mockCtx = (state) => ({
             st.started >= 1 && P.sound.next === P.game.simFrame, `${st.started} started, next ${P.sound.next}, sim ${P.game.simFrame}`);
   cb(4000);
   checkTrue('a long stall is capped at maxDt, not replayed', P.game.frame - before <= 80 + Math.ceil(0.25 * FRAME_HZ));
+  check("...and the page's loop never threw", threw, '');
 }
 
 /* =======================================================================
@@ -1533,7 +1538,10 @@ function liveGate(L, who, how, menuWay){
   };
   /* boot: the start is the tape's hand-over at $8800 (sample.py
      --start-here), and row 0 the demo's first $AE29: bootPass runs to it */
-  const bootT = how === 'boot' ? g.pass(kb) / L.rows[0].t : 1, bootBorder = g.border;
+  let bootT = 1;
+  if (how === 'boot') try { bootT = g.pass(kb) / L.rows[0].t; }
+  catch (e){ check(`${who}: the engine reaches the first row the machine sampled`, `the boot pass threw: ${e.message}`, want(L.rows[0])); return; }
+  const bootBorder = g.border;
   /* ...its text rows in the font (D5): the display checked below them, $4800- */
   const blind0 = (got, w) => { if (how === 'boot'){ const d = L.vars.length + 1 + L.hash.findIndex(([lo]) => lo === 0x4000); got[d] = w[d]; } return got; };
   check(`${who}: the engine ${how === 'boot' ? 'reaches' : 'starts from'} the first row the machine sampled`, blind0(row(g.m, g.r), want(L.rows[0])), want(L.rows[0]));
