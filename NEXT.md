@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     world builders (boundaries, wraps, both instances, every field seeded) in rig.js, with their kit checks
-Step:     python tools/manual.py --map gate ; read the BUILD rows, then sketch the builder API against one existing in/out fixture gate
-Then:     an engine-step helper that turns a throw into a named FAIL (T197), per-verdict stamps, roster
+Unit:     seed builder -- callio --derive that sets every byte a case reads then rewrites unchanged to another value, until G.unseeded is [] per fixture
+Step:     node scratchpad census (G.unseeded over build/callio_*.json): 598 stores in 20 fixtures never seen changing a byte, worst 97cb 59, ad1b 59, ae17 58, roundIn's reset block shared; start with ad1b
+Then:     on/off identity gate, engine-step helper (T197), per-verdict stamps, roster; apply G.worlds to the other guard-bearing gates (demoPoint $ABCB has the same XOR guard)
 Blocked:  none
-Notes:    full battery 3f4aa12: 623/624 killed, 0 crashes, 1 ambiguous anchor since fixed and killed -- all 624 killed. It took 145.6 min (73.4 before, 7 more cases): unexplained, per-case mean 45 s. Runs --jobs 4 (D8)
+Notes:    full battery started after the worlds commit (rig.js changed): read build/mutants/summary.txt. Affected run at worlds: 24/24 killed, 29.0 min. Runs --jobs 4 (D8)

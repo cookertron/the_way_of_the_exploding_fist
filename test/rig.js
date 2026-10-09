@@ -330,7 +330,79 @@ function untouched(m, lo, hi, v, wrote) {
   return bad.map(hex);
 }
 
-const gate = { POISON, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty };
+/* ---------- world builders (map: gate, the BUILD rows) -------------------
+   A world is the input a case must hold: { addr: byte, ... }, a partial
+   assignment of the bytes the real call READ.  The builders make the list
+   a routine's guards and fields call for; worlds(fx, want) names the ones
+   no case of the fixture holds, each in the syntax of callio.py --derive
+   --set, so a miss is the oracle command that fills it (the oracle is
+   still the machine code; the world is constructed, so the case says so).
+     world.at(a, ...vs)      one world per value: a wrap's boundary (T157),
+                             a guard's other arm (T124)
+     world.bounds(a, k, d)   k - d, k, k + d as bytes: the exact threshold
+                             and both sides of it (T141, T128); d is 1
+     world.both(ws, lo, hi, off)  each world and its mirror, lo..hi moved
+                             by +off and lo+off..hi+off by -off: the other
+                             player, the other instance (T132)
+     world.cross(as, bs)     every a joined with every b: one field at its
+                             boundary while another holds each value (T129)
+   A world with no bytes, or a list with no worlds, throws (T110).
+   unseeded(fx) -- the out addresses no case wrote over a different value:
+   in every case the store left what was there (the byte read, else the
+   poison), so an engine that drops it passes every case (T44, T91, T131). */
+function caseByte(c, a) {
+  for (const [a0, h] of c.in) if (a0 <= a && a < a0 + h.length / 2) return parseInt(h.substr(2 * (a - a0), 2), 16);
+  return undefined;
+}
+const setSyntax = w => Object.keys(w).map(Number).sort((x, y) => x - y)
+  .map(a => `0x${a.toString(16).toUpperCase()}=0x${w[a].toString(16).toUpperCase()}`).join(',');
+const world = {
+  at(a, ...vs) { nonEmpty('world.at: the values', vs.length); return vs.map(v => ({ [a]: v & 0xFF })); },
+  bounds(a, k, d = 1) { return [k - d, k, k + d].map(v => ({ [a]: v & 0xFF })); },
+  both(ws, lo, hi, off) {
+    nonEmpty('world.both: the worlds', ws.length);
+    const move = a => a >= lo && a <= hi ? a + off : a >= lo + off && a <= hi + off ? a - off : a;
+    const out = [];
+    for (const w of ws) {
+      const m = {};
+      for (const a in w) m[move(Number(a))] = w[a];
+      out.push(w, m);
+    }
+    return out;
+  },
+  cross(as, bs) {
+    nonEmpty('world.cross: the first worlds', as.length); nonEmpty('world.cross: the second worlds', bs.length);
+    return as.flatMap(a => bs.map(b => Object.assign({}, a, b)));
+  },
+};
+function worlds(fx, want) {
+  nonEmpty('worlds: the wanted worlds', want.length);
+  nonEmpty('worlds: the fixture\'s cases', fx.cases.length);
+  const seen = new Set(), miss = [];
+  for (const w of want) {
+    const keys = Object.keys(w).map(Number);
+    nonEmpty('worlds: a world\'s bytes', keys.length);
+    const s = setSyntax(w);
+    if (seen.has(s)) continue;
+    seen.add(s);
+    if (!fx.cases.some(c => keys.every(a => caseByte(c, a) === w[a]))) miss.push(s);
+  }
+  return miss;
+}
+function unseeded(fx, fill = POISON) {
+  nonEmpty('unseeded: the fixture\'s cases', fx.cases.length);
+  const seen = new Map();
+  for (const c of fx.cases)
+    for (const [a0, h] of c.out) for (let k = 0; k < h.length / 2; k++) {
+      const a = a0 + k, v = parseInt(h.substr(2 * k, 2), 16), was = caseByte(c, a);
+      seen.set(a, seen.get(a) || v !== (was === undefined ? fill : was));
+    }
+  nonEmpty('unseeded: the writes of the cases', seen.size);
+  return [...seen].filter(([, s]) => !s).map(([a]) => a).sort((x, y) => x - y).map(hex);
+}
+
+const gate = { POISON, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty,
+               world, worlds, unseeded };
 
 module.exports = {
   ROOT, sandbox, els, drawCalls, listeners, localStorageStore,

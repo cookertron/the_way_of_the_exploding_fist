@@ -539,6 +539,26 @@ const mockCtx = (state) => ({
   check('unnamed reports both directions', G.unnamed([1, 2, 0x1F], [2, 3]), [['1', '1f'], ['3']]);
   const m = new Uint8Array(16).fill(0xA5); m[3] = 0; m[5] = 1;
   check('untouched names a changed cell not in the written set', G.untouched(m, 0, 15, 0xA5, [3]), ['$5']);
+  /* the world builders: a fixture whose two cases read $8000 = 3 and 4
+     with $8040 = 0, and write $9000 over itself in one and over 0 in the other */
+  const W = G.world, wf = { cases: [{ in: [[0x8000, '03'], [0x8040, '00'], [0x9000, '07']], out: [[0x9000, '07'], [0x9001, 'a5']] },
+                                    { in: [[0x8000, '04'], [0x8040, '00'], [0x9000, '00']], out: [[0x9000, '07']] }] };
+  check('world.bounds makes both sides of the threshold and the threshold, as bytes',
+        [W.bounds(0x8000, 4), W.bounds(0x8000, 0, 2)], [[{ 32768: 3 }, { 32768: 4 }, { 32768: 5 }], [{ 32768: 254 }, { 32768: 0 }, { 32768: 2 }]]);
+  check('world.both mirrors each world across the instances, both ways',
+        W.both([{ 0x8000: 1, 0x8040: 2, 0x9000: 3 }], 0x8000, 0x803F, 0x40), [{ 0x8000: 1, 0x8040: 2, 0x9000: 3 }, { 0x8040: 1, 0x8000: 2, 0x9000: 3 }]);
+  check('world.cross joins every pair', W.cross(W.at(1, 0, 1), W.at(2, 5)), [{ 1: 0, 2: 5 }, { 1: 1, 2: 5 }]);
+  check('worlds names a missing world as callio --derive --set, once, and passes those held',
+        [G.worlds(wf, W.bounds(0x8000, 4)), G.worlds(wf, W.cross(W.at(0x8000, 3, 4), W.at(0x8040, 0)))], [['0x8000=0x5'], []]);
+  check('worlds sees the other instance missing (T132), and a world only part held',
+        [G.worlds(wf, W.both([{ 0x8000: 3, 0x8040: 0 }], 0x8000, 0x803F, 0x40)), G.worlds(wf, [{ 0x8000: 3, 0x8040: 1 }])],
+        [['0x8000=0x0,0x8040=0x3'], ['0x8000=0x3,0x8040=0x1']]);
+  check('worlds does not count a byte the case never read as held', G.worlds(wf, [{ 0x8001: 0xA5 }]), ['0x8001=0xA5']);
+  check('unseeded names a store that left what was there in every case, the poison included',
+        [G.unseeded(wf), G.unseeded({ cases: [wf.cases[0]] })], [['$9001'], ['$9000', '$9001']]);
+  check('an empty world list, an empty world or a fixture with no writes throws (T110)',
+        [throws(() => G.worlds(wf, [])), throws(() => G.worlds(wf, [{}])), throws(() => W.both([], 0, 1, 2)),
+         throws(() => W.cross([], [{}])), throws(() => G.unseeded({ cases: [{ in: [], out: [] }] }))], [true, true, true, true, true]);
 }
 
 /* =======================================================================
@@ -1063,6 +1083,13 @@ const mockCtx = (state) => ({
   check('...and the derived cases hold a count of 3 (no win), a binary carry into DAA and a half-carry under 10',
         [fx.cases.some(c => set(c).aa08 === 1 && set(c).aa01 === 2), fx.cases.some(c => set(c).b030 === 0xF5),
          fx.cases.some(c => set(c).b019 === 8 && set(c).b030 === 9)], [true, true, true]);
+  /* the guard is ($AA03 XOR $AA43) AND $10, so either side scoring takes it:
+     play only ever had P1's bit set, where dropping $AA43 changes nothing.
+     Each side scores a half and a full point, and both bits set is no point. */
+  const W = G.world;
+  check('...and the cases hold every world the point guard and award read: either side scoring 1 or 2, both bits set, time up or not (T132, T124)',
+        G.worlds(fx, [...W.both(W.cross([{ 0xAA03: 0x16, 0xAA43: 0 }], W.at(0xAA08, 1, 2)), 0xAA00, 0xAA3F, 0x40),
+                      { 0xAA03: 0x16, 0xAA43: 0x16 }, ...W.at(0x9C2B, 0, 1)]), []);
   check('the pointPath gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
   check('no pointPath case stores the poison over a byte it never read (T131)', r.masked, 0);
 }

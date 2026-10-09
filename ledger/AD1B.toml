@@ -39,3 +39,8 @@ n      = 2
 kind   = "gated"
 says   = "1UP quit (G+H: A = $80, Num_Players 0): $AE2D, $AD1C RET M, $ACA6 JP M, $ACCF JR NZ, $ACD9 to $AC39 -- the lost way into the demo; onward+boutNext follow live_quit row for row (400 rows, quit at 36), its pass 0.9976"
 by     = "port.json live_quit (python tools/sample.py --state p1 --script 10:,15:D,10:W,1:G+H,40:) ; node test/kit.test.js (liveGate quit)"
+
+[[fact]]
+kind   = "measured"
+says   = "point guard ($AA03 XOR $AA43) AND $10: worlds added for P2 scoring 1 and 2 ($AA43=$16, $AA03=0) and both bits set -- cases 18-20 derived, no new PCs (a value gap coverage missed); a guard on $AA03 alone is now killed"
+by     = "python tools/callio.py --derive --state p1 --fixture build/callio_ad1b.json --case 0 --set 0xAA03=0,0xAA43=0x16,0xAA48=1 (=2; and 0xAA43=0x16) ; node test/kit.test.js"

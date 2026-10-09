@@ -4957,5 +4957,53 @@
   "new": "if (hl === 0x8C42 && p === 1){ m[0x900D] = 1; k(20, 2); }",
   "increment": "97CB-configs",
   "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "pointPath: the guard reads P1's attack state only",
+  "old": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 7 + 7;",
+  "new": "  if (m[0xAA03] & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 7 + 7;",
+  "increment": "worlds",
+  "kills": "pointPath matches the real $AD1B to $AE29 (or its way out) on every case: bytes, exit, T and R exactly"
+ },
+ {
+  "file": "rig.js",
+  "label": "worlds: every wanted world counted as held",
+  "old": "    if (!fx.cases.some(c => keys.every(a => caseByte(c, a) === w[a]))) miss.push(s);",
+  "new": "    if (false && !fx.cases.some(c => keys.every(a => caseByte(c, a) === w[a]))) miss.push(s);",
+  "increment": "worlds",
+  "kills": "worlds names a missing world as callio --derive --set, once, and passes those held"
+ },
+ {
+  "file": "rig.js",
+  "label": "worlds: an unread byte matches any value",
+  "old": "    if (!fx.cases.some(c => keys.every(a => caseByte(c, a) === w[a]))) miss.push(s);",
+  "new": "    if (!fx.cases.some(c => keys.every(a => caseByte(c, a) === undefined || caseByte(c, a) === w[a]))) miss.push(s);",
+  "increment": "worlds",
+  "kills": "worlds does not count a byte the case never read as held"
+ },
+ {
+  "file": "rig.js",
+  "label": "world.both: mirrors one way only",
+  "old": "a >= lo + off && a <= hi + off ? a - off : a;",
+  "new": "a;",
+  "increment": "worlds",
+  "kills": "world.both mirrors each world across the instances, both ways"
+ },
+ {
+  "file": "rig.js",
+  "label": "world.bounds: no world below the threshold",
+  "old": "return [k - d, k, k + d].map(",
+  "new": "return [k, k + d].map(",
+  "increment": "worlds",
+  "kills": "world.bounds makes both sides of the threshold and the threshold, as bytes"
+ },
+ {
+  "file": "rig.js",
+  "label": "unseeded: a store over an unread byte always counts as seen",
+  "old": "v !== (was === undefined ? fill : was)",
+  "new": "v !== (was === undefined ? v ^ 1 : was)",
+  "increment": "worlds",
+  "kills": "unseeded names a store that left what was there in every case, the poison included"
  }
 ]
