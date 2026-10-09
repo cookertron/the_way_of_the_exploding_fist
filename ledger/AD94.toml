@@ -23,3 +23,9 @@ kind   = "insn"
 at     = "$AD94"
 says   = "P2 wins: CALL $AE9D sets $AA4C=$19, $AA58=$7A, clears $AA4B/$AA56, $C427=1, loops $95D4+$BF13 until $AA4D; $AD97 returns A=0 to $ACA6, out of the 1UP game. $AE7A is P1's twin"
 by     = "python tools/adis.py 0xAD94 6 ; python tools/adis.py 0xAE78 40 ; python tools/adis.py 0xAC80 40"
+
+[[fact]]
+kind   = "gated"
+at     = "$AD94"
+says   = "the case 'winStart's R lost' now anchors on $AD94's own R line (4-space indent, with the demoNext line above); its old 6-space anchor could only hit the 'end' and 'quit' paths; killed by the P2 roundPass row"
+by     = "python tools/mutants.py --match \"winStart's R lost\" --jobs 1"

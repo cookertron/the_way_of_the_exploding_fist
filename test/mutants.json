@@ -3090,8 +3090,8 @@
  {
   "file": "template.html",
   "label": "AD94 win: Fist: winStart's R lost",
-  "old": "      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null;",
-  "new": "      res.exit = null;",
+  "old": "    else this.demoNext = res.exit === 'quit' ? 0x80 : 0;   // 'time': XOR A; 'quit': A negative\n    res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null;",
+  "new": "    else this.demoNext = res.exit === 'quit' ? 0x80 : 0;   // 'time': XOR A; 'quit': A negative\n    res.exit = null;",
   "increment": "AD94-win",
   "kills": "P2: roundPass and the victory pose follow the machine sample for sample over keyed 1P play until the bout ends"
  },

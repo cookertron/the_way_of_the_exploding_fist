@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     the full mutation battery run that is due (gate-helper and fixture changes, the boot crash fix)
-Step:     python tools/mutants.py --background --jobs 4 ; read build/mutants/summary.txt when it lands -- expect 0 crashes
-Then:     world builders (boundaries, wraps, both instances, every field seeded), an engine-step helper that turns a throw into a named FAIL (T197), per-verdict stamps, roster
+Unit:     world builders (boundaries, wraps, both instances, every field seeded) in rig.js, with their kit checks
+Step:     python tools/manual.py --map gate ; read the BUILD rows, then sketch the builder API against one existing in/out fixture gate
+Then:     an engine-step helper that turns a throw into a named FAIL (T197), per-verdict stamps, roster
 Blocked:  none
-Notes:    last.json still holds pre-00:45 verdicts (25 SURVIVED, 4 TIMEOUT, incl. 'boot: $C425 not cleared') the full run will refresh; check that one if it times out again. Mutation runs --jobs 4 (D8)
+Notes:    full battery 3f4aa12: 623/624 killed, 0 crashes, 1 ambiguous anchor since fixed and killed -- all 624 killed. It took 145.6 min (73.4 before, 7 more cases): unexplained, per-case mean 45 s. Runs --jobs 4 (D8)
