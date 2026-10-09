@@ -4901,5 +4901,37 @@
   "new": "  catch (e) { return 1; }\n}",
   "increment": "gate-helpers-2",
   "kills": "negative is the corrupt replay's count, and a throw's message rather than a crash"
+ },
+ {
+  "file": "template.html",
+  "label": "1UP quit: onward ignores it, the engine stops at $AD1B",
+  "old": "    if (res.exit === 'quit'){\n      M1.m1 = 2;",
+  "new": "    if (res.exit === 'quit!'){\n      M1.m1 = 2;",
+  "increment": "quit-1up",
+  "kills": "quit: leave the game on the pass the machine left"
+ },
+ {
+  "file": "template.html",
+  "label": "1UP quit: $AD1B's AND A: RET M not counted in R",
+  "old": "      M1.m1 = 2;                                   // AND A: RET M\n      const t = 4 + 11",
+  "new": "      M1.m1 = 0;                                   // AND A: RET M\n      const t = 4 + 11",
+  "increment": "quit-1up",
+  "kills": "quit: roundPass, the quit and the demo follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "1UP quit: boutNext's $80 the lost bout's M1 (CP $81, JR NZ dropped)",
+  "old": "  if (a & 0x80) return (M1.m1 += 3,",
+  "new": "  if (a & 0x80) return (M1.m1 += 1,",
+  "increment": "quit-1up",
+  "kills": "quit: roundPass, the quit and the demo follow the machine sample for sample"
+ },
+ {
+  "file": "template.html",
+  "label": "1UP quit: boutNext's $80 read as won (no JP M branch)",
+  "old": "  if (a & 0x80) return (M1.m1 += 3,",
+  "new": "  if (a & 0x80 && 0) return (M1.m1 += 3,",
+  "increment": "quit-1up",
+  "kills": "quit: roundPass, the quit and the demo follow the machine sample for sample"
  }
 ]

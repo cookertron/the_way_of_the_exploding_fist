@@ -2455,12 +2455,14 @@ function timeUp(m){
    2 while the stage $AF34 steps 1-3 ($AF27), the new-stage flag $AF35 is
    set, and the rank rises: Current_Rank $B05F by one in BCD and Also_Rank
    $AA80 by one, or at rank $10 Also_Rank = 7 + (R & 3) by Random_Number;
-   then JP $AC5F, the next bout.  The draw ($81) is drawStart's.  r is R
+   then JP $AC5F, the next bout.  The draw ($81) is drawStart's; the quit's
+   $80 takes the JP M to $ACCF and, not $81, the lost way out.  r is R
    less the M1 already in M1.m1.  Returns T and the PC reached.  Gated
    against python tools/callio.py --capture --call 0xACA6 0xAC5F,0xAC39
    (build/callio_aca6.json, the starts constructed by pokes). */
 function boutNext(m, a, r){
   M1.m1 += 3;                                      // AND A: JP M: JR Z
+  if (a & 0x80) return (M1.m1 += 3, { t: 4 + 10 + 7 + 12 + 4 + 10, at: 0xAC39 });   // the quit's $80: JP M, $ACCF CP $81: JR NZ, $ACD9 XOR A: RET
   if (!a) return (M1.m1 += 2, { t: 4 + 10 + 12 + 4 + 10, at: 0xAC39 });   // XOR A: RET
   let t = 4 + 10 + 7 + 10 + 11; M1.m1 += 3;        // LD HL,$AA3C: DEC (HL): JR NZ
   if (--m[0xAA3C] & 0xFF) return { t: t + 12, at: 0xAC5F };
@@ -3050,8 +3052,18 @@ class Fist {
   }
   /* the way on from pointPath's exit in res: 'time' decided by timeUp, then
      'p1' / 'p2' into the victory pose to its loop top, 'draw' out to $ACA6;
-     res.r and res.exit updated, the T added returned */
+     roundTail's 'quit' (G+H held: Check_Quit_Game's A = $80, Num_Players 0)
+     by $AD1B AND A: RET M to $ACA6 and boutNext's JP M, out at $AC39 as a
+     lost bout (python tools/sample.py --state p1 --script "10:,3:G+H":
+     $AD1B, $ACA6, $ACCF, the demo's $AE29 in the same pass); res.r and
+     res.exit updated, the T added returned */
   onward(res){
+    if (res.exit === 'quit'){
+      M1.m1 = 2;                                   // AND A: RET M
+      const t = 4 + 11 + this.next(0x80, 0);
+      res.r = (res.r & 0x80) | ((res.r + M1.m1) & 0x7F); res.exit = null;
+      return t;
+    }
     if (res.exit !== 'time' && res.exit !== 'p1' && res.exit !== 'p2') return 0;
     M1.m1 = 0;
     let t = 0;

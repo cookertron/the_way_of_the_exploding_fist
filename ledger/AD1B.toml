@@ -3,7 +3,7 @@
 
 name     = "point_path"
 entries  = ["$AD1B"]
-fixtures = ["point_ad1b", "live"]
+fixtures = ["point_ad1b", "live", "live_quit"]
 port     = "pointPath"
 manual   = ["7.2", "Q11"]
 
@@ -28,7 +28,14 @@ kind   = "measured"
 says   = "confirmed from a real start: the port matches the cases captured from the user's snapshot (state stage2, nothing poked) exactly, as it matches the poke-built ones"
 by     = "python tools/callio.py --check --state stage2 --fixture (this routine's fixture) ; node test/kit.test.js"
 
-[[open]]
-ask    = "can $9C28 hold a value >= $80, taking the RET M at $AD1C (pointPath 'quit', ported from the listing, ungated)?"
-tried  = "callio --derive --reg 0=0x80 runs out of the bracket into the caller of $AD18 (641k T) -- no case"
-settle = "bracket from the caller of $AD18 when it is ported, or find every write to $9C28 (grepbytes 32 28 9C)"
+[[fact]]
+kind   = "unreachable"
+says   = "$9C28 never holds >= $80: written only at $9CD5 (0) and $9B0A (from $AA03/$AA43: only 0, $16, $1A, $1B); the RET M at $AD1C is taken instead after round_loop's RET M at $AE2D, the 1UP quit"
+by     = "python tools/grepbytes.py \"28 9C\" ; python tools/grepbytes.py \"32 03 AA\" ; python tools/grepbytes.py \"32 43 AA\" ; python tools/adis.py 0xA04B 12 ; python tools/adis.py 0x9EAE 12"
+window = "every write in the image, direct and through the $A5F1/$A62B copies"
+n      = 2
+
+[[fact]]
+kind   = "gated"
+says   = "1UP quit (G+H: A = $80, Num_Players 0): $AE2D, $AD1C RET M, $ACA6 JP M, $ACCF JR NZ, $ACD9 to $AC39 -- the lost way into the demo; onward+boutNext follow live_quit row for row (400 rows, quit at 36), its pass 0.9976"
+by     = "port.json live_quit (python tools/sample.py --state p1 --script 10:,15:D,10:W,1:G+H,40:) ; node test/kit.test.js (liveGate quit)"

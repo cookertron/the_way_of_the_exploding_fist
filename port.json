@@ -157,6 +157,12 @@
       "note": "live rows for the 1UP game started from the demo, TAPE-DERIVED (gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --passes 1000 --json build/live_1up.json with live's script and ',165:,1:1' after it (key 1 at visit 400, in the demo), live's vars, hashes, skips and marks, --also live's and 0xAD18"
     },
     {
+      "key": "live_quit",
+      "file": "build/live_quit.json",
+      "required": true,
+      "note": "live rows for the 1UP game quit by G+H (Check_Quit_Game), TAPE-DERIVED (gitignored, rule 7): python tools/sample.py --state p1 --at 0xAE29 --passes 400 --script 10:,15:D,10:W,1:G+H,40: --json build/live_quit.json with live_1up's vars (and np=0x9C2C), hashes, skips, marks (and 0xACCF), --also; the quit at pass 36 through $AD1B, $ACA6, $ACCF into the demo"
+    },
+    {
       "key": "round_ae17",
       "file": "build/callio_ae17.json",
       "required": true,

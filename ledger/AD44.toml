@@ -24,7 +24,7 @@ kind   = "gated"
 says   = "Fist follows live_time (Time poked to 1) sample for sample: 34 round passes, 3 round-end passes at $AD0B, the draw, 66 pose passes, out at $AC5F on the machine's row; drawStart's charge only to the 0.5% mean"
 by     = "node test/kit.test.js (live block, time)"
 
-[[open]]
-ask    = "is (IX) at $AE78 -- the first byte of the frame at word $C428 -- ever >= $80, taking the RET M at $AD1C after time up (pointPath quit)?"
-tried  = "one played case: $C428 = $F3D4, ($F3D4) = 1"
-settle = "list the first byte of every frame reachable through $C440 + 2*$C423 and $44CC (renderFighters), or capture $AE67 cases from other poses"
+[[fact]]
+kind   = "measured"
+says   = "(IX) at $AE78 is never >= $80: every frame 0-58 ($44CC + word $C440+2n) starts with 1, 2 or 3; all 8 time ups in the live fixtures end on P1 frame $37 ($F3D4 = 1), and no fixture row holds a frame above 58"
+by     = "python (image.bin: m[$44CC + word at $C440+2n] for n 0-58) ; scan of build/live_*.json rows: p1/p2 frame max, P1 frame on rows marked $AE67"
