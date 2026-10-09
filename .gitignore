@@ -29,3 +29,5 @@ build/live_*.json
 # the build and gate stamps are local state (manual 12.3; tools/stamp.py)
 build/built.json
 build/gate.json
+# the gallery PNGs are tape-derived (rule 7; tools/gallery.py)
+build/gallery/
