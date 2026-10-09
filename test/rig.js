@@ -418,8 +418,16 @@ function unseeded(fx, fill = POISON) {
     .map(([a]) => a).sort((x, y) => x - y).map(hex);
 }
 
+/* listed(fx) -- the cases a row that lists the fixture's ways reads: all
+   but the seeds (callio.py --seed marks them), which every replay still
+   gates byte for byte but which take no named way of their own. */
+function listed(fx) {
+  const l = fx.cases.filter(c => !c.seed);
+  nonEmpty('listed: the fixture\'s unseeded cases', l.length);
+  return l;
+}
 const gate = { POISON, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty,
-               world, worlds, unseeded };
+               world, worlds, unseeded, listed };
 
 module.exports = {
   ROOT, sandbox, els, drawCalls, listeners, localStorageStore,

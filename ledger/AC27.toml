@@ -33,3 +33,8 @@ by     = "python tools/callio.py --check --state p1 --fixture build/callio_ac27_
 kind   = "gated"
 says   = "live_1up follows the machine row for row: the demo quit by key 1 at row 401 through $ABB9 and $AC27, the 1UP game's tune and setup (0.05%), roundIn (8020 T vs 8152, 1.6%), the game lost at row 800 back into the demo, to row 1000"
 by     = "node test/kit.test.js (live block, the 1UP rows)"
+
+[[open]]
+ask    = "why does no --seed derive seed $9C2C under $AC27 (read, written back unchanged in every case)?"
+tried  = "python tools/callio.py --seed --state p1 --fixture build/callio_ac27.json: 53 of 55 seeded, $9C2C left (its XOR $FF, XOR 1, 0/1 and copy-source tries all dropped)"
+settle = "python tools/callio.py --derive --state p1 --fixture build/callio_ac27.json --case 0 --set 0x9C2C=0x01 and read why it is dropped (ROM, size, or no change)"

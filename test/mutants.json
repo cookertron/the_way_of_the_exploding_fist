@@ -234,8 +234,8 @@
  {
   "file": "template.html",
   "label": "BF13 zero-fill blocks",
-  "old": "for (let i = 0; i < 8; i++){ hl = (hl - 1) & 0xFFFF; m[hl] = 0; }",
-  "new": "for (let i = 0; i < 7; i++){ hl = (hl - 1) & 0xFFFF; m[hl] = 0; }",
+  "old": "for (let i = 0; i < 8; i++){ hl = (hl - 1) & 0xFFFF; if (hl >= 0x4000) m[hl] = 0; }",
+  "new": "for (let i = 0; i < 7; i++){ hl = (hl - 1) & 0xFFFF; if (hl >= 0x4000) m[hl] = 0; }",
   "increment": "BF13-js",
   "kills": "renderFighters writes every byte the real $BF13 wrote (50 rendfx cases)"
  },
@@ -5045,5 +5045,77 @@
   "new": "if (writes(p, a)) guards.add(a);",
   "increment": "seed",
   "kills": "unseeded passes a store a one-byte derive shows guarding itself, and nothing less"
+ },
+ {
+  "file": "template.html",
+  "label": "sprLdir: a store below $4000 lands",
+  "old": "i > 0; i--){ if (d >= 0x4000) m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; }\n  return [s, d];",
+  "new": "i > 0; i--){ m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; }\n  return [s, d];",
+  "increment": "seed-all",
+  "kills": "winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap"
+ },
+ {
+  "file": "template.html",
+  "label": "spriteDecode: the single byte lands below $4000",
+  "old": "if (de >= 0x4000) m[de] = m[de] & (m[0xB500 + v] | m[0xB600 + v]) | v;",
+  "new": "m[de] = m[de] & (m[0xB500 + v] | m[0xB600 + v]) | v;",
+  "increment": "seed-all",
+  "kills": "winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap"
+ },
+ {
+  "file": "template.html",
+  "label": "spriteDecode: the left edge lands below $4000",
+  "old": "if (de >= 0x4000) m[de] = m[de] & m[0xB500 + v] | v;",
+  "new": "m[de] = m[de] & m[0xB500 + v] | v;",
+  "increment": "seed-all",
+  "kills": "winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap"
+ },
+ {
+  "file": "template.html",
+  "label": "spriteDecode: the right edge lands below $4000",
+  "old": "if (de >= 0x4000) m[de] = m[de] & m[0xB600 + v] | v;",
+  "new": "m[de] = m[de] & m[0xB600 + v] | v;",
+  "increment": "seed-all",
+  "kills": "winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap"
+ },
+ {
+  "file": "template.html",
+  "label": "rfLdir: a store below $4000 lands",
+  "old": "const rfLdir = (m, s, d, n) => { for (let i = n || 0x10000; i > 0; i--){ if (d >= 0x4000) m[d] = m[s];",
+  "new": "const rfLdir = (m, s, d, n) => { for (let i = n || 0x10000; i > 0; i--){ m[d] = m[s];",
+  "increment": "seed-all",
+  "kills": "winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap"
+ },
+ {
+  "file": "template.html",
+  "label": "rfShadow: the odd zeroes land below $4000",
+  "old": "for (let k = r; k > 0; k--){ if (hl >= 0x4000) m[hl] = 0;",
+  "new": "for (let k = r; k > 0; k--){ m[hl] = 0;",
+  "increment": "seed-all",
+  "kills": "winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap"
+ },
+ {
+  "file": "template.html",
+  "label": "rfShadow: the block zeroes land below $4000",
+  "old": "hl = (hl - 1) & 0xFFFF; if (hl >= 0x4000) m[hl] = 0; }",
+  "new": "hl = (hl - 1) & 0xFFFF; m[hl] = 0; }",
+  "increment": "seed-all",
+  "kills": "winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap"
+ },
+ {
+  "file": "rig.js",
+  "label": "listed: the seeds counted as ways",
+  "old": "const l = fx.cases.filter(c => !c.seed);",
+  "new": "const l = fx.cases;",
+  "increment": "seed-all",
+  "kills": "...and the machine left for $ACA6 with A = 0 (the 1UP bout lost: winEnd)"
+ },
+ {
+  "file": "kit.test.js",
+  "label": "seeded block: only the $A5 unseeded set",
+  "old": "return G.unseeded(P.assets[k]).filter(a => u5.has(a))",
+  "new": "return G.unseeded(P.assets[k]).filter(a => u5.has(a) || true)",
+  "increment": "seed-all",
+  "kills": "every callio fixture seeds every store under $A5 and $5A (callio --seed), all 26 of them, but $9C2C under $AC27 (ledger/AC27.toml open)"
  }
 ]

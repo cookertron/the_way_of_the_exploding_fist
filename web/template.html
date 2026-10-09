@@ -66,13 +66,15 @@ const A = JSON.parse(document.getElementById('assets').textContent);
    the sprite at hl, the flags $C40E (bit 0 mirror, bits 1/2/3 shift
    2/4/6 px), $C407 (recolour) and $C408 (the stride), the tables
    $B500-$B9FF, and writes its scratch $8AE9-$8B1C and the bytes under de.
+   A store through a wrapped address below $4000 is dropped, as the ROM
+   drops it (here and in render_fighters; ledger/AD5F.toml).
    T measured: equal to the harness's uncontended twin on all 441 sprdec
    cases (python tools/sprdec.py --check).  Stack contention in play is not
    charged here (8803 open 1). */
 const sprLdirT = n => 21 * (n || 0x10000) - 5;
 const sprDjnzT = (k, body) => k * (body + 13) - 5;
 function sprLdir(m, s, d, n){
-  for (let i = n || 0x10000; i > 0; i--){ m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; }
+  for (let i = n || 0x10000; i > 0; i--){ if (d >= 0x4000) m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; }
   return [s, d];
 }
 function sprPut16(m, a, v){ m[a] = v & 0xFF; m[a + 1] = (v >> 8) & 0xFF; }
@@ -217,17 +219,17 @@ function spriteDecode(m, hl, de, paths){
     if (b === 0){
       tally('single');
       const v = m[hl];
-      m[de] = m[de] & (m[0xB500 + v] | m[0xB600 + v]) | v;
+      if (de >= 0x4000) m[de] = m[de] & (m[0xB500 + v] | m[0xB600 + v]) | v;
       t += 121; M1.m1 += 21;
     } else {
       tally('edges');
       let v = m[hl];
-      m[de] = m[de] & m[0xB500 + v] | v;
+      if (de >= 0x4000) m[de] = m[de] & m[0xB500 + v] | v;
       hl = (hl + 1) & 0xFFFF; de = (de + 1) & 0xFFFF;
       b--; t += 96; M1.m1 += 17;
       if (b){ [hl, de] = sprLdir(m, hl, de, b); t += 11 + sprLdirT(b); M1.m1 += 2 + 2 * b; }
       v = m[hl];
-      m[de] = m[de] & m[0xB600 + v] | v;
+      if (de >= 0x4000) m[de] = m[de] & m[0xB600 + v] | v;
       t += 70; M1.m1 += 13;
     }
     hl = sprGet16(m, 0x8B14); de = sprGet16(m, 0x8B16); t += 46; M1.m1 += 4;
@@ -257,7 +259,7 @@ const rfMul = (m, d, e) => [d * e, 222 - rfPop(e), 38 + rfPop(e)];  // $C319: HL
 function rfMinMax(d, e){                          // $C1F6 with its CALL: [min, max, T, M1]
   return d < e ? [d, e, 66, 7] : [e, d, 78, 10];
 }
-const rfLdir = (m, s, d, n) => { for (let i = n || 0x10000; i > 0; i--){ m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; } return [s, d]; };
+const rfLdir = (m, s, d, n) => { for (let i = n || 0x10000; i > 0; i--){ if (d >= 0x4000) m[d] = m[s]; s = (s + 1) & 0xFFFF; d = (d + 1) & 0xFFFF; } return [s, d]; };
 function rfScreenAddr(y){                         // Screen_Calc $C203 with its CALL: [HL, T]
   const hi = y & 0xC0;
   const base = hi === 0 ? 0x4000 : hi === 0x40 ? 0x4800 : 0x5000;
@@ -291,7 +293,7 @@ function rfShadow(m, h, l, b, c, sp){
   const r = n & 7;
   if (r){
     t += 7 + 8; M1.m1 += 3 + 4 * r;
-    for (let k = r; k > 0; k--){ m[hl] = 0; hl = (hl + 1) & 0xFFFF; n = (n - 1) & 0xFFFF; t += k > 1 ? 32 : 27; }
+    for (let k = r; k > 0; k--){ if (hl >= 0x4000) m[hl] = 0; hl = (hl + 1) & 0xFFFF; n = (n - 1) & 0xFFFF; t += k > 1 ? 32 : 27; }
   } else { t += 12; M1.m1 += 1; }
   hl = (hl + n) & 0xFFFF;
   const blocks = ((n >> 3) & 0xFF) || 256;
@@ -299,7 +301,7 @@ function rfShadow(m, h, l, b, c, sp){
   m[0xC2B0] = s & 0xFF; m[0xC2B1] = s >> 8;
   t += 11 + 4 + 4 + 36 + 20 + 6 + 10; M1.m1 += 16 + 5 * blocks + 3;   // with LD SP,(nn) and the RET
   for (let k = blocks; k > 0; k--){
-    for (let i = 0; i < 8; i++){ hl = (hl - 1) & 0xFFFF; m[hl] = 0; }
+    for (let i = 0; i < 8; i++){ hl = (hl - 1) & 0xFFFF; if (hl >= 0x4000) m[hl] = 0; }
     t += 44 + (k > 1 ? 13 : 8);
   }
   return t + 20 + 10;

@@ -96,7 +96,10 @@ how many reads were fetches.
              one; a lone byte also tries XOR 1 and 0/1; then each left is
              changed with the bytes the case read holding its value (a
              copy's source).  A derive that fails, or writes more than
-             twice its parent's bytes, is dropped.  --max N cases (40),
+             twice its parent's bytes, or reads ROM as data or runs ROM
+             code its parent did not (no replay without the ROM; D5), is
+             dropped.  Each case kept is marked "seed": a gate's rows that
+             list the cases' ways read the cases without it.  --max N cases (40),
              --dry lists the stores only.  A store of the poison over a
              byte never read cannot be set: the gate's $5A replay sees it.
   --cover    shrink a fixture in place to a greedy cover of its PC sets:
@@ -714,6 +717,15 @@ def seed(args):
         except DeriveError:
             fx['code'] = code
             return False
+        rom = {a for lo, hi in c.get('rom', []) for a in range(lo, hi + 1)}
+        if any(a not in rom for lo, hi in new.get('rom', []) for a in range(lo, hi + 1)):
+            fx['code'] = code                      # ROM read as data: no replay without it, and D5
+            return False
+        pcs = lambda s: {int(s[i:i + 4], 16) for i in range(0, len(s), 4)}
+        if any(a < 0x4000 for a in pcs(new['sig']) - pcs(c['sig'])):
+            fx['code'] = code                      # a wild jump into ROM code: the port has none to run
+            return False
+        new['seed'] = True                         # a gate's case-list rows read the cases without it
         fx['cases'].append(new)
         got = todo - set(unseeded(fx))
         if not got or len(unruns(new['out'])) > 2 * len(unruns(c['out'])) + 64:

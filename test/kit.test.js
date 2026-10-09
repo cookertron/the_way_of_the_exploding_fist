@@ -1189,7 +1189,7 @@ const mockCtx = (state) => ({
   check("demoOn matches the real $ABB9 to the next stage's $AE29 or $AC27 on every case: bytes, text cells, at, T and R exactly", G.failed(r, 'at', 't', 'r'), [0, '']);
   const set = c => (c.derived || {}).set || {};
   check('...and the cases take every way: each stage 1-3 next, the RET at rank 4 (with and without the stage wrap), the quit',
-        [fx.cases.filter(c => c.xpc === 0xAE29).length, fx.cases.filter(c => c.xpc === 0xAC27).map(c => [set(c).b05f, set(c).af34, ((c.derived || {}).reg || {})[0]])],
+        [G.listed(fx).filter(c => c.xpc === 0xAE29).length, G.listed(fx).filter(c => c.xpc === 0xAC27).map(c => [set(c).b05f, set(c).af34, ((c.derived || {}).reg || {})[0]])],
         [3, [[3, undefined, undefined], [undefined, undefined, 128], [3, 3, undefined]]]);
   check('the demoOn gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
   /* some stores here are $A5 over a byte never read: no byte is both $A5 and
@@ -1219,7 +1219,7 @@ const mockCtx = (state) => ({
   check('winStart, winPass and winEnd match the real $AD94 to $ACA6 (P2 wins, 66 passes of the pose): bytes, T and R exactly',
         G.failed(r, 't', 'r', 'passes'), [0, '']);
   check('...and the machine left for $ACA6 with A = 0 (the 1UP bout lost: winEnd)',
-        fx.cases.map(c => c.exit[fx.regs.indexOf(0)]), [0]);
+        G.listed(fx).map(c => c.exit[fx.regs.indexOf(0)]), [0]);
   check('the winPass (P2) gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
   check('no winPass (P2) case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
@@ -1249,11 +1249,34 @@ const mockCtx = (state) => ({
   check('winStart, winPass, bonusStart and bonusPass match the real $AD5F to $ACA6 (P1 wins, 66 passes of the pose, the clock counted): bytes, T and R exactly',
         G.failed(r, 't', 'r', 'passes'), [0, '']);
   const clock = c => { for (const [a, h] of c.in) if (a <= 0x9CA5 && 0x9CA5 < a + h.length / 2) return parseInt(h.substr((0x9CA5 - a) * 2, 2), 16); };
-  check('...and the machine left for $ACA6 with A = 1 (the bout won), a second counted for each left on the clock, played and none (Time 0 derived)',
-        [fx.cases.map(c => c.exit[fx.regs.indexOf(0)]), secs, fx.cases.map(c => (c.derived || {}).set), secs[0] > 1],
-        [[1, 1], fx.cases.map(clock), [undefined, { '9ca5': 0 }], true]);
+  check('...and the machine left for $ACA6 with A = 1 (the bout won), a second counted for each left on the clock, played and none (Time 0 derived), then the seeds (callio --seed)',
+        [fx.cases.map(c => c.exit[fx.regs.indexOf(0)]), secs, fx.cases.slice(0, 2).map(c => (c.derived || {}).set),
+         fx.cases.slice(2).map(c => c.derived.from), secs[0] > 1],
+        [fx.cases.map(() => 1), fx.cases.map(clock), [undefined, { '9ca5': 0 }], [0, 0, 0, 0], true]);
   check('the winPass (P1) gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
   check('no winPass (P1) case stores the poison over a byte it never read (T131)', r.masked, 0);
+}
+
+/* ---- the ROM drops a store ------------------------------------------------
+   win_ad5f case 0 with P1's last box $C42C-$C42F = $F0 $D4 $48 $BE (like
+   callio --seed's first try, ledger/AD5F.toml, but one that reaches every
+   guarded store, the shadow LDIR and the odd zeroes too): the box outgrows
+   the back buffer, its fill, decode and copy wrap past $FFFF, and the
+   machine's stores to $0000-$3FFF go nowhere.  Not a case: the copy-out then reads ROM as data
+   (D5), so the row asserts the hardware's half -- nothing below $4000
+   changes -- and that the world does wrap. */
+{
+  const fx = P.assets.win_ad5f, G = rig.gate, c = fx.cases[0];
+  const m = new Uint8Array(0x10000).fill(G.POISON);
+  for (const [a, h] of c.in) for (let k = 0; k < h.length / 2; k++) m[a + k] = parseInt(h.substr(2 * k, 2), 16);
+  m[0xC42C] = 0xF0; m[0xC42D] = 0xD4; m[0xC42E] = 0x48; m[0xC42F] = 0xBE;
+  let t = P.winStart(m, 0xAA00), w, big = 0;
+  do {
+    w = P.winPass(m, 0xAA00, c.sp - 2, null); t += w.t;
+    big = Math.max(big, (m[0xC40A] || 256) * (m[0xC409] || 256));
+  } while (!w.out && t <= c.t);
+  check('winPass on a box past the back buffer ($C42C-$C42F = $F0 $D4 $48 $BE) leaves $0000-$3FFF as it was, as the ROM does, and the box did wrap',
+        [G.untouched(m, 0, 0x3FFF, G.POISON, []), big > 0x10000 - 0xF730], [[], true]);
 }
 
 /* ---- time up: the round end $AE67 and the decision $AD44 ----------------
@@ -1283,7 +1306,7 @@ const mockCtx = (state) => ({
     check('endStart, winPass on $AA0D and endTail match the real $AE67 to $AD1B (time up, the round end): bytes, T, R and A = (IX) exactly',
           G.failed(r, 't', 'r', 'a'), [0, '']);
     checkTrue('...over a loop of many passes, the start constructed (Time poked to 1)',
-              passes[0] > 1 && fx.cases.every(c => (c.poked || {})['9ca5'] === 1), `passes ${passes}`);
+              passes[0] > 1 && G.listed(fx).every(c => (c.poked || {})['9ca5'] === 1), `passes ${passes}`);
     check('the endStart gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
     check('no endStart case stores the poison over a byte it never read (T131)', r.masked, 0);
   }
@@ -1294,7 +1317,7 @@ const mockCtx = (state) => ({
       P.M1.m1 = 0;
       const u = P.timeUp(m);
       let t = u.t, w, a = 0x81;
-      ways.push(u.exit);
+      if (!c.seed) ways.push(u.exit);
       if (u.exit !== 'draw'){
         const A = u.exit === 'p1' ? 0xAA00 : 0xAA40;
         t += P.winStart(m, A);
@@ -1313,7 +1336,7 @@ const mockCtx = (state) => ({
     check('timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly',
           G.failed(r, 't', 'r', 'a'), [0, '']);
     check('...and the cases take every arm: the draw, P1 and P2 ahead on the count, then on the tally ($AD5C, $AD91)',
-          [ways, fx.cases.map(c => c.exit[iA])], [['draw', 'p1', 'p2', 'p1', 'p2'], [0x81, 1, 0, 1, 0]]);
+          [ways, G.listed(fx).map(c => c.exit[iA])], [['draw', 'p1', 'p2', 'p1', 'p2'], [0x81, 1, 0, 1, 0]]);
     check('the timeUp gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
     check('no timeUp case stores the poison over a byte it never read (T131)', r.masked, 0);
   }
@@ -1328,7 +1351,7 @@ const mockCtx = (state) => ({
       try {
         do { w = P.winPass(m, 0xAA00, c.sp, null); t += w.t; n++; } while (!w.out && t <= c.t);   // $BF13 at SP - 4 + 2
       } catch (err){ throw new Error(`pass ${n}: ${err.message}`); }
-      passes.push(n);
+      if (!c.seed) passes.push(n);
       return { t, r: rx(c) };
     };
     const opts = { skip: G.frames, blind: fx.blind };
@@ -1372,7 +1395,7 @@ const mockCtx = (state) => ({
   check("boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly",
         G.failed(r, 't', 'r', 'at'), [0, '']);
   check("...and the cases take every arm: lost, won with bouts left, rank up, rank up with the stage wrapping, the top rank's random, the draw; and from a real snapshot (stage2, not poked): rank up, then lost",
-        [fx.cases.map(c => c.regs[iA]), fx.cases.map(c => c.t), fx.cases.map(c => c.source)],
+        [G.listed(fx).map(c => c.regs[iA]), G.listed(fx).map(c => c.t), G.listed(fx).map(c => c.source)],
         [[0, 1, 0, 1, 1, 1, 0x81, 1, 1, 0], [40, 54, 40, 222, 240, 251, fx.cases[6].t, 222, 222, 40], [...Array(8).fill(undefined), 'stage2', 'stage2']]);
   check('...and one derived: the rank from 9 to $10, a BCD carry through DAA',
         [fx.cases[7].derived, fx.cases[7].out.find(([a]) => a === 0xB05F)], [{ from: 3, set: { b05f: 9 } }, [0xB05F, '10']]);
@@ -1395,7 +1418,7 @@ const mockCtx = (state) => ({
         G.failed(r, 't', 'r'), [0, '']);
   const hi = c => (c.out.find(([a]) => a === 0xB024) || [, ''])[1].slice(0, 16);
   check("...and the cases take every arm: below (twice), the table beaten (played, a tie, above), a higher top byte not enough; 2UP: a tie, P2 higher (copied over P1) beating and tying the table, P1 higher beating it and not",
-        [fx.cases.map(c => c.t), fx.cases.map(c => c.derived && c.derived.from), fx.cases.map(hi)],
+        [G.listed(fx).map(c => c.t), G.listed(fx).map(c => c.derived && c.derived.from), G.listed(fx).map(hi)],
         [[368, 11336, 368, 11208, 11106, 343, 807, 11596, 11621, 11597, 783, 11597],
          [undefined, undefined, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6],
          ['', '2020202020202030', '', '2020202031303030', '2020203131353030', '', '', '2020202032303030', '2020202031303030', '2020202035303030', '', '2020202035303030']]);
@@ -1422,8 +1445,8 @@ const mockCtx = (state) => ({
         G.failed(r, 't', 'r', 'outs'), [0, '']);
   const at = (c, x) => { for (const [a, h] of c.in) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
   check('...and the cases take every arm: each stage (2, 3, the wrap to 1) and rank suffix, the tune played, and derived: no new stage (neither read), sound off, novice; and stage 3 from a real snapshot (stage2, not poked)',
-        [fx.cases.map(c => at(c, 0xAF34)), fx.cases.map(c => at(c, 0xB05F)), fx.cases.map(c => (c.outs || []).length),
-         fx.cases.map(c => c.derived && c.derived.set), fx.cases.map(c => c.source)],
+        [G.listed(fx).map(c => at(c, 0xAF34)), G.listed(fx).map(c => at(c, 0xB05F)), G.listed(fx).map(c => (c.outs || []).length),
+         G.listed(fx).map(c => c.derived && c.derived.set), G.listed(fx).map(c => c.source)],
         [[2, 3, 1, 1, undefined, 2, 2, 3], [1, 2, 3, 6, undefined, 1, 0, 1], [3422, 3422, 3422, 3422, 0, 0, 3422, 3422],
          [undefined, undefined, undefined, undefined, { af35: 0 }, { b2fa: 0 }, { b05f: 0 }, undefined], [...Array(7).fill(undefined), 'stage2']]);
   check('the setupRest gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
@@ -1456,7 +1479,7 @@ function demoEntry(fx, run){
         rig.gate.failed(r, 't', 'r'), [0, '']);
   const outAt = (c, x) => { for (const [a, h] of c.out) if (a <= x && x < a + h.length / 2) return parseInt(h.substr((x - a) * 2, 2), 16); };
   check('...and the cases draw each demo rank 7-10 for both sides ($AA94, Also_Rank $AA80), R at the JR 94 played, 95, 96, 97 and $7F derived',
-        [[0xAA94, 0xAA80].map(x => [...new Set(fx.cases.map(c => outAt(c, x)))].sort()), fx.cases.map(c => c.r)],
+        [[0xAA94, 0xAA80].map(x => [...new Set(fx.cases.map(c => outAt(c, x)))].sort()), rig.gate.listed(fx).map(c => c.r)],
         [[[10, 7, 8, 9], [10, 7, 8, 9]], [94, 95, 96, 97, 127]]);
   check('the demoIn gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
   check('demoIn writes the bytes the $A5 poison masked, replayed under $5A (T131)', r.under5A(), [0, '']);
@@ -1492,7 +1515,7 @@ function demoEntry(fx, run){
   check("gameDispatch, Num_Players 2 (Start_2UP_Game $AD9C, its tune, New_Round, Reset_Score), on through the stage $ADBA to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly",
         rig.gate.failed(r, 't', 'r'), [0, '']);
   check("...and the tune's $FE writes at their T from $AC27, on every case",
-        [all.length, fx.cases.every((c, i) => all[i] === JSON.stringify(c.outs || [])), fx.cases.map(c => (c.outs || []).length)],
+        [all.length, fx.cases.every((c, i) => all[i] === JSON.stringify(c.outs || [])), rig.gate.listed(fx).map(c => (c.outs || []).length)],
         [fx.cases.length, true, [3422]]);
   check('the start2Rest gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
   check('start2Rest writes the bytes the $A5 poison masked, replayed under $5A (T131)', r.under5A(), [0, '']);
@@ -1515,10 +1538,23 @@ function demoEntry(fx, run){
   check("gameDispatch, Num_Players 1 (Start_1UP_Game $AC3E, Reset_Score), on through $AC5F's setup to the game's first $AE29 matches the real $AC27: bytes, text cells, T and R exactly",
         rig.gate.failed(r, 't', 'r'), [0, '']);
   check("...and the tune's $FE writes at their T from $AC27, on every case",
-        [all.length, fx.cases.every((c, i) => all[i] === JSON.stringify(c.outs || [])), fx.cases.map(c => (c.outs || []).length)],
+        [all.length, fx.cases.every((c, i) => all[i] === JSON.stringify(c.outs || [])), rig.gate.listed(fx).map(c => (c.outs || []).length)],
         [fx.cases.length, true, [3422]]);
   check('the start1 gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
   check('start1 writes the bytes the $A5 poison masked, replayed under $5A (T131)', r.under5A(), [0, '']);
+}
+
+/* ---- every callio fixture seeded ----------------------------------------
+   python tools/callio.py --seed on each: no store that an engine dropping
+   it would pass on every case under the $A5 poison AND under $5A (a store
+   of $A5 over a byte never read is seen by the $5A replay, T131). */
+{
+  const G = rig.gate, keys = Object.keys(P.assets).filter(k => Array.isArray(P.assets[k].calls));   // callio's shape
+  const left = keys.flatMap(k => {
+    const u5 = new Set(G.unseeded(P.assets[k], 0x5A));
+    return G.unseeded(P.assets[k]).filter(a => u5.has(a)).map(a => `${k} ${a}`);
+  });
+  check('every callio fixture seeds every store under $A5 and $5A (callio --seed), all 26 of them, but $9C2C under $AC27 (ledger/AC27.toml open)', [keys.length, left], [26, ['demo_ac27 $9c2c']]);
 }
 
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
