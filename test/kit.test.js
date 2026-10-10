@@ -423,7 +423,7 @@ const mockCtx = (state) => ({
   check('...and clear removes it', st.load(), null);
 }
 {
-  const d = new P.Demo(); const kb = new S.Keyboard();
+  const d = rig.gate.guard(new P.Demo()); const kb = new S.Keyboard();
   check('the demo starts with its block at the centre', [d.x, d.y], [15, 11]);
   kb.press('P'); d.step(kb);
   check('P moves the block right on a movement frame', d.x, 16);
@@ -446,6 +446,7 @@ const mockCtx = (state) => ({
   check('...and reddens the border while firing', d.border, 2);
   kb.releaseAll(); d.step(kb);
   check('releasing leaves the speaker LOW with one closing edge', [d.sound.log[d.sound.log.length - 1][1], d.border], [0, 0]);
+  check('...and the demo never threw (T197)', d.threw, '');
 }
 {
   /* the page's own loop, driven through the captured rAF: three and a half
@@ -527,6 +528,18 @@ const mockCtx = (state) => ({
   check('corrupt skips a case that writes nothing',
         (() => { try { return G.corrupt({ cases: [{ in: [], out: [] }, fx.cases[0]] }).cases.map(c => c.out[0][1]); }
                  catch (e) { return String(e); } })(), ['1022a5']);
+  /* guard (T197): an engine whose step calls its own pass, throwing on the
+     third step's pass -- named once, as the outer call, every later call a no-op */
+  const eng = G.guard({ k: 0, step(){ return this.pass(); }, pass(){ if (++this.k === 3) throw new Error('jumps to $0'); return 7; } });
+  const steps = [eng.step(), eng.step(), eng.step(), eng.step(), eng.pass()];
+  check("guard keeps an engine's throw as a named failure, the outer call's, and stops the engine there",
+        [steps, eng.threw, eng.k], [[7, 7, 0, 0, 0], 'step 3: jumps to $0', 3]);
+  check('guard leaves an engine that never throws as it was, threw empty',
+        (() => { const ok = G.guard({ pass(){ return 5; } }); return [ok.pass(), ok.pass(), ok.threw]; })(), [5, 5, '']);
+  check("identity names a step that throws, never crashing: a flag run's, and the faithful run's",
+        [G.identity(fl => ({ fl, f: 0 }), { off: 'view' }, 4, (e, f) => { if (e.fl.off === false && f === 2) throw new Error('boom'); e.f = f; }, e => [e.f]),
+         G.identity(() => ({ f: 0 }), {}, 4, (e, f) => { if (f === 1) throw new Error('boom'); e.f = f; }, e => [e.f])],
+        [['off off: frame 2 threw: boom'], ['faithful: frame 1 threw: boom']]);
   const throws = f => { try { f(); return false; } catch (e) { return /T110/.test(e.message); } };
   check('an empty measurement throws (replay, ran, missing, distinct, unnamed)',
         [throws(() => G.replay({ cases: [] }, good)), throws(() => G.ran([])), throws(() => G.missing([], new Set())),
@@ -1599,7 +1612,7 @@ function liveGate(L, who, how, menuWay){
       ? Buffer.from(m.subarray(a, a + n)).toString('hex').toUpperCase()
       : m[a].toString(16).toUpperCase().padStart(2, '0')), r, ...L.hash.map(([lo, hi]) => fnv(m, lo, hi))];
   const want = r => [...r.v, r.r, ...r.h];
-  const g = new P.Fist(L.start), kb = new S.Keyboard();
+  const g = rig.gate.guard(new P.Fist(L.start)), kb = new S.Keyboard();   // a throw is a row's failure (T197)
   let first = '', exit = null, ratio = [];
   /* the menu's keys by port read from $8C54 (sample.py --reads), through
      the engine's hook: the nth read of the menu sees the nth entry */
@@ -1611,7 +1624,7 @@ function liveGate(L, who, how, menuWay){
   let menuReads = 0, menuSteps = 0, logStart = -1;   // logStart: the sound log's length as the menu closes
   const menuPaid = [];
   /* a menu that never sees its key polls without end once the plan runs
-     out: 64 reads past it, throw -- the pass's catch below fails the row */
+     out: 64 reads past it, throw -- the guard's catch fails the row below */
   if (L.reads) g.menuRead = n => {
     if (n > rplan.length + 64) throw new Error(`menu read ${n} past the ${rplan.length} planned`);
     kb.releaseAll(); for (const x of rplan[n] || []) kb.press(x); menuReads = n + 1;
@@ -1619,8 +1632,10 @@ function liveGate(L, who, how, menuWay){
   /* boot: the start is the tape's hand-over at $8800 (sample.py
      --start-here), and row 0 the demo's first $AE29: bootPass runs to it */
   let bootT = 1;
-  if (how === 'boot') try { bootT = g.pass(kb) / L.rows[0].t; }
-  catch (e){ check(`${who}: the engine reaches the first row the machine sampled`, `the boot pass threw: ${e.message}`, want(L.rows[0])); return; }
+  if (how === 'boot'){
+    bootT = g.pass(kb) / L.rows[0].t;
+    if (g.threw){ check(`${who}: the engine reaches the first row the machine sampled`, `the boot pass threw: ${g.threw}`, want(L.rows[0])); return; }
+  }
   const bootBorder = g.border;
   /* ...its text rows in the font (D5): the display checked below them, $4800- */
   const blind0 = (got, w) => { if (how === 'boot'){ const d = L.vars.length + 1 + L.hash.findIndex(([lo]) => lo === 0x4000); got[d] = w[d]; } return got; };
@@ -1668,20 +1683,19 @@ function liveGate(L, who, how, menuWay){
   for (; k < seq.length; k++){
     if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt && g.demoNext === null){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
     logN = g.sound.log.length;
-    let cost;
-    try {                                          // a pass that throws (the menu's replay guard) is this row's failure
-      cost = g.pass(kb);
-      if (g.menu){                                 // the menu up: run it step by step, as the frames would
-        while (g.menu){ cost += g.pass(kb); menuSteps++; }
-        logStart = g.sound.log.length;
-        menuPaid.push([seq[k].p, cost / seq[k].t]);
-      }
-    } catch (e){ first = `row ${seq[k].p}: the pass threw: ${e.message}`; break; }
+    let cost = g.pass(kb);                         // a pass that throws (the menu's replay guard) is this row's failure
+    if (g.menu){                                   // the menu up: run it step by step, as the frames would
+      while (g.menu && !g.threw){ cost += g.pass(kb); menuSteps++; }
+      logStart = g.sound.log.length;
+      menuPaid.push([seq[k].p, cost / seq[k].t]);
+    }
+    if (g.threw){ first = `row ${seq[k].p}: the pass threw: ${g.threw}`; break; }
     const textUp = menuPaid.length && menuPaid[menuPaid.length - 1][0] === seq[k].p && seq[k].sub;
     if (g.setup){
       const t1 = g.simT, e = g.sound.log.slice(logN).filter(([f]) => f * P.T_FRAME <= t1);
       edges = e.length; if (edges) tail = t1 - e[edges - 1][0] * P.T_FRAME;
       cost += g.pass(kb); setupT = cost; setupM = seq[k].t;
+      if (g.threw){ first = `row ${seq[k].p}: the setup's pass threw: ${g.threw}`; break; }
       setups.push([seq[k].p, cost / seq[k].t, edges]);
     }
     if (g.exit && g.exit.at !== seq[k].pc){ exit = g.exit.exit; at = seq[k].p; break; }
@@ -1764,8 +1778,8 @@ function liveGate(L, who, how, menuWay){
          the loop calls it, no keys held -- the menu stays up, a frame's T
          spent per frame (it polls, DI), the keyboard read live; E, then
          one frame: its RET, the pass replayed, on to $ABB9 */
-      const f = new P.Fist(L.start), kf = new S.Keyboard();
-      for (let n = 0; n <= startAt - 1 && !f.menu; ){
+      const f = rig.gate.guard(new P.Fist(L.start)), kf = new S.Keyboard();
+      for (let n = 0; n <= startAt - 1 && !f.menu && !f.threw; ){
         if (!f.win && !f.bonus && !f.both && !f.setup && !f.enter && !f.demoAt && f.demoNext === null){ kf.releaseAll(); for (const x of plan[n] || []) kf.press(x); n++; }
         f.pass(kf);
       }
@@ -1775,7 +1789,7 @@ function liveGate(L, who, how, menuWay){
       const held = [!!f.menu, Math.abs((f.simT - sim0) / P.T_FRAME - 100) <= 1, f.passes === passes0];
       kf.press('E'); f.step(kf); kf.releaseAll();
       check(`${who}: ...and on the page's frames the menu opened by key 0 stays up over 100 frames with no key (a frame's T each, no pass completed), and E closes it in a frame, out to $ABB9`,
-            [up, ...held, f.menu, f.demoNext === 0x80 || f.passes > passes0], [true, true, true, true, null, true]);
+            [up, ...held, f.menu, f.demoNext === 0x80 || f.passes > passes0, f.threw], [true, true, true, true, null, true, '']);
     }
   }
   if (how === 'start2'){
@@ -1964,7 +1978,7 @@ function followGate(L, who){
     });
     seq.push({ ...r, t: r.t + carry, pc: L.at, p: i + 1 });
   });
-  const g = new P.Fist(L.start), kb = new S.Keyboard();
+  const g = rig.gate.guard(new P.Fist(L.start)), kb = new S.Keyboard();
   const pcNow = () => g.exit ? g.exit.at : g.enter ? 0xAD18 : g.demoAt ? 0xAC3C : g.demoNext !== null ? 0xABB9 : g.bonus ? 0xAD6E : g.both ? 0xAD0B : g.win === 0xAA00 ? 0xAE8E : g.win ? 0xAEB2 : L.at;
   const disp = L.hash.findIndex(([lo]) => lo === 0x4000);
   let first = '', k = 0, round = 0, blind = false, sum = 0;
@@ -1973,6 +1987,7 @@ function followGate(L, who){
     if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt && g.demoNext === null){ kb.releaseAll(); for (const x of plan[round] || []) kb.press(x); round++; }
     let cost = g.pass(kb);
     if (g.setup) cost += g.pass(kb);
+    if (g.threw){ first = `row ${seq[k].p}: the pass threw: ${g.threw}`; break; }
     if (g.exit && g.exit.at !== seq[k].pc){ first = `row ${seq[k].p}: the engine stopped (${g.exit.exit} at $${g.exit.at.toString(16)})`; break; }
     sum += cost / seq[k].t;
     const got = [pcNow(), ...row(g.m, g.r)], w = [seq[k].pc, ...want(seq[k])];
@@ -2005,7 +2020,8 @@ for (const [key, who] of [...[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => [`live_dan${n
   const ways = ['time', 'quit', 'end'].map(e => {
     const g = new P.Fist(P.assets.live.start), res = { exit: e, r: 0 };
     g.demo = true;
-    const t = g.demoOut(res);
+    let t;
+    try { t = g.demoOut(res); } catch (x){ return `${e}: demoOut threw: ${x.message}`; }   // a row's failure (T197)
     P.M1.m1 = 0;
     return [res.exit, g.demoNext, g.both, t === (e === 'end' ? P.endStart(new Uint8Array(0x10000)) : 0)];
   });
@@ -2037,10 +2053,10 @@ for (const [key, who] of [...[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => [`live_dan${n
   const step = kbs => (g, f) => { const kb = kbs.get(g) || kbs.set(g, new S.Keyboard()).get(g); kb.releaseAll(); for (const k of keys(f)) kb.press(k); g.step(kb); };
   if (L){
     const kbs = new Map(), make = fl => new P.Fist(L.start, fl);
-    const bad = G.identity(make, P.Fist.FLAGS, 900, step(kbs), snap), g = make({});
+    const bad = G.identity(make, P.Fist.FLAGS, 900, step(kbs), snap), g = G.guard(make({}));
     for (let f = 0; f < 900; f++) step(kbs)(g, f);
     check(`G.identity: every added-layer flag off (and view flag on) holds the faithful state byte for byte, ${g.passes} passes from the boot through key 1's game`, bad, []);
-    check('...and the run left the demo by key 1 into the 1UP game (Num_Players $9C2C 1), still running', [g.m[0x9C2C], g.demo, g.exit], [1, false, null]);
+    check('...and the run left the demo by key 1 into the 1UP game (Num_Players $9C2C 1), still running', [g.m[0x9C2C], g.demo, g.exit, g.threw], [1, false, null, '']);
   } else console.log('  note  live_boot absent (the user\'s snapshot, not in the repository): the identity run not run');
   /* the controls: a stand-in engine over the live start, its flags acting as named */
   class Leaky extends P.Fist {

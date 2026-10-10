@@ -5173,5 +5173,29 @@
   "new": "return [JSON.stringify(s)];",
   "increment": "identity",
   "kills": "G.identity known-wrong: a view flag that writes when on, a play flag that changes nothing, a flag whose off differs -- each named"
+ },
+ {
+  "file": "rig.js",
+  "label": "guard: the engine stepped on after its throw",
+  "old": "      if (e.threw) return 0;\n",
+  "new": "",
+  "increment": "guard",
+  "kills": "guard keeps an engine's throw as a named failure, the outer call's, and stops the engine there"
+ },
+ {
+  "file": "rig.js",
+  "label": "guard: step's own passes caught as their own",
+  "old": "if (depth) return f.apply(e, a);",
+  "new": "if (false) return f.apply(e, a);",
+  "increment": "guard",
+  "kills": "guard keeps an engine's throw as a named failure, the outer call's, and stops the engine there"
+ },
+ {
+  "file": "rig.js",
+  "label": "identity: a run's throw not reported",
+  "old": "if (threw.has(name)) bad.push(`${name}: ${threw.get(name)}`);",
+  "new": "if (false) bad.push(`${name}: ${threw.get(name)}`);",
+  "increment": "guard",
+  "kills": "identity names a step that throws, never crashing: a flag run's, and the faithful run's"
  }
 ]

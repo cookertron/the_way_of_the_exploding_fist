@@ -436,9 +436,11 @@ function listed(fx) {
    empty when no flag is declared (T110).  A 'play' flag on must change
    the state somewhere, or the gate cannot see what it is named for (T55).
      flags   { name: 'view' | 'play' }, the engine's declaration
+   A step that throws is a failure here, never a crash (T197).
    Returns the failures, [] when every pair agrees:
      'name off: frame f, snap[i]'   the first difference of a pair
-     'play name: on never differs'  a play flag the run cannot see */
+     'play name: on never differs'  a play flag the run cannot see
+     'name: frame f threw: message' a run whose step threw ('faithful', the base) */
 function identity(make, flags, frames, step, snap) {
   nonEmpty('identity: the frames', frames);
   const kinds = Object.entries(flags), bad = [];
@@ -447,13 +449,15 @@ function identity(make, flags, frames, step, snap) {
                 ...kinds.map(([n]) => [`${n} off`, make({ [n]: false }), true]),
                 ...kinds.filter(([, k]) => k === 'view').map(([n]) => [`${n} on`, make({ [n]: true }), true]),
                 ...kinds.filter(([, k]) => k === 'play').map(([n]) => [`play ${n}`, make({ [n]: true }), false])];
-  const base = make({}), first = new Map();
+  const base = make({}), first = new Map(), threw = new Map();
+  /* a step that throws is a failure named here, never a crash (T197) */
+  const ok = (name, e, f) => { try { step(e, f); return true; } catch (x) { threw.set(name, `frame ${f} threw: ${x.message}`); return false; } };
   for (let f = 0; f < frames; f++) {
-    step(base, f);
+    if (!ok('faithful', base, f)) return [...bad, `faithful: ${threw.get('faithful')}`];
     const want = snap(base);
     nonEmpty('identity: the snapshot', want.length);
     for (const [name, e] of runs) {
-      step(e, f);
+      if (threw.has(name) || !ok(name, e, f)) continue;
       if (first.has(name)) continue;
       const got = snap(e);
       const i = got.length !== want.length ? Math.min(got.length, want.length) : got.findIndex((v, j) => v !== want[j]);
@@ -461,11 +465,39 @@ function identity(make, flags, frames, step, snap) {
     }
   }
   for (const [name, , same] of runs)
-    if (same && first.has(name)) bad.push(`${name}: ${first.get(name)}`);
+    if (threw.has(name)) bad.push(`${name}: ${threw.get(name)}`);
+    else if (same && first.has(name)) bad.push(`${name}: ${first.get(name)}`);
     else if (!same && !first.has(name)) bad.push(`${name}: on never differs`);
   return bad;
 }
-const gate = { POISON, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty,
+/* guard(engine) -- T197: an engine throw outside a catch is a crash, not
+   a kill the runner can name.  Wraps the engine's step and pass so the
+   outermost call that throws keeps 'step 12: message' (its own count, the
+   first throw only) in engine.threw, and every later call is a no-op
+   returning 0.  The block's row then checks threw === '' -- or, as a gate
+   that stops at its first bad row, names it there.  A loop that waits on
+   the engine's state must test threw too, or a throw hangs it (a TIMEOUT,
+   not a kill).  Returns the engine. */
+function guard(e) {
+  if (typeof e.step !== 'function' && typeof e.pass !== 'function')
+    throw new Error('guard: the engine has neither step nor pass -- nothing to guard (T110)');
+  e.threw = '';
+  let depth = 0;
+  const n = { step: 0, pass: 0 };
+  for (const k of ['step', 'pass']) if (typeof e[k] === 'function') {
+    const f = e[k];
+    e[k] = function (...a) {
+      if (e.threw) return 0;
+      if (depth) return f.apply(e, a);             // step's own passes: the outer call catches
+      n[k]++; depth++;
+      try { return f.apply(e, a); }
+      catch (x) { e.threw = `${k} ${n[k]}: ${x.message}`; return 0; }
+      finally { depth--; }
+    };
+  }
+  return e;
+}
+const gate = { POISON, guard, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty,
                world, worlds, unseeded, listed, identity };
 
 module.exports = {
