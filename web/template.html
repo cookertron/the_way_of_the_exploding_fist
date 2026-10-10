@@ -2946,7 +2946,15 @@ function specPort(kb, p){                          // IN as the machine answers
   return (p & 1) ? 0xFF : kb.port(p >> 8);
 }
 class Fist {
-  constructor(st){
+  /* the added layer (rule 5): every departure from the original a named
+     flag, off on the faithful path -- { name: 'view' | 'play' }, a view flag
+     leaving the machine's state unchanged on or off, a play flag changing it
+     when on.  None yet.  An undeclared flag throws; test/kit.test.js gates
+     each by G.identity against the faithful run (T24) */
+  static FLAGS = Object.freeze({});
+  constructor(st, flags = {}){
+    for (const k of Object.keys(flags)) if (!Object.hasOwn(Fist.FLAGS, k)) throw new Error(`Fist: no added-layer flag '${k}'`);
+    this.flags = Object.freeze(Object.fromEntries(Object.keys(Fist.FLAGS).map(k => [k, !!flags[k]])));
     this.m = new Uint8Array(0x10000); this.m.set(fromHex(st.ram), 0x4000);
     this.r = st.r; this.sp = st.sp;
     this.passes = 0; this.simT = 0; this.acc = 0; this.exit = null;

@@ -2004,4 +2004,51 @@ for (const [key, who] of [...[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => [`live_dan${n
         ways, [[null, 0, null, true], [null, 0x80, null, true], [null, null, 'end', true]]);
 }
 
+/* ---- the added layer: every flag off is the faithful path (T24, rule 5) --
+   Fist.FLAGS declares each departure; the gate names the same list, an
+   undeclared flag throws, and G.identity steps the engine from the tape's
+   hand-over through the demo, key 1's game and keyed play, beside each flag
+   off (and each view flag on), the whole state compared every frame.  Its
+   known-wrong controls (T100): a view flag that pokes one byte when on, a
+   play flag that changes nothing, a flag whose off differs -- each named. */
+{
+  const G = rig.gate, NAMED = {};                  // the flags this gate names: none yet
+  check('Fist.FLAGS: the page declares exactly the flags the identity gate names', P.Fist.FLAGS, NAMED);
+  let threw = '';
+  try { new P.Fist(P.assets.live.start, { turbo: true }); } catch (e) { threw = e.message; }
+  check('Fist: an undeclared added-layer flag throws', threw, "Fist: no added-layer flag 'turbo'");
+  const L = P.assets.live_boot;
+  const snap = g => {
+    const s = { r: g.r, sp: g.sp, passes: g.passes, simT: g.simT, acc: g.acc, exit: g.exit, frame: g.frame, border: g.border,
+                win: g.win, bonus: g.bonus, both: g.both, setup: g.setup, enter: g.enter, stage: g.stage, demoAt: g.demoAt,
+                demo: g.demo, two: g.two, demoNext: g.demoNext, menu: !!g.menu, log: g.sound.log };
+    return [...g.m, JSON.stringify(s)];
+  };
+  const keys = f => f < 300 ? [] : f < 310 ? ['1'] : f < 500 ? [] : [['P'], ['O'], ['Q', 'P'], ['A'], ['SPACE']][(f >> 4) % 5];
+  const step = kbs => (g, f) => { const kb = kbs.get(g) || kbs.set(g, new S.Keyboard()).get(g); kb.releaseAll(); for (const k of keys(f)) kb.press(k); g.step(kb); };
+  if (L){
+    const kbs = new Map(), make = fl => new P.Fist(L.start, fl);
+    const bad = G.identity(make, P.Fist.FLAGS, 900, step(kbs), snap), g = make({});
+    for (let f = 0; f < 900; f++) step(kbs)(g, f);
+    check(`G.identity: every added-layer flag off (and view flag on) holds the faithful state byte for byte, ${g.passes} passes from the boot through key 1's game`, bad, []);
+    check('...and the run left the demo by key 1 into the 1UP game (Num_Players $9C2C 1), still running', [g.m[0x9C2C], g.demo, g.exit], [1, false, null]);
+  } else console.log('  note  live_boot absent (the user\'s snapshot, not in the repository): the identity run not run');
+  /* the controls: a stand-in engine over the live start, its flags acting as named */
+  class Leaky extends P.Fist {
+    constructor(st, fl){ super(st); this.fl = fl; }
+    step(kb){ super.step(kb); if (this.frame === 7 && (this.fl.poke || this.fl.off === false)) this.m[0x5C00] ^= 1; }
+  }
+  const lk = new Map(), mk = fl => new Leaky(P.assets.live.start, fl);
+  check('G.identity known-wrong: a view flag that writes when on, a play flag that changes nothing, a flag whose off differs -- each named',
+        G.identity(mk, { poke: 'view', idle: 'play', off: 'view' }, 12, step(lk), snap),
+        ['off off: frame 6, snap[23552]', 'poke on: frame 6, snap[23552]', 'play idle: on never differs']);
+  let made = 0;                                    // each engine made pokes its own value: not deterministic
+  class Drift extends P.Fist { step(kb){ super.step(kb); if (this.frame === 3) this.m[0x5C00] = this.n ??= ++made; } }
+  check('G.identity known-wrong: an engine whose two faithful runs differ is named, with no flag declared',
+        G.identity(() => new Drift(P.assets.live.start), {}, 6, step(new Map()), snap), ['faithful again: frame 2, snap[23552]']);
+  let empty = '';
+  try { G.identity(mk, {}, 0, step(lk), snap); } catch (e) { empty = e.message; }
+  checkTrue('G.identity known-wrong: no frames throws (T110)', empty.includes('identity: the frames is empty'), empty);
+}
+
 rig.done();

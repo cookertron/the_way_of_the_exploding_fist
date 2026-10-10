@@ -5117,5 +5117,61 @@
   "new": "return G.unseeded(P.assets[k]).filter(a => u5.has(a) || true)",
   "increment": "seed-all",
   "kills": "every callio fixture seeds every store under $A5 and $5A (callio --seed), all 26 of them, but $9C2C under $AC27 (ledger/AC27.toml open)"
+ },
+ {
+  "file": "template.html",
+  "label": "Fist: undeclared flags accepted",
+  "old": "if (!Object.hasOwn(Fist.FLAGS, k)) throw",
+  "new": "if (false) throw",
+  "increment": "identity",
+  "kills": "Fist: an undeclared added-layer flag throws"
+ },
+ {
+  "file": "rig.js",
+  "label": "identity: the faithful-again run dropped",
+  "old": "const runs = [['faithful again', make({}), true],",
+  "new": "const runs = [",
+  "increment": "identity",
+  "kills": "G.identity known-wrong: an engine whose two faithful runs differ is named, with no flag declared"
+ },
+ {
+  "file": "rig.js",
+  "label": "identity: view flags never run on",
+  "old": "...kinds.filter(([, k]) => k === 'view').map(([n]) => [`${n} on`, make({ [n]: true }), true]),",
+  "new": "",
+  "increment": "identity",
+  "kills": "G.identity known-wrong: a view flag that writes when on, a play flag that changes nothing, a flag whose off differs -- each named"
+ },
+ {
+  "file": "rig.js",
+  "label": "identity: play flags not required to differ",
+  "old": "else if (!same && !first.has(name)) bad.push(`${name}: on never differs`);",
+  "new": "",
+  "increment": "identity",
+  "kills": "G.identity known-wrong: a view flag that writes when on, a play flag that changes nothing, a flag whose off differs -- each named"
+ },
+ {
+  "file": "rig.js",
+  "label": "identity: only the first frame compared",
+  "old": "if (first.has(name)) continue;",
+  "new": "if (first.has(name) || f > 0) continue;",
+  "increment": "identity",
+  "kills": "G.identity known-wrong: a view flag that writes when on, a play flag that changes nothing, a flag whose off differs -- each named"
+ },
+ {
+  "file": "rig.js",
+  "label": "identity: zero frames passes",
+  "old": "nonEmpty('identity: the frames', frames);",
+  "new": "",
+  "increment": "identity",
+  "kills": "G.identity known-wrong: no frames throws (T110)"
+ },
+ {
+  "file": "kit.test.js",
+  "label": "identity snapshot: memory left out",
+  "old": "return [...g.m, JSON.stringify(s)];",
+  "new": "return [JSON.stringify(s)];",
+  "increment": "identity",
+  "kills": "G.identity known-wrong: a view flag that writes when on, a play flag that changes nothing, a flag whose off differs -- each named"
  }
 ]

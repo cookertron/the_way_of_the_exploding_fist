@@ -8,14 +8,14 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 
 | State | Meaning | All 197 | #61 onward |
 |---|---|---|---|
-| KIT | the kit already prevents it | 52 | 27 |
+| KIT | the kit already prevents it | 53 | 27 |
 | BB | built in the Bubble Bobble repo and generic; move it into the kit | 9 | 9 |
-| BUILD | no mechanism yet; build it | 112 | 83 |
+| BUILD | no mechanism yet; build it | 111 | 83 |
 | READ | knowledge only; read by ID when relevant | 24 | 18 |
 
 | Mechanism | Traps | Still to build |
 |---|---|---|
-| `gate`: Gate helpers in test/rig.js | 50 | 39 |
+| `gate`: Gate helpers in test/rig.js | 50 | 38 |
 | `measure`: measure(), the single measurement entry point (manual 6.11) | 24 | 24 |
 | `battery`: Kit mutation runner, tools/mutants.py (manual 6.12) | 22 | 6 |
 | `lint`: Static checks on engine and test source | 14 | 11 |
@@ -34,7 +34,7 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 
 Each mechanism's trap numbers are its acceptance tests: once it is built, each listed trap should be impossible to fall into, not just documented.
 
-**`gate`: Gate helpers in test/rig.js** (50 traps; KIT 11, BUILD 39). The fixture must exist; the code under test must run on the gate's path; worlds are dirty and position-dependent by default; every comparison, wrap and last slot gets a boundary value; counts and footprints are asserted beside values; every instance is driven (both players); departures are off, and on/off must be byte-identical; a negative control must fail; seeds cover every field the code reads.  Built: `rig.gate` -- replay (a poisoned 64K, the whole of memory compared, the masked-store census), corrupt (the negative control), nonEmpty (an empty measurement throws), ran/missing (coverage from the machine's sig), distinct, sameSource, unnamed, untouched, the world builders (world.at/bounds/both/cross; worlds names each world a fixture lacks as a callio --derive --set; unseeded names stores never seen changing a byte); each gated in kit.test.js.  Still to build: the seeding derive that empties unseeded, the on/off identity gate, and an engine step that turns a throw into a named FAIL.
+**`gate`: Gate helpers in test/rig.js** (50 traps; KIT 12, BUILD 38). The fixture must exist; the code under test must run on the gate's path; worlds are dirty and position-dependent by default; every comparison, wrap and last slot gets a boundary value; counts and footprints are asserted beside values; every instance is driven (both players); departures are off, and on/off must be byte-identical; a negative control must fail; seeds cover every field the code reads.  Built: `rig.gate` -- replay (a poisoned 64K, the whole of memory compared, the masked-store census), corrupt (the negative control), nonEmpty (an empty measurement throws), ran/missing (coverage from the machine's sig), distinct, sameSource, unnamed, untouched, the world builders (world.at/bounds/both/cross; worlds names each world a fixture lacks as a callio --derive --set; unseeded names stores never seen changing a byte); identity (the on/off identity gate: each declared flag off, each view flag on, beside the faithful run, the whole state every frame); each gated in kit.test.js.  Still to build: the seeding derive that empties unseeded, and an engine step that turns a throw into a named FAIL.
 
 Traps: #24, #37, #40, #44, #49, #50, #54, #55, #57, #60, #61, #62, #63, #66, #77, #78, #79, #88, #91, #93, #96, #98, #100, #104, #110, #111, #115, #122, #124, #125, #127, #128, #129, #131, #132, #133, #135, #138, #140, #141, #148, #157, #159, #164, #169, #175, #181, #190, #191, #197
 
@@ -117,7 +117,7 @@ Traps: #178, #179, #184
 | 21 | One key script through harness and engine, diffed row by row. | `rig` | KIT |
 | 22 | Freeze the oracle's output as a fixture the suite runs against. | `rig` | KIT |
 | 23 | Mutation-test every behaviour; a named check must fail. | `battery` | KIT |
-| 24 | Run each enhancement on and off and require byte-identical state. | `gate` | BUILD |
+| 24 | Run each enhancement on and off and require byte-identical state. | `gate` | KIT |
 | 25 | Ship diagnostics; on a player's machine they are the debugger. | `platform` | KIT |
 | 26 | The static image is post-boot; study the front end in a live state. | `manual` | READ |
 | 27 | An empty watch result first rules out a degenerate range. | `measure` | BUILD |

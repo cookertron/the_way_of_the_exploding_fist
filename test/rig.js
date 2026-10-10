@@ -426,8 +426,47 @@ function listed(fx) {
   nonEmpty('listed: the fixture\'s unseeded cases', l.length);
   return l;
 }
+/* identity(make, flags, frames, step, snap) -- the on/off identity gate
+   (T24, rule 5): the faithful engine make({}) stepped beside one made
+   with each flag off, and for a 'view' flag one with it on, frame for frame
+   through step(e, f) (which sets the keys of frame f), their snap(e) --
+   the whole state, memory and the engine's own -- compared after every
+   frame.  A second faithful run is always compared too: an engine that is
+   not deterministic cannot be gated, and it keeps the measurement non-
+   empty when no flag is declared (T110).  A 'play' flag on must change
+   the state somewhere, or the gate cannot see what it is named for (T55).
+     flags   { name: 'view' | 'play' }, the engine's declaration
+   Returns the failures, [] when every pair agrees:
+     'name off: frame f, snap[i]'   the first difference of a pair
+     'play name: on never differs'  a play flag the run cannot see */
+function identity(make, flags, frames, step, snap) {
+  nonEmpty('identity: the frames', frames);
+  const kinds = Object.entries(flags), bad = [];
+  for (const [n, k] of kinds) if (k !== 'view' && k !== 'play') bad.push(`${n}: kind '${k}' is neither view nor play`);
+  const runs = [['faithful again', make({}), true],
+                ...kinds.map(([n]) => [`${n} off`, make({ [n]: false }), true]),
+                ...kinds.filter(([, k]) => k === 'view').map(([n]) => [`${n} on`, make({ [n]: true }), true]),
+                ...kinds.filter(([, k]) => k === 'play').map(([n]) => [`play ${n}`, make({ [n]: true }), false])];
+  const base = make({}), first = new Map();
+  for (let f = 0; f < frames; f++) {
+    step(base, f);
+    const want = snap(base);
+    nonEmpty('identity: the snapshot', want.length);
+    for (const [name, e] of runs) {
+      step(e, f);
+      if (first.has(name)) continue;
+      const got = snap(e);
+      const i = got.length !== want.length ? Math.min(got.length, want.length) : got.findIndex((v, j) => v !== want[j]);
+      if (i >= 0) first.set(name, `frame ${f}, snap[${i}]`);
+    }
+  }
+  for (const [name, , same] of runs)
+    if (same && first.has(name)) bad.push(`${name}: ${first.get(name)}`);
+    else if (!same && !first.has(name)) bad.push(`${name}: on never differs`);
+  return bad;
+}
 const gate = { POISON, replay, failed, frames, corrupt, negative, ran, missing, distinct, sameSource, unnamed, untouched, nonEmpty,
-               world, worlds, unseeded, listed };
+               world, worlds, unseeded, listed, identity };
 
 module.exports = {
   ROOT, sandbox, els, drawCalls, listeners, localStorageStore,
