@@ -98,7 +98,10 @@ how many reads were fetches.
              copy's source).  A derive that fails, or writes more than
              twice its parent's bytes, or reads ROM as data or runs ROM
              code its parent did not (no replay without the ROM; D5), is
-             dropped.  Each case kept is marked "seed": a gate's rows that
+             dropped, as is one past its parent's T + 200000.  A mode byte
+             whose other way runs longer or prints new glyphs ($9C2C under
+             $AC27: the 1UP game) is derived by hand with --derive --set
+             and marked "seed".  Each case kept is marked "seed": a gate's rows that
              list the cases' ways read the cases without it.  --max N cases (40),
              --dry lists the stores only.  A store of the poison over a
              byte never read cannot be set: the gate's $5A replay sees it.

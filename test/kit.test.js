@@ -1488,10 +1488,19 @@ function demoEntry(fx, run){
 /* ---- Main_Game_Loop's dispatch $AC27 after the demo's RET ------------
    python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29
    (port.json demo_ac27: the demo's fourth stage over, Num_Players 0, the
-   JR Z to $AC09 and a new demo).  gameDispatch as demoIn's gate. */
+   JR Z to $AC09 and a new demo).  gameDispatch as demoIn's gate; the seed
+   case ($9C2C 1: callio --derive --set 0x9C2C=0x01, marked "seed" by hand,
+   as --seed drops a way that reads new ROM glyphs) runs on through $AC5F
+   as start_ac27's. */
 {
   const fx = P.assets.demo_ac27;
-  const r = demoEntry(fx, (m, r) => { const d = P.gameDispatch(m, r); return d.at === 0xAE29 ? d.t : -1; });
+  const r = demoEntry(fx, (m, r) => {
+    const d = P.gameDispatch(m, r);
+    if (d.at === 0xAE29) return d.t;
+    if (d.at !== 0xAC5F) return -1;
+    const s = P.setupMusic(m, []);
+    return d.t + s.t + P.setupRest(m, s.stage) + P.roundIn(m, r);
+  });
   check("gameDispatch matches the real $AC27 (Num_Players 0: JR Z, a new demo) to its first $AE29: bytes, text cells, T and R exactly",
         rig.gate.failed(r, 't', 'r'), [0, '']);
   check('the gameDispatch gate fails on a case with one byte corrupted (T100)', r.corrupt(), 1);
@@ -1554,7 +1563,7 @@ function demoEntry(fx, run){
     const u5 = new Set(G.unseeded(P.assets[k], 0x5A));
     return G.unseeded(P.assets[k]).filter(a => u5.has(a)).map(a => `${k} ${a}`);
   });
-  check('every callio fixture seeds every store under $A5 and $5A (callio --seed), all 26 of them, but $9C2C under $AC27 (ledger/AC27.toml open)', [keys.length, left], [26, ['demo_ac27 $9c2c']]);
+  check('every callio fixture seeds every store under $A5 and $5A (callio --seed), all 26 of them', [keys.length, left], [26, []]);
 }
 
 /* ---- round_loop $AE26, the live loop, against the machine pass by pass --
