@@ -346,5 +346,51 @@
     "cases": "test/mutants.json",
     "suite": "test/kit.test.js",
     "diagnostic": "FIST_"
+  },
+  "roster": {
+    "file": "build/roster.json",
+    "heartbeat": "0xAE29",
+    "frames": 3000,
+    "steps": 300000,
+    "min_pcs": 32,
+    "columns": {
+      "np": "0x9C2C",
+      "demo": "0xAA06",
+      "sound": "0xB2FA",
+      "rank": "0xB05F",
+      "also_rank": "0xAA80",
+      "stage": "0xAF34",
+      "bouts": "0xAA3C",
+      "newstage": "0xAF35",
+      "time": "0x9CA5",
+      "timeup": "0x9C2B",
+      "yy1": "0xAA01",
+      "yy2": "0xAA41",
+      "sc1": "0xB02F:3",
+      "sc2": "0xB032:3",
+      "hi": "0xB035:3",
+      "ctl1": "0x8BD2:w",
+      "ctl2": "0x8BE6:w",
+      "yy2up": "0x9057"
+    },
+    "notes": {
+      "yy2up": "Yin_Yang_2UP's first byte: $3A as the tape has it, $C9 (RET) where the user's snapshots carried their cheat; snapimport put it back",
+      "ctl1": "Player_1_Controls: the table each player reads ($8BD4 keys, $8C30 Sinclair_1, $8C1E Sinclair_2, $8C42 Kempston)"
+    },
+    "sources": {
+      "boot": "build/boot48.z80 at the tape's hand-over $8800 (snapimport --save boot)",
+      "stage2": "snapshots/going_to_stage_2.szx, 128K .szx in the 48K configuration (snapimport --save stage2)",
+      "dan2": "snapshots/1st_dan_to_2nd_dan.szx, cheat $9057 put back to $3A",
+      "dan3": "snapshots/2nd_dan_to_3rd_dan.szx, cheat put back",
+      "dan4": "snapshots/3rd_dan_to_4th_dan.szx, cheat put back",
+      "dan5": "snapshots/4th_dan_to_5th_dan.szx, cheat put back",
+      "dan6": "snapshots/5th_dan_to_6th_dan.szx, cheat put back",
+      "dan7": "snapshots/6th_dan_to_7th_dan.szx, cheat put back",
+      "dan8": "snapshots/7th_dan_to_8th_dan.szx, cheat put back",
+      "dan9": "snapshots/8th_dan_to_9th_dan.szx, cheat put back",
+      "dan10": "snapshots/9th_dan_to_10th_dan.szx, cheat put back",
+      "dan10a": "snapshots/10th_dan_1.szx, cheat put back",
+      "dan10b": "snapshots/10th_dan_2.szx, cheat put back"
+    }
   }
 }

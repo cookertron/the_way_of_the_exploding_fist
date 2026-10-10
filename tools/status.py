@@ -65,6 +65,10 @@ def gather():
            'web': R.source_text('web', ('.js', '.html')),
            'tests': R.source_text('test', ('.js',)),
            'next': read('NEXT.md'), 'decisions': read('docs/DECISIONS.md')}
+    try:
+        ctx['port'] = json.loads(read('port.json') or '{}')
+    except ValueError:
+        ctx['port'] = {}
     for folder, topic in ((R.LEDGER, False), (R.TOPICS, True)):
         if not os.path.isdir(folder):
             continue
@@ -275,6 +279,24 @@ def check(ctx):
             if moved:
                 warn.append('a full mutation run is due: %s changed since the last one '
                             '(python tools/mutants.py --background)' % ', '.join(moved))
+
+    # the roster manifest (manual 12.6): every saved state a row, computed
+    rcfg = (ctx['port'].get('roster') or {}) if isinstance(ctx.get('port'), dict) else {}
+    rfile = rcfg.get('file', 'build/roster.json')
+    sdir = os.path.join(ROOT, ((ctx.get('port') or {}).get('z80') or {}).get('states') or 'build')
+    pkls = sorted(f[:-4] for f in os.listdir(sdir) if f.endswith('.pkl')) if os.path.isdir(sdir) else []
+    if pkls:
+        st, why = ST.freshness(rfile)
+        if st in ('missing', 'unreadable'):
+            warn.append('no roster manifest for %d saved states: python tools/roster.py (manual 12.6)'
+                        % len(pkls))
+        else:
+            if st != 'fresh':
+                warn.append('the roster is %s (%s): python tools/roster.py' % (st, why[0] if why else st))
+            have = set(((ST.load(rfile) or {}).get('states') or {}))
+            new = [n for n in pkls if n not in have]
+            if new:
+                warn.append('saved states not in the roster: %s (python tools/roster.py)' % ', '.join(new))
 
     scratch = os.path.join(ROOT, 'scratch')
     last = git('log', '-1', '--format=%ct')

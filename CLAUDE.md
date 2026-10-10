@@ -112,6 +112,10 @@ record up loses nothing.
 - `tools/stamp.py` — evidence freshness (manual 12.3): every fixture writer
   stamps what produced it; a replay `--check` restamps; a green full suite
   writes `build/gate.json`.  status.py reports fresh / stale / unstamped.
+- `tools/roster.py` — the roster manifest (manual 12.6): every saved
+  state a row of computed columns (PC and stack, patched code, usable,
+  the world variables in `port.json` roster.columns) and the census of
+  columns no state varies; "on all states" means `roster.usable()`.
 - `tools/measure.py` — `measure()`, the one entry point an oracle calls
   (manual 6.11): G11's six defaults built in, `--lint` for oracle scripts.
 
@@ -124,7 +128,7 @@ each must prevent.
 | Tool | Replaces |
 |---|---|
 | the rest of the gate helpers: a callio derive that seeds every unseeded store | remembering how gates fail (map: `gate`, the BUILD rows) |
-| the byte-usage map and roster manifest | backward-decode verdicts; guessing how saved states differ (12.5, 12.6) |
+| the byte-usage map | backward-decode verdicts (12.5) |
 | `tools/brief.py`, `tools/verify_claims.py` | re-reading a range to check a sub-agent (12.7) |
 
 When one lands, move it into "What is already here" and delete every rule

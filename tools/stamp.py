@@ -32,9 +32,13 @@ asset's content hash, the build's own inputs); rig.done() copies it into
 build/gate.json with the suite's own hashes when the WHOLE suite passes.  A
 fixture's gate is fresh while that chain still matches the disk.
 
+A step that read saved states also carries "roster": each state's row in
+the roster manifest (tools/roster.py, 12.6) by name, its hash and usable
+flag; a step measured on a state the roster calls unusable is stale.
+
 Not covered yet: port.json (the harness reads its tape and z80 sections; a
-change there stales nothing), and the "engine", "roster" and "branches"
-fields of 12.3, which arrive with measure() and the roster manifest.
+change there stales nothing), and the "engine" and "branches" fields of
+12.3, which arrive with measure().
 
     python tools/stamp.py                  every asset in port.json
     python tools/stamp.py KEY|FILE ...     just those
@@ -146,6 +150,12 @@ def step(fx, by, argv=None):
         argv = [os.path.basename(sys.argv[0])] + sys.argv[1:]
     files = {f: file_hash(f) for f in code_files() + READ}
     st = {'by': by, 'args': list(argv), 'files': files, 'content': content_hash(fx)}
+    states = [f for f in READ if f.endswith('.pkl')]
+    if states:
+        import roster                   # 12.6: the rows of the states measured on
+        rows = roster.rows_for(states)
+        if rows is not None:
+            st['roster'] = rows
     old = fx.get('_stamp') if isinstance(fx.get('_stamp'), dict) else {}
     steps = [] if by in ('capture', 'check') else list(old.get('steps', []))
     fx['_stamp'] = {'steps': steps + [st]}
@@ -169,6 +179,9 @@ def stale_reasons(stamp, fx):
                 why.append('%s is gone (read by %s)' % (f, s.get('by')))
             elif now != h:
                 why.append('%s changed since %s' % (f, s.get('by')))
+        for n, r in (s.get('roster') or {}).items():
+            if not r.get('usable'):
+                why.append('%s measured on %s, not usable in the roster (TRAPS #150)' % (s.get('by'), n))
     if content_hash(fx) != steps[-1].get('content'):
         why.append('the fixture changed after its last step: a hand edit? (TRAPS #97)')
     return why

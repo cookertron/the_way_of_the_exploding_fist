@@ -8,9 +8,9 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 
 | State | Meaning | All 198 | #61 onward |
 |---|---|---|---|
-| KIT | the kit already prevents it | 55 | 29 |
+| KIT | the kit already prevents it | 60 | 33 |
 | BB | built in the Bubble Bobble repo and generic; move it into the kit | 9 | 9 |
-| BUILD | no mechanism yet; build it | 110 | 82 |
+| BUILD | no mechanism yet; build it | 105 | 78 |
 | READ | knowledge only; read by ID when relevant | 24 | 18 |
 
 | Mechanism | Traps | Still to build |
@@ -20,7 +20,7 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 | `battery`: Kit mutation runner, tools/mutants.py (manual 6.12) | 23 | 6 |
 | `lint`: Static checks on engine and test source | 14 | 11 |
 | `harness`: Harness defaults and API in tools/harness.py | 10 | 8 |
-| `roster`: Save-state manifest and census rules (manual 12.6) | 8 | 8 |
+| `roster`: Save-state manifest and census rules (manual 12.6) | 8 | 3 |
 | `codemap`: adis, walk, grepbytes and the byte-usage map (phase 4, 12.5) | 8 | 8 |
 | `status`: Ledger and status script (manual 12.2-12.4) | 5 | 2 |
 | `build`: Build-time checks in tools/build.py | 6 | 3 |
@@ -54,7 +54,7 @@ Traps: #45, #75, #81, #95, #99, #103, #113, #114, #117, #123, #134, #163, #173, 
 
 Traps: #1, #2, #29, #38, #39, #41, #42, #69, #139, #151
 
-**`roster`: Save-state manifest and census rules (manual 12.6)** (8 traps; BUILD 8). Computed tags per state (machine, detect bytes, PC and stack at capture, usable); every census states its population, N, window and whether play was natural or forced; variables that always co-occur are flagged.
+**`roster`: Save-state manifest and census rules (manual 12.6)** (8 traps; KIT 5, BUILD 3). Computed tags per state (machine, detect bytes, PC and stack at capture, usable); every census states its population, N, window and whether play was natural or forced; variables that always co-occur are flagged.  Built: `tools/roster.py` -- every saved state a row of computed columns (hash, PC, SP and the stack top, patched code against the image, usable from the heartbeat and a distinct-PC count, one column per declared world variable) with the census of columns that never vary and pairs set together in every state; stamp.step() records the rows a measurement read and stales one taken on an unusable state; status.py warns when the roster is stale or misses a state.  Still to build: censuses that state their population, N and window (natural play vs forced), and the differ grouping its mismatches by roster column.
 
 Traps: #28, #31, #67, #84, #150, #165, #183, #188
 
@@ -121,7 +121,7 @@ Traps: #178, #179, #184
 | 25 | Ship diagnostics; on a player's machine they are the debugger. | `platform` | KIT |
 | 26 | The static image is post-boot; study the front end in a live state. | `manual` | READ |
 | 27 | An empty watch result first rules out a degenerate range. | `measure` | BUILD |
-| 28 | Record the machine-detect bytes per state; a key script can flip the detect. | `roster` | BUILD |
+| 28 | Record the machine-detect bytes per state; a key script can flip the detect. | `roster` | KIT |
 | 29 | Frame stepping overshoots cumulatively; add an absolute-target mode. | `harness` | BUILD |
 | 30 | A self-modifying PRNG's cycle depends on its seed; don't reuse it elsewhere. | `manual` | READ |
 | 31 | Distribution claims come from natural play; forced scenarios only reach paths. | `roster` | BUILD |
@@ -160,7 +160,7 @@ Traps: #178, #179, #184
 | 64 | Choose each claim's bracket by when its evidence is destroyed. | `measure` | BUILD |
 | 65 | Read the docstring of any tool a plan names before writing a new one. | `status` | BUILD |
 | 66 | Check that the oracle's input and the engine method's input are the same. | `gate` | BUILD |
-| 67 | Record each state's PC and stack top; a state can resume mid-routine. | `roster` | BUILD |
+| 67 | Record each state's PC and stack top; a state can resume mid-routine. | `roster` | KIT |
 | 68 | Decode from known entries only; one byte into a prefix invents code. | `codemap` | BUILD |
 | 69 | Restore PC and SP after call(); sentinels can collide with game bytes. | `harness` | BUILD |
 | 70 | Mutate the value that lands; a typed array masks it for you. | `battery` | BUILD |
@@ -243,7 +243,7 @@ Traps: #178, #179, #184
 | 147 | Exclude named windows only, and report what was dropped. | `measure` | BUILD |
 | 148 | Measure the step the gate names, as a difference of two runs. | `gate` | BUILD |
 | 149 | Write code with the Write/Edit tools, never through shell escaping. | `hook` | KIT |
-| 150 | Mark hung captures unusable in the roster manifest. | `roster` | BUILD |
+| 150 | Mark hung captures unusable in the roster manifest. | `roster` | KIT |
 | 151 | Address registers by name; check a probe aims before sweeping. | `harness` | BUILD |
 | 152 | Poison only the question's extent; report contiguous runs. | `measure` | BUILD |
 | 153 | Attribute every write to its PC before explaining it. | `measure` | BUILD |
@@ -276,12 +276,12 @@ Traps: #178, #179, #184
 | 180 | A mask that looks cosmetic can switch a whole behaviour. | `manual` | READ |
 | 181 | When no caller can express a difference, gate the routine at its entry. | `gate` | BUILD |
 | 182 | Poison where the routine actually writes, with a telling value. | `measure` | BUILD |
-| 183 | Choose census worlds that contain the thing being counted. | `roster` | BUILD |
+| 183 | Choose census worlds that contain the thing being counted. | `roster` | KIT |
 | 184 | The same bits are paint at one time and bubble tags at another. | `game` | READ |
 | 185 | Decode suite output as UTF-8 and require the N/N line. | `battery` | KIT |
 | 186 | An anchor must match live code, not a comment; keep a count invariant. | `battery` | BB |
 | 187 | When a slow check reports a class of error, write the fast one. | `manual` | READ |
-| 188 | Flag variables that are set together in every world you built. | `roster` | BUILD |
+| 188 | Flag variables that are set together in every world you built. | `roster` | KIT |
 | 189 | Poison around NUL terminators, never over them. | `measure` | BUILD |
 | 190 | Drive input-gated routines with input, beside a refusal control. | `gate` | BUILD |
 | 191 | Seed data that separates the headline claim from its equivalents. | `gate` | BUILD |

@@ -1,0 +1,18 @@
+# ledger/topics/roster.toml -- current truth about "the roster manifest -- the saved states and what worlds they hold (manual 12.6)", a system spanning
+# routines (manual 12.11).  Written with tools/record.py; history is in git.
+
+name     = "the roster manifest -- the saved states and what worlds they hold (manual 12.6)"
+routines = ["$AE29"]
+manual   = ["12.6", "12.3"]
+
+[[fact]]
+kind   = "measured"
+says   = "16 saved states, all usable ($AE29 within 312 frames, 44-1997 distinct PCs); no tape-loaded code byte differs from the image ($9057 is $3A in all); dan states resume in Intro_Music, p1/p1b/s1/stage2 in the sprite decoder $8803"
+by     = "python tools/roster.py"
+
+[[fact]]
+kind   = "never"
+says   = "no saved state has sound off ($B2FA 0), a changed control table ($8BD2/$8BE6), a 2UP game, $AF35 set, P2 yin-yang ($AA41) nonzero or a new high score: a gate needing one builds the world (G.worlds, callio --poke)"
+by     = "python tools/roster.py --print"
+window = "every build/*.pkl, the columns of port.json roster.columns"
+n      = 16
