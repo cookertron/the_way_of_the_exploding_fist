@@ -3095,3 +3095,13 @@ docs/TRAPS-MAP.md (tools/status.py --check, tools/selftest.py). -->
     The rule: **every call that steps the engine inside a check goes through a catch
     that fails a named row with the error's message**, so a throw is a kill the runner
     can attribute.  A gate helper should own this, not each gate.
+198. **A LONG RUN THAT READS ITS REVISION WHEN IT ENDS CREDITS THE WRONG COMMIT**
+    (Exploding Fist, per-verdict stamps, 2026-10-10).  The runner recorded
+    `git rev-parse HEAD` as the full run's revision AFTER the run, not before it.
+    A full battery takes hours; a session that commits a runner change while one
+    is going (the kit says never to wait on it) gets that commit credited with a
+    full run it never had, and status.py stops saying a run is due.  Caught while
+    reading the runner, before it happened: the run then going was the old runner,
+    and the commit about to land changed the runner.
+    The rule: **anything a long job ran against is read when it starts** -- the
+    revision, and the tracked files that were dirty -- and stamped on each result.

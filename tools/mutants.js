@@ -18,7 +18,11 @@
  *       page, when it exists; otherwise save it there), and write,
  *       per case, the blocks whose run executed its anchor -- "all" when the
  *       page load or the prelude did, because load-time code feeds every block --
- *       and each block's time.
+ *       and each block's time.  For the verdict stamps (manual 6.12 step 4) it
+ *       also writes hashes of the page code each run executed: "load" for the
+ *       page load and the prelude, "code" per block, and "anchor" per case --
+ *       each function's OWN text, its nested functions cut out, so an edit to
+ *       one function stales only the verdicts whose blocks ran it.
  *
  * The selectable copy also honours ZX_FAILFAST (exit at the first FAIL line,
  * after printing it) and prints "  @@block N" before each block, so the runner
@@ -151,8 +155,10 @@ function prepare(suite, out, info) {
   parts.push(src.slice(last));
   fs.writeFileSync(out, parts.join(''));
   const blocks = stmts.filter(s => s.block).map(({ i, line, end_line, checks, sha, deps }) => ({ i, line, end_line, checks, sha, deps }));
+  const helpers = crypto.createHash('sha256');
+  for (const s of stmts) if (!s.block) helpers.update(src.slice(s.start, s.end) + '\n');
   fs.writeFileSync(info, JSON.stringify({ suite, sha: crypto.createHash('sha256').update(src).digest('hex').slice(0, 12),
-    blocks, prelude: stmts.filter(s => !s.block).map(s => s.i) }, null, 1));
+    helpers: helpers.digest('hex').slice(0, 12), blocks, prelude: stmts.filter(s => !s.block).map(s => s.i) }, null, 1));
   console.log('prepared %s: %d blocks, %d prelude statements', out, blocks.length, stmts.length - blocks.length);
 }
 
@@ -198,24 +204,55 @@ function cover(suite, selectable, infoPath, casesPath, outPath, keep) {
     return !!best && best[2] > 0;
   };
 
+  // each function's own text: its source with every nested function cut out
+  const h12 = t => crypto.createHash('sha256').update(t).digest('hex').slice(0, 12);
+  const own = new Map();
+  fns.forEach(([a, b], n) => {
+    let text = '', at = a;
+    for (let m = n + 1; m < fns.length && fns[m][0] < b; m++) {
+      const [c, d] = fns[m];
+      if (c < at || d > b) continue;            // inside a child already cut out
+      text += code.slice(at, c) + '\u0000';
+      at = d;
+    }
+    own.set(a + ':' + b, h12(text + code.slice(at, b)));
+  });
+  const executed = k => {
+    const got = new Set();
+    for (const s of iv[k].scripts) for (const f of s.fns) if (f[0][2] > 0) got.add(own.get(f[0][0] + ':' + f[0][1]));
+    return got;
+  };
+  const load = new Set(), perBlock = {};
+  iv.forEach((v, k) => {
+    const into = v.block === -1 ? load : (perBlock[v.block] = perBlock[v.block] || new Set());
+    for (const x of executed(k)) into.add(x);
+  });
+  const digest = set => h12([...set].sort().join(','));
+
   const src = fs.readFileSync(suite, 'utf8');
   const stmts = table(src);
   const blockSet = new Set(info.blocks.map(b => b.i));
   const cases = JSON.parse(fs.readFileSync(casesPath, 'utf8'));
-  const result = { ms: {}, prelude_ms: 0, cases: {} };
+  const result = { ms: {}, prelude_ms: 0, cases: {}, load: digest(load), code: {}, anchor: {} };
+  for (const b in perBlock) result.code[b] = digest(perBlock[b]);
   iv.forEach(v => { if (v.block === -1) result.prelude_ms += v.ms; else result.ms[v.block] = (result.ms[v.block] || 0) + v.ms; });
   const tally = {};
   for (const c of cases) {
     let res = 'all';
     if (/\.test\.js$/.test(c.file)) {
       const p = src.indexOf(c.old.replace(/\r?\n/g, src.includes('\r\n') ? '\r\n' : '\n'));
-      if (p >= 0) { const st = stmts.find(s => s.start <= p && p < s.end); if (st && blockSet.has(st.i)) res = [st.i]; }
+      if (p >= 0) {
+        const st = stmts.find(s => s.start <= p && p < s.end);
+        if (st && blockSet.has(st.i)) res = [st.i];
+        if (st) result.anchor[c.id] = st.sha;
+      }
     } else {
       let o = c.old, p = code.indexOf(o);
       if (p < 0) { o = c.old.replace(/\r?\n/g, '\r\n'); p = code.indexOf(o); }
       if (p >= 0 && code.indexOf(o, p + 1) < 0) {
         const pts = [p, p + (o.length >> 1), p + Math.max(0, o.length - 1)];
         const owner = pts.map(innermost);
+        if (owner[0]) result.anchor[c.id] = own.get(owner[0][0] + ':' + owner[0][1]);
         const hit = new Set();
         let early = false;
         iv.forEach((v, k) => {

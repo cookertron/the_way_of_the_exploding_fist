@@ -1421,11 +1421,48 @@ def t_mutants():
                 json.dump(cases, f)
             r = subprocess.run([sys.executable, 'tools/mutants.py', '--jobs', '1', '--affected'], cwd=d,
                                capture_output=True, text=True, timeout=600)
-            if 'affected: 2 cases (1 new, 0 anchor lines, 0 killing block, 1 dead anchor)' not in r.stdout:
-                raise AssertionError('--affected must pick the new case and keep the dead anchor: '
+            if 'affected: 3 cases (1 new, 0 anchor lines, 0 killing block, 1 dead anchor, 1 red)' not in r.stdout:
+                raise AssertionError('--affected must pick the new case and keep the red ones: '
                                      + r.stdout[-400:])
-            if 'LISTED 2  KILLED 1' not in r.stdout:
+            if 'LISTED 3  KILLED 1' not in r.stdout:
                 raise AssertionError('the new case must be killed: ' + r.stdout[-300:])
+        if not has_git:
+            return
+        # manual 6.12 step 4: every killed verdict is stamped, and an edit stales
+        # only the verdicts whose blocks executed the edited function
+        state = json.load(io.open(os.path.join(d, 'build', 'mutants', 'last.json'), encoding='utf-8'))
+        for k, v in state['cases'].items():
+            if (v['verdict'] == 'KILLED') != bool(v.get('stamp')):
+                raise AssertionError('a stamp on every killed verdict and on nothing else: %r %r' % (k, v))
+        game = os.path.join(d, 'web', 'game.js')
+        io.open(game, 'w', encoding='utf-8', newline='\n').write(
+            pristine.replace('k() { return DEMO_K; },', 'k() { const v = DEMO_K; return v; },'))
+        r = subprocess.run([sys.executable, 'tools/mutants.py', '--jobs', '1', '--affected', '--list'], cwd=d,
+                           capture_output=True, text=True, timeout=600)
+        listed = sorted(l.strip() for l in r.stdout.splitlines() if l.startswith('  ') and 'block' not in l)
+        eq(listed, ['a dead anchor', 'the constant', 'unused is never called'],
+           'editing k() stales the one verdict killed in the block that runs it, and the red ones: ' + r.stdout[-300:])
+        if '1 stamp code' not in r.stdout:
+            raise AssertionError('the reason must name the executed code: ' + r.stdout[-300:])
+        io.open(game, 'w', encoding='utf-8', newline='\n').write(pristine)
+        # manual 6.12 step 6: whole kill sets, then the cases that add nothing
+        cases = json.load(io.open(os.path.join(d, 'test', 'mutants.json'), encoding='utf-8'))
+        cases.append({'file': 'game.js', 'label': 'add adds one', 'old': 'return a + b;', 'new': 'return a + b + 1;'})
+        with open(os.path.join(d, 'test', 'mutants.json'), 'w', encoding='utf-8') as f:
+            json.dump(cases, f)
+        r = subprocess.run([sys.executable, 'tools/mutants.py', '--jobs', '1', '--all-rows'], cwd=d,
+                           capture_output=True, text=True, timeout=600)
+        r = subprocess.run([sys.executable, 'tools/mutants.py', '--prune', '--write'], cwd=d,
+                           capture_output=True, text=True, timeout=600)
+        if '6 cases with whole kill sets: 3 add nothing, 3 kept' not in r.stdout:
+            raise AssertionError('--prune on the synthetic port: ' + r.stdout[-400:])
+        cases = json.load(io.open(os.path.join(d, 'test', 'mutants.json'), encoding='utf-8'))
+        eq(sorted(c['label'] for c in cases if c.get('withdrawn')), ['add adds one', 'the test expects 6', 'twice quadruples'],
+           'the later of two cases with the same kill set is withdrawn, with its reason')
+        r = subprocess.run([sys.executable, 'tools/mutants.py', '--jobs', '1', '--list'], cwd=d,
+                           capture_output=True, text=True, timeout=600)
+        if '3 withdrawn cases not run' not in r.stdout or '5 cases would run' not in r.stdout:
+            raise AssertionError('withdrawn cases are not run: ' + r.stdout[-300:])
 
 
 def t_context_watch():
@@ -1494,7 +1531,7 @@ CHECKS = [
     ('records: record.py writes each record to its home, refuses what it cannot check', t_records),
     ('status: orientation, per-routine view, check blocks orphans and broken links', t_status),
     ('hooks: the context watch notes each handover crossing once', t_context_watch),
-    ('mutants: selection, killing block, survivor confirmed, dead anchor, test-file case, --affected', t_mutants),
+    ('mutants: selection, killing block, survivor confirmed, dead anchor, test-file case, --affected, verdict stamps, --prune', t_mutants),
     ('traps: every trap has exactly one row in the trap-to-check map', t_traps_map),
     ('hooks: read and heredoc guards, stop check, session and sub-agent context', t_hooks),
 ]

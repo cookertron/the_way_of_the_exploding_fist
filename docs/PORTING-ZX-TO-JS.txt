@@ -3279,18 +3279,27 @@ It was built in this order, each step worth having on its own:
      verdict records the row and the block that killed the case, and
      next time that block runs first. TRAPS #145 still holds: if another
      row kills it instead, that is recorded, not assumed away.
-  4. STAMP THE VERDICTS (12.3). Built in part: --affected re-runs a case
-     when its anchor lines or its killing block changed, and status.py
-     warns when the rig, the build or the runner changed since the last
-     full run. Per-verdict hashes of the code each block executed are
-     still to build.
+  4. STAMP THE VERDICTS (12.3). Every killed verdict records what it ran
+     against: the case, the page function holding its anchor, the killing
+     block and the blocks it depends on, the suite's helpers, the rig, and
+     the page code those blocks and the page load EXECUTED -- each
+     function's own text with its nested functions cut out, hashed from
+     the coverage pass. --affected re-runs a case when any part changed,
+     and every red verdict; --affected --list shows which and why. An
+     edit to one function stales only the verdicts whose blocks ran it.
+     The revision is read when the run STARTS (TRAPS #198), and
+     status.py warns when the rig, the build or the runner changed since
+     the last full run.
   5. BUILD ONCE FOR ALL MUTANTS, behind a switch, as Stryker's mutation
      switching does. Not built: step 1 showed the rebuild costs 0.2 s.
      Build it for a port whose build is slow, and only after measuring.
   6. PRUNE WHAT ADDS NOTHING: a case killed by every row that kills
-     another case adds nothing to it. Still to build, because stopping
-     at the first failure records one killing row and pruning needs them
-     all -- an occasional run with no early stop.
+     another case adds nothing to it. Stopping at the first failure
+     records one killing row, so pruning takes an occasional run with no
+     early stop (--all-rows); --prune then lists the subsumed cases, and
+     --prune --write marks each "withdrawn" with the case that holds its
+     claim (TRAPS #158). Only whole kill sets count; of two equal sets
+     the later case goes. A withdrawn case keeps its place, not its run.
 
 Measured on 24 Bubble Bobble cases checked against the full run's
 verdicts: every verdict agreed; 9.2 s a case while the killing blocks

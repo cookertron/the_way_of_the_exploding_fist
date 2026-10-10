@@ -104,7 +104,8 @@ record up loses nothing.
 - `tools/mutants.py` — the mutation battery's runner (manual 6.12): each
   case runs only the gate blocks its anchor reaches, killing block first,
   stopping at the first failure; survivors are confirmed against the whole
-  suite.
+  suite.  Verdicts are stamped (`--affected` re-runs only stale ones);
+  `--all-rows` then `--prune` finds the cases that add nothing.
 - `tools/record.py` and `tools/status.py` — the records (manual 12.11):
   record.py writes each to its home and checks its links; status.py gives
   the orientation, `status.py ADDR`, `--check` and `--index`.
@@ -123,7 +124,6 @@ each must prevent.
 | Tool | Replaces |
 |---|---|
 | the rest of the gate helpers: a callio derive that seeds every unseeded store | remembering how gates fail (map: `gate`, the BUILD rows) |
-| per-verdict stamps and pruning, for the runner (manual 6.12 steps 4, 6) | re-running unchanged verdicts at milestones; keeping redundant cases (map: `battery`) |
 | the byte-usage map and roster manifest | backward-decode verdicts; guessing how saved states differ (12.5, 12.6) |
 | `tools/brief.py`, `tools/verify_claims.py` | re-reading a range to check a sub-agent (12.7) |
 

@@ -1,14 +1,14 @@
 # Trap-to-check map for the Spectrum Port Kit
 
-Every trap in `docs/TRAPS.md` (197 entries: 1-25 from the ports before Bubble Bobble, 26-196 from Bubble Bobble, 197 on from this port), mapped to the kit mechanism that should make it impossible to fall into again, and whether that mechanism exists yet. A rule that lives only in `TRAPS.md` protects the next port only if it is read at the right moment, which fails after a compaction and across days. A rule that lives in a tool, a gate helper or a hook protects it every time. Bubble Bobble's own log reached the same conclusion (TRAPS #169): writing a lesson down did not prevent it, and only an assert did.
+Every trap in `docs/TRAPS.md` (198 entries: 1-25 from the ports before Bubble Bobble, 26-196 from Bubble Bobble, 197 on from this port), mapped to the kit mechanism that should make it impossible to fall into again, and whether that mechanism exists yet. A rule that lives only in `TRAPS.md` protects the next port only if it is read at the right moment, which fails after a compaction and across days. A rule that lives in a tool, a gate helper or a hook protects it every time. Bubble Bobble's own log reached the same conclusion (TRAPS #169): writing a lesson down did not prevent it, and only an assert did.
 
 Rules are one-line paraphrases; `python tools/manual.py T146` prints the full entry with its row here, and `python tools/manual.py --map gate` (or `--map BUILD`) lists the rows for one mechanism or state. States come from what the trap texts and the Bubble Bobble handover say. Where neither says a fix exists, the row is marked BUILD, so check before building.
 
 ## Summary
 
-| State | Meaning | All 197 | #61 onward |
+| State | Meaning | All 198 | #61 onward |
 |---|---|---|---|
-| KIT | the kit already prevents it | 54 | 28 |
+| KIT | the kit already prevents it | 55 | 29 |
 | BB | built in the Bubble Bobble repo and generic; move it into the kit | 9 | 9 |
 | BUILD | no mechanism yet; build it | 110 | 82 |
 | READ | knowledge only; read by ID when relevant | 24 | 18 |
@@ -17,7 +17,7 @@ Rules are one-line paraphrases; `python tools/manual.py T146` prints the full en
 |---|---|---|
 | `gate`: Gate helpers in test/rig.js | 50 | 37 |
 | `measure`: measure(), the single measurement entry point (manual 6.11) | 24 | 24 |
-| `battery`: Kit mutation runner, tools/mutants.py (manual 6.12) | 22 | 6 |
+| `battery`: Kit mutation runner, tools/mutants.py (manual 6.12) | 23 | 6 |
 | `lint`: Static checks on engine and test source | 14 | 11 |
 | `harness`: Harness defaults and API in tools/harness.py | 10 | 8 |
 | `roster`: Save-state manifest and census rules (manual 12.6) | 8 | 8 |
@@ -42,9 +42,9 @@ Traps: #24, #37, #40, #44, #49, #50, #54, #55, #57, #60, #61, #62, #63, #66, #77
 
 Traps: #27, #34, #35, #46, #59, #64, #71, #87, #89, #90, #94, #102, #143, #144, #146, #147, #152, #153, #154, #160, #172, #182, #189, #193
 
-**`battery`: Kit mutation runner, tools/mutants.py (manual 6.12)** (22 traps; KIT 14, BUILD 6, BB 2). Checks each mutation applied; requires the positive N/N baseline and a selectable copy that runs the same checks; reports dead and ambiguous anchors as red; tells a diagnostic, a broken mutant and a crash apart; gives timeouts their own verdict and keeps their FAIL lines; runs one battery at a time; reads its paths from port.json; records each case's killing row and block; runs only the blocks a case's anchor reaches, killing block first, stopping at the first failure, and confirms survivors against the whole suite; runs the affected cases per increment.  Still to build: anchors checked against live code rather than comments, a reason kept for every withdrawn case, per-verdict stamps, and pruning.
+**`battery`: Kit mutation runner, tools/mutants.py (manual 6.12)** (23 traps; KIT 15, BUILD 6, BB 2). Checks each mutation applied; requires the positive N/N baseline and a selectable copy that runs the same checks; reports dead and ambiguous anchors as red; tells a diagnostic, a broken mutant and a crash apart; gives timeouts their own verdict and keeps their FAIL lines; runs one battery at a time; reads its paths from port.json; records each case's killing row and block; runs only the blocks a case's anchor reaches, killing block first, stopping at the first failure, and confirms survivors against the whole suite; runs the affected cases per increment.  Still to build: anchors checked against live code rather than comments, a reason kept for every withdrawn case, per-verdict stamps, and pruning.
 
-Traps: #23, #33, #70, #73, #106, #107, #118, #119, #126, #130, #137, #145, #158, #162, #166, #167, #177, #185, #186, #194, #195, #196
+Traps: #23, #33, #70, #73, #106, #107, #118, #119, #126, #130, #137, #145, #158, #162, #166, #167, #177, #185, #186, #194, #195, #196, #198
 
 **`lint`: Static checks on engine and test source** (14 traps; BUILD 11, BB 3). Page+offset addresses built with +, not |; DJNZ as an 8-bit decrement; no bare ram[] stores; an uncalled-method census; duplicate constants; call sites checked when a parameter is added; fallbacks flagged; numbers in labels and comments sourced or PROVISIONAL.
 
@@ -291,6 +291,7 @@ Traps: #178, #179, #184
 | 195 | Check anchor uniqueness; a repeated idiom matches many lines. | `battery` | KIT |
 | 196 | Drain FAIL lines before killing a timed-out run. | `battery` | KIT |
 | 197 | Step the engine inside a catch that fails a named row. | `gate` | KIT |
+| 198 | Read what a long run ran against when it starts, and stamp each result. | `battery` | KIT |
 
 ## Keeping the map honest
 

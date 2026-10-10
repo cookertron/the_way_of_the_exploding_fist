@@ -264,13 +264,14 @@ def check(ctx):
     if mlast:
         try:
             rev = json.loads(mlast).get('full_rev')
+            dirty = json.loads(mlast).get('full_dirty') or []
         except ValueError:
-            rev = None
+            rev, dirty = None, []
         if not rev:
             warn.append('no full mutation run on record: python tools/mutants.py --background')
         else:
             moved = [f for f in ('test/rig.js', 'tools/build.py', 'tools/mutants.py', 'tools/mutants.js')
-                     if git('diff', '--quiet', rev, '--', f) is None]
+                     if git('diff', '--quiet', rev, '--', f) is None or f in dirty]
             if moved:
                 warn.append('a full mutation run is due: %s changed since the last one '
                             '(python tools/mutants.py --background)' % ', '.join(moved))
@@ -279,6 +280,8 @@ def check(ctx):
     last = git('log', '-1', '--format=%ct')
     if os.path.isdir(scratch) and last and last.strip().isdigit():
         for dirpath, dirs, files in os.walk(scratch):
+            if dirpath == scratch and 'mutants' in dirs:
+                dirs.remove('mutants')      # the runner's worker trees: rebuilt by every run
             for fn in files:
                 p = os.path.join(dirpath, fn)
                 if os.path.getmtime(p) < int(last.strip()):

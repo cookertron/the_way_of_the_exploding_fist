@@ -3,9 +3,16 @@
 mutants.py -- the mutation battery's runner (manual 6.9 step 9, 6.12).
 
   python tools/mutants.py                  every case
-  python tools/mutants.py --affected       new cases, cases whose anchor lines changed,
-                                           cases whose killing block changed -- since
-                                           the last full run
+  python tools/mutants.py --affected       the cases whose verdicts no longer hold: new
+                                           ones, red ones, and those whose STAMP changed
+                                           (below); an unstamped verdict falls back to
+                                           "anchor lines changed since the last full run"
+  python tools/mutants.py --affected --list   what --affected would run, and why; runs nothing
+  python tools/mutants.py --all-rows       no early stop: every failing row of each case,
+                                           recorded for --prune (slow; occasional)
+  python tools/mutants.py --prune [--write]   manual 6.12 step 6: the cases killed by every
+                                           row that kills another case; --write marks
+                                           them "withdrawn", with the reason, in the cases
   python tools/mutants.py --match TEXT     cases whose label contains TEXT ('||' = or)
   python tools/mutants.py --sample N       a random N cases (seeded): to check the runner
                                            against a full run's verdicts
@@ -34,11 +41,21 @@ endings kept, timeouts that keep the FAIL lines already printed, crashes split
 into DIAGNOSTIC / BROKEN-MUTANT / CRASH, a wall-clock floor, and an alarm when
 every case survives.
 
+VERDICT STAMPS (manual 6.12 step 4, 12.3).  Every killed verdict records what
+it ran against: the case (file, old, new), the page function holding its
+anchor, the killing block and the blocks it depends on, the page code those
+blocks and the page load EXECUTED (each function's own text, nested functions
+cut out, from the coverage pass), the suite's helpers and the rig -- plus the
+revision when the run started, and whether the tree was dirty.  An edit to a
+function stales only the verdicts whose blocks ran it.  A verdict that is not
+killed carries no stamp, and is always re-run.
+
 Configuration, in port.json:
   "mutants": {"cases": "test/mutants.json", "suite": "test/game.test.js",
               "diagnostic": "BB_"}
 Cases are a JSON list of {"file", "label", "old", "new"} (plus, ideally,
-"increment" and "kills"), or a Python file holding MUTS = [(file, label, old,
+"increment" and "kills", and "withdrawn": the reason, for a case no longer
+run), or a Python file holding MUTS = [(file, label, old,
 new), ...].  A file ending in .test.js, and rig.js, live in test/; everything
 else in web/.
 """
@@ -103,9 +120,56 @@ def load_cases(path):
     if len(labels) != len(set(labels)):
         dup = sorted({l for l in labels if labels.count(l) > 1})[:3]
         raise SystemExit('case labels must be unique; repeated: %s' % '; '.join(dup))
+    # a withdrawn case keeps its id (ids index the coverage map) and its reason, and is not run
     return [{'id': i, 'file': f, 'label': l, 'old': o, 'new': n,
-             'kills': extra.get('kills'), 'increment': extra.get('increment')}
+             'kills': extra.get('kills'), 'increment': extra.get('increment'),
+             'withdrawn': extra.get('withdrawn')}
             for i, (f, l, o, n, extra) in enumerate(rows)]
+
+
+# ---------------------------------------------------------------------------
+# verdict stamps (manual 6.12 step 4, 12.3): what a verdict ran against
+# ---------------------------------------------------------------------------
+STAMP_PARTS = ('case', 'anchor', 'blocks', 'code', 'helpers', 'rig')
+
+
+def case_sha(case):
+    return sha('\0'.join((case['file'], case['old'], case['new'])))
+
+
+def stamp_of(case, block, cur, deps, sha_of):
+    """The stamp of a verdict killed in `block`: the case itself, the page
+    function holding its anchor, the killing block and every block it depends
+    on, the page code those blocks and the page load executed, the suite's
+    helpers and the rig.  None when nothing narrower than "everything" holds
+    it -- a survivor, a dead anchor, a crash -- and such a verdict is re-run."""
+    if not isinstance(block, int) or block not in sha_of:
+        return None
+    need, todo = set(), [block]
+    while todo:
+        b = todo.pop()
+        if b not in need:
+            need.add(b)
+            todo.extend(deps.get(b, []))
+    return stamp_for(case, sorted(need), cur, sha_of)
+
+
+def stamp_for(case, need, cur, sha_of):
+    return {'case': case_sha(case), 'anchor': cur['anchor'].get(str(case['id'])),
+            'blocks': sha(','.join(sha_of.get(b, '-') for b in need)),
+            'code': sha(','.join([cur['load']] + [cur['code'].get(str(b), '-') for b in need])),
+            'helpers': cur['helpers'], 'rig': cur['rig'], 'block_list': need}
+
+
+def stale_parts(prev, case, cur, sha_of):
+    """The parts of a recorded stamp that no longer hold, recomputed for the
+    blocks it names against today's tree; None when the verdict carries no
+    stamp (then the older anchor-line rule decides)."""
+    old = prev.get('stamp')
+    if not old or not old.get('block_list'):
+        return None
+    now = stamp_for(case, old['block_list'], cur, sha_of)
+    return [k for k in STAMP_PARTS if old.get(k) != now[k] or now[k] is None]
 
 
 def src_path(fn, root):
@@ -237,8 +301,20 @@ def order_blocks(cands, killer, ms, deps):
     return out
 
 
-def run_case(tree, case, plan, diagnostic, suite, full_suite):
+def all_rows(out):
+    """Every failing row, in order and once each (step 6 needs the whole set)."""
+    rows = []
+    for line in out.splitlines():
+        if line.lstrip().startswith('FAIL'):
+            r = line.strip()[4:].strip()
+            if r not in rows:
+                rows.append(r)
+    return rows
+
+
+def run_case(tree, case, plan, diagnostic, suite, full_suite, every_row=False):
     t0 = time.time()
+    stop = '' if every_row else '1'
     applied = apply_case(tree, case)
     if isinstance(applied, str):
         return {'label': case['label'], 'verdict': applied, 'seconds': 0.0}
@@ -251,21 +327,25 @@ def run_case(tree, case, plan, diagnostic, suite, full_suite):
                            capture_output=True, timeout=CASE_TIMEOUT)
         build(tree)
         if full_suite:
-            out, tmo = run_node(tree, suite, {'ZX_FAILFAST': '1'})
+            out, tmo = run_node(tree, suite, {'ZX_FAILFAST': stop})
             verdict, row, block = classify(out, tmo, diagnostic)
             confirmed = False
         else:
-            out, tmo = run_node(tree, SELECTABLE, {'ZX_BLOCKS': json.dumps(plan), 'ZX_FAILFAST': '1'})
+            out, tmo = run_node(tree, SELECTABLE, {'ZX_BLOCKS': json.dumps(plan), 'ZX_FAILFAST': stop})
             verdict, row, block = classify(out, tmo, diagnostic)
             confirmed = False
             if verdict == 'PASSED':
                 # *** A SURVIVOR IS CONFIRMED AGAINST THE WHOLE SUITE. ***
-                out, tmo = run_node(tree, suite, {'ZX_FAILFAST': '1'})
+                out, tmo = run_node(tree, suite, {'ZX_FAILFAST': stop})
                 verdict, row, block = classify(out, tmo, diagnostic)
                 confirmed = True
         if verdict == 'PASSED':
             verdict = 'SURVIVED'
-        return {'label': case['label'], 'verdict': verdict, 'row': row,
+        extra = {}
+        if every_row:
+            # complete: the run reached done() inside the time limit, so the set is whole
+            extra = {'rows_all': all_rows(out), 'complete': bool(summary_of(out)) and not tmo}
+        return {'label': case['label'], 'verdict': verdict, 'row': row, **extra,
                 'block': block if isinstance(block, int) else None,
                 'miss': confirmed and verdict in GOOD, 'blocks_run': len(plan) if plan else 0,
                 'seconds': round(time.time() - t0, 2)}
@@ -304,10 +384,10 @@ def isolate(args):
 
 def worker(args):
     """Phase 2, per worker: the same tree, its share of the cases."""
-    i, cases, plans, diagnostic, suite, full_suite = args
+    i, cases, plans, diagnostic, suite, full_suite, every_row = args
     tree = os.path.join(WORKDIR, 'w%d' % i)
-    rows = [run_case(tree, c, plans.get(c['id']), diagnostic, suite, full_suite or plans.get(c['id']) is None)
-            for c in cases]
+    rows = [run_case(tree, c, plans.get(c['id']), diagnostic, suite, full_suite or plans.get(c['id']) is None,
+                     every_row) for c in cases]
     return {'worker': i, 'fatal': None, 'rows': rows}
 
 
@@ -326,17 +406,32 @@ def changed_lines(base, rel):
     return lines
 
 
-def affected(cases, last, block_sha):
+def affected(cases, last, block_sha, cur=None, sha_of=None):
+    """The cases whose verdicts no longer hold.  A stamped verdict is re-run
+    when any part of its stamp changed (the reasons count the first part that
+    did); a red verdict always is; an unstamped one falls back to the older
+    rule, anchor lines changed since the last full run."""
     base = last.get('full_rev')
-    if not base:
-        return cases, 'no full run on record: every case'
     seen = last.get('cases', {})
     keep, why = [], {'new': 0, 'anchor lines': 0, 'killing block': 0, 'dead anchor': 0}
+    why.update({'stamp ' + k: 0 for k in STAMP_PARTS})
+    why['red'] = 0
     texts, changes = {}, {}
     for c in cases:
         prev = seen.get(c['label'])
         if not prev:
             keep.append(c); why['new'] += 1
+            continue
+        if prev.get('verdict') not in GOOD:     # red stays red
+            keep.append(c); why['dead anchor' if prev.get('verdict') in ('ANCHOR', 'AMBIGUOUS') else 'red'] += 1
+            continue
+        parts = stale_parts(prev, c, cur, sha_of) if cur else None
+        if parts is not None:
+            if parts:
+                keep.append(c); why['stamp ' + parts[0]] += 1
+            continue
+        if not base:
+            keep.append(c); why['anchor lines'] += 1
             continue
         if prev.get('killer_sha') and prev['killer_sha'] not in block_sha:
             keep.append(c); why['killing block'] += 1
@@ -356,7 +451,8 @@ def affected(cases, last, block_sha):
         span = set(range(first, first + c['old'].count('\n') + 1))
         if span & changes[rel]:
             keep.append(c); why['anchor lines'] += 1
-    return keep, ', '.join('%d %s' % (n, k) for k, n in why.items())
+    fixed = ('new', 'anchor lines', 'killing block', 'dead anchor')
+    return keep, ', '.join('%d %s' % (n, k) for k, n in why.items() if k in fixed or n)
 
 
 def prep_key(tree, suite):
@@ -376,18 +472,77 @@ def prep_key(tree, suite):
     return h.hexdigest()[:16]
 
 
+def dirty_files():
+    """Tracked files the run reads that differ from HEAD when it starts."""
+    out = git('status', '--porcelain', '--', 'web', 'test', 'tools', 'port.json') or ''
+    return sorted(l[3:].strip() for l in out.splitlines() if l[:2].strip() and not l.startswith('??'))
+
+
 def full_run_due(last):
     base = last.get('full_rev')
     if not base:
         return 'no full run on record'
-    moved = [f for f in RUNNER_FILES if git('diff', '--quiet', base, '--', f) is None]
+    moved = [f for f in RUNNER_FILES if git('diff', '--quiet', base, '--', f) is None
+             or f in last.get('full_dirty', [])]
     return ('changed since the last full run: ' + ', '.join(moved)) if moved else None
+
+
+def prune(cfg, cases, last, write):
+    """Manual 6.12 step 6: a case killed by every row that kills another case
+    adds nothing to it.  Only whole kill sets count -- an --all-rows verdict
+    that reached done() -- so a case never measured that way is neither pruned
+    nor used to prune.  Of two cases with the same set, the later one goes."""
+    rec = last.get('cases', {})
+    pool = [c for c in cases if not c.get('withdrawn') and rec.get(c['label'], {}).get('verdict') in GOOD
+            and rec[c['label']].get('complete') and rec[c['label']].get('rows_all')]
+    kills = {c['label']: frozenset(rec[c['label']]['rows_all']) for c in pool}
+
+    def covers(b, a):           # b's kill set inside a's: killing b kills a
+        return kills[b['label']] < kills[a['label']] or (kills[b['label']] == kills[a['label']] and b['id'] < a['id'])
+    gone = {a['label'] for a in pool if any(b is not a and covers(b, a) for b in pool)}
+    kept = [c for c in pool if c['label'] not in gone]
+    by = {}
+    for a in pool:
+        if a['label'] in gone:      # a kept case always exists: the minimal ones are kept
+            by[a['label']] = next(b['label'] for b in kept if kills[b['label']] <= kills[a['label']])
+    unmeasured = sum(1 for c in cases if not c.get('withdrawn')) - len(pool)
+    for a in sorted(by):
+        print('  subsumed: %s\n            by %s' % (a, by[a]))
+    print('%d cases with whole kill sets: %d add nothing, %d kept; %d not measured with --all-rows'
+          % (len(pool), len(by), len(kept), unmeasured))
+    io.open(os.path.join(STATE, 'prune.json'), 'w', encoding='utf-8').write(json.dumps(
+        {'measured': len(pool), 'subsumed': by, 'unmeasured': unmeasured}, indent=1))
+    if write and by:
+        path = os.path.join(ROOT, cfg['cases'])
+        if not path.endswith('.json'):
+            raise SystemExit('--write marks withdrawn cases in a JSON case file only')
+        raw = io.open(path, 'rb').read()
+        data = json.loads(raw.decode('utf-8'))
+        when = last.get('last_time') or '?'
+        for c in data:
+            if c['label'] in by and not c.get('withdrawn'):
+                r = rec[c['label']]
+                c['withdrawn'] = ('subsumed by %r: every row that kills it also kills this one '
+                                  '(--all-rows verdict at rev %s, run %s)' % (by[c['label']], (r.get('rev') or '?')[:12], when))
+        text = json.dumps(data, indent=1, ensure_ascii=False) + '\n'
+        if b'\r\n' in raw:
+            text = text.replace('\n', '\r\n')
+        io.open(path, 'w', encoding='utf-8', newline='').write(text)
+        print('marked %d cases withdrawn in %s' % (len(by), cfg['cases']))
+    return 0
 
 
 def main(argv):
     if '-h' in argv or '--help' in argv:
         print(__doc__.strip())
         return 0
+    if '--prune' in argv:
+        cfg = config()
+        try:
+            last = json.load(io.open(os.path.join(STATE, 'last.json'), encoding='utf-8'))
+        except (OSError, ValueError):
+            last = {}
+        return prune(cfg, load_cases(cfg['cases']), last, '--write' in argv)
     if '--background' in argv:
         os.makedirs(STATE, exist_ok=True)
         log = io.open(os.path.join(STATE, 'run.log'), 'w', encoding='utf-8')
@@ -428,6 +583,15 @@ def main(argv):
 def run(argv, cfg, cases, last, last_path, jobs, full_suite):
     t0 = time.time()
     suite = cfg['suite']
+    # *** WHAT THE RUN RAN AGAINST IS READ WHEN IT STARTS. ***  Read at the end,
+    # a commit made during a run of hours would claim a full run it never had.
+    rev = (git('rev-parse', 'HEAD') or '').strip() or None
+    dirty = dirty_files()
+    every_label = {c['label'] for c in cases}
+    withdrawn = [c for c in cases if c.get('withdrawn')]
+    cases = [c for c in cases if not c.get('withdrawn')]
+    if withdrawn:
+        print('%d withdrawn cases not run (each carries its reason in the case file)' % len(withdrawn), flush=True)
     os.makedirs(STATE, exist_ok=True)
     prep = make_tree('prep')
     if not build(prep):
@@ -493,6 +657,12 @@ def run(argv, cfg, cases, last, last_path, jobs, full_suite):
     block_sha = {b['sha']: b['i'] for b in info['blocks']}
     sha_of = {b['i']: b['sha'] for b in info['blocks']}
     ms = cov.get('ms', {})
+    cur = None
+    if not full_suite and 'load' in cov:
+        rig_p = os.path.join(prep, 'test', 'rig.js')
+        cur = {'load': cov['load'], 'code': cov.get('code', {}), 'anchor': cov.get('anchor', {}),
+               'helpers': info.get('helpers'),
+               'rig': sha(io.open(rig_p, encoding='utf-8').read()) if os.path.isfile(rig_p) else None}
 
     if '--profile' in argv:
         b0 = time.time(); build(prep); bt = time.time() - b0
@@ -516,7 +686,7 @@ def run(argv, cfg, cases, last, last_path, jobs, full_suite):
         due = full_run_due(last)
         if due:
             print('*** A FULL RUN IS DUE: %s ***' % due, flush=True)
-        cases, why = affected(cases, last, block_sha)
+        cases, why = affected(cases, last, block_sha, cur, sha_of)
         kind = 'affected'
         print('affected: %d cases (%s)' % (len(cases), why), flush=True)
     elif '--sample' in argv:
@@ -530,9 +700,16 @@ def run(argv, cfg, cases, last, last_path, jobs, full_suite):
         kind = 'match'
     else:
         kind = 'full'
+    if '--list' in argv:
+        for c in cases:
+            print('  %s' % c['label'])
+        print('%d cases would run (--list: nothing was run)' % len(cases))
+        shutil.rmtree(prep, ignore_errors=True)
+        return 0
     if not cases:
         print('nothing to run')
         return 0
+    every_row = '--all-rows' in argv
 
     jobs = max(1, min(jobs, len(cases)))
     bshares = [[] for _ in range(jobs)]
@@ -630,7 +807,7 @@ def run(argv, cfg, cases, last, last_path, jobs, full_suite):
 
     rows, done = [], 0
     with ProcessPoolExecutor(max_workers=jobs) as ex:
-        futs = [ex.submit(worker, (k, shares[k], plans, cfg['diagnostic'], suite, full_suite)) for k in range(jobs)]
+        futs = [ex.submit(worker, (k, shares[k], plans, cfg['diagnostic'], suite, full_suite, every_row)) for k in range(jobs)]
         for f in as_completed(futs):
             r = f.result()
             if r['fatal']:
@@ -667,17 +844,29 @@ def run(argv, cfg, cases, last, last_path, jobs, full_suite):
         print('  !! EVERY CASE SURVIVED -- suspect the RUNNER, not the suite')
 
     # record: killing rows and blocks per case, and the last full run's revision
-    rev = (git('rev-parse', 'HEAD') or '').strip() or None
     recorded = dict(last.get('cases', {}))
+    by_label = {c['label']: c for c in cases}
     for r in rows:
         b = r.get('block')
-        recorded[r['label']] = {'verdict': r['verdict'], 'row': r.get('row'),
-                                'killer_sha': sha_of.get(b) if isinstance(b, int) else None,
-                                'seconds': r.get('seconds')}
+        prev = recorded.get(r['label'], {})
+        v = {'verdict': r['verdict'], 'row': r.get('row'),
+             'killer_sha': sha_of.get(b) if isinstance(b, int) else None,
+             'seconds': r.get('seconds'), 'rev': rev, 'dirty': bool(dirty)}
+        # *** EVERY VERDICT IS STAMPED WITH WHAT IT RAN AGAINST (manual 6.12 step 4). ***
+        if cur and r['verdict'] in GOOD and not r.get('miss'):
+            v['stamp'] = stamp_of(by_label[r['label']], b, cur, deps, sha_of)
+        if 'rows_all' in r:
+            v['rows_all'], v['complete'] = r['rows_all'], r['complete']
+        elif (prev.get('rows_all') and prev.get('stamp') and v.get('stamp') and
+              all(prev['stamp'].get(k) == v['stamp'].get(k) for k in STAMP_PARTS)):
+            v['rows_all'], v['complete'] = prev['rows_all'], prev.get('complete')   # still describes this code
+        recorded[r['label']] = v
+    recorded = {k: v for k, v in recorded.items() if k in every_label}       # a deleted case leaves no verdict
     state = {'cases': recorded, 'full_rev': last.get('full_rev'), 'full_time': last.get('full_time'),
+             'full_dirty': last.get('full_dirty', []),
              'last_kind': kind, 'last_time': datetime.datetime.now().isoformat(timespec='seconds')}
     if kind == 'full' and not fatal:
-        state['full_rev'], state['full_time'] = rev, state['last_time']
+        state['full_rev'], state['full_time'], state['full_dirty'] = rev, state['last_time'], dirty
     json.dump(state, io.open(last_path, 'w', encoding='utf-8'), indent=1)
     io.open(os.path.join(STATE, 'summary.txt'), 'w', encoding='utf-8').write(line + '\n')
     bad = by.get('SURVIVED') or by.get('ANCHOR') or by.get('AMBIGUOUS') or by.get('CRASH') or \
