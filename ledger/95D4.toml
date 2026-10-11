@@ -26,15 +26,26 @@ by     = "python tools/adis.py 0x95D4 120 ; python tools/adis.py 0x968B 90 ; pyt
 
 [[fact]]
 kind   = "measured"
-says   = "fixture build/callio_95d4.json: 137 play cases (s1, p1 x 7 key scripts, p1b W; 6000 frames, per 1) + 6 derived from case 6 ($AA14=2 for the $963F borrow; $AA59 at the $5F and $C8 clamp edges); --check 143/143, T 223-4834"
+says   = "fixture build/callio_95d4.json: 137 play cases (s1, p1 x 7 key scripts, p1b W; 6000 frames, per 1) + 6 derived from case 6 ($AA14=2 for the $963F borrow; $AA59 at the $5F and $C8 clamp edges) + 59 edge worlds (parents 0 2 3 5 15 23); --check 202/202, T 223-5007"
 by     = "python tools/callio.py --capture --state p1 --keys W --call 0x978D 0x9790 --frames 6000 --per 1 --out build/callio_95d4.json --append ; python tools/callio.py --check --state s1 --fixture build/callio_95d4.json"
 
 [[fact]]
 kind   = "gated"
-says   = "fighterMotion writes every byte of all 143 cases, reads no ROM (the $FF copy is written as $FF), and tallies the exact uncontended T; every branch reached; 24 mutants killed"
+says   = "fighterMotion writes every byte of all 202 cases, reads no ROM (the $FF copy is written as $FF), and tallies the exact uncontended T; every branch reached; 32 mutants killed"
 by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --affected"
 
 [[fact]]
 kind   = "gated"
-says   = "fighterMotion counts its M1 cycles into M1.m1 (one per instruction, two for SBC HL and the CB shifts at $9702-$9708) and matches rx - r mod 128 on all 143 callio cases"
+says   = "fighterMotion counts its M1 cycles into M1.m1 (one per instruction, two for SBC HL and the CB shifts at $9702-$9708) and matches rx - r mod 128 on all 202 callio cases"
 by     = "python tools/blockcost.py 0x95D4 0x9743 ; python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+at     = "$96BB"
+says   = "AND A clears carry, so $96BC's JR NC is always taken: the clamp tests signed x +/- ptr[3]; derived at steps +/-3, every direction, facing and fighter: results $FF, $00 store 0, $01 stores 1, $5E stays, $5F and $60 store $5F"
+by     = "python tools/adis.py 0x968B 90 ; python tools/callio.py --derive --state s1 --fixture build/callio_95d4.json --case 0 --set 0xAA10=0x1,0xAA14=0xFC,0xAA15=0x93,0xAA16=0x0,0xAA17=0x0,0xAA19=0x2"
+
+[[fact]]
+kind   = "gated"
+says   = "G.worlds: the cases hold all 78 edge worlds (both fighters): idle, start each way, hold and frame counts at each edge both ways, the page step each way on 4-aligned pointers (T115), the swap at facing 0 and 1, the clamp results above"
+by     = "node test/kit.test.js"

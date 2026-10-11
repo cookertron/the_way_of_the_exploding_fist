@@ -893,6 +893,33 @@ const hitCtx = (p1, differ, agree) => hitPairs().map(s => s.split(',').map(Numbe
   /* the RET Z at $95ED taken for both fighters: a case without $95EE */
   check('the callio cases include a pass with both fighters idle',
         pcs.some(s => s.has(0x95ED) && !s.has(0x95EE)), true);
+  /* Per fighter A, every guard at its edge and one past: idle ($95ED),
+     start each way ($95F2, $96F1), the forward hold and frame counts
+     ($9603, $960D), the backward ones against their tops ($961B, $9627),
+     the pointer stepping across a page each way ($963D, $9646; play's
+     pointers are 4-aligned, T115) and the facing swap ($9692).  The carry
+     at $96BC is dead (AND A), so x's clamp tests the signed x +/- ptr[3]
+     at $5E/$5F/$60 and $FF/$00/$01: steps 3 ($94BC) and -3 ($93FC), every
+     direction and facing, the hold not expiring.  Play's x is 0-$5F, so
+     $C8 is only reached out of play (fact 4).  The derived cases flip at
+     exactly these edges (ledger/95D4.toml). */
+  const motionWorlds = A => {
+    const w = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [A + Number(k), v & 0xFF]));
+    const back = { 0x16: 1, 0x11: 2, 0x10: 2, 0x0F: 3 }, fwd = { 0x16: 0, 0x10: 0, 0x0E: 1 };
+    const out = [w({ 0x0C: 0 }), w({ 0x0B: 0, 0x16: 0 }), w({ 0x0B: 0, 0x16: 1 }),
+                 w({ 0x16: 0, 0x10: 1 }), w(fwd), w({ ...fwd, 0x0E: 0 }),
+                 w({ 0x16: 1, 0x11: 2, 0x10: 1 }), w({ ...back, 0x0E: 1 }), w({ ...back, 0x0E: 2 }),
+                 w({ ...back, 0x0E: 1, 0x14: 0x00 }), w({ ...back, 0x0E: 1, 0x14: 0x04 }),
+                 w({ ...fwd, 0x14: 0xFC }), w({ ...fwd, 0x14: 0xF8 }), w({ ...fwd, 0x17: 0 }), w({ ...fwd, 0x17: 1 })];
+    for (const d of [0, 1]) for (const f of [0, 1]) for (const [s, p] of [[3, 0x94BC], [-3, 0x93FC]]) {
+      const step = d === f ? s : -s;
+      for (const r of step > 0 ? [0x5E, 0x5F, 0x60] : [-1, 0, 1])
+        out.push(w({ 0x10: 1, ...(d ? { 0x11: 2 } : {}), 0x16: d, 0x17: f, 0x14: p & 0xFF, 0x15: p >> 8, 0x19: r - step }));
+    }
+    return out;
+  };
+  check('...and the cases hold every edge world of $95D4 for both fighters: its counts, the page step, the swap and x\'s clamp at each edge and one past (T124, T141)',
+        G.worlds(fx, [...motionWorlds(0xAA00), ...motionWorlds(0xAA40)]), []);
 }
 
 /* ---- control_pass $97CB and the AI $A090 against its frozen oracle ----

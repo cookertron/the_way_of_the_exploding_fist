@@ -5373,5 +5373,69 @@
   "new": "if (m[0xA614] < 6){\n      k(32, 3);\n      if (m[0xA62F] !== 1)",
   "increment": "97CB worlds",
   "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: x kept below $5E",
+  "old": "if (x < 0x5F){ m[A + 0x19] = x;",
+  "new": "if (x < 0x5E){ m[A + 0x19] = x;",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: wrap test never true",
+  "old": "if (x >= 0xC8){ m[A + 0x19] = 0;",
+  "new": "if (x > 0xFF){ m[A + 0x19] = 0;",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: back step borrows at 4",
+  "old": "if (v < 0){ m[A + 0x15]--;",
+  "new": "if (v <= 0){ m[A + 0x15]--;",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: forward step carries from $F8",
+  "old": "if (v > 0xFF){ m[A + 0x15]++;",
+  "new": "if (v >= 0xFC){ m[A + 0x15]++;",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: forward hold expires at 1",
+  "old": "if (m[A + 0x10]){ m[A + 0x10]--;",
+  "new": "if (m[A + 0x10] > 1){ m[A + 0x10]--;",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: forward frames end at 1",
+  "old": "if (!m[A + 0x0E]) { M1.m1 += 1; return t + 12 + done(); }",
+  "new": "if (m[A + 0x0E] <= 1) { M1.m1 += 1; return t + 12 + done(); }",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: back hold expires one early",
+  "old": "if (m[A + 0x10] !== m[A + 0x11])",
+  "new": "if (m[A + 0x10] < m[A + 0x11] - 1)",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "motion worlds: back frames end one early",
+  "old": "if (((m[A + 0x0F] - 1) & 0xFF) === m[A + 0x0E])",
+  "new": "if (m[A + 0x0E] >= ((m[A + 0x0F] - 2) & 0xFF))",
+  "increment": "95D4 worlds",
+  "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
  }
 ]
