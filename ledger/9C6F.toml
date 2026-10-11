@@ -44,3 +44,8 @@ by     = "python tools/callio.py --capture --state s1 --call 0x9745 0x9748 --bli
 kind   = "gated"
 says   = "the JS counts its M1 cycles into M1.m1 and matches R advanced in the real code (rx - r mod 128, stamped by callio --stamp-r) on every callio case"
 by     = "python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "play only set P2 reel $AA43 at the OR guard, and no move $16 met CP $17; cases 31 ($AA03=$16 alone) and 32 ($AA04=$16) derived, no new PCs. Above $17 not built: $16 is the last move id"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_9c6f.json --case 4 --set 0xAA03=0x16 --set 0xAA43=0 ; same --case 11 --set 0xAA04=0x16 ; callio --check (33, 0 disagree)"

@@ -28,3 +28,8 @@ by     = "node test/kit.test.js (live block, time)"
 kind   = "measured"
 says   = "(IX) at $AE78 is never >= $80: every frame 0-58 ($44CC + word $C440+2n) starts with 1, 2 or 3; all 8 time ups in the live fixtures end on P1 frame $37 ($F3D4 = 1), and no fixture row holds a frame above 58"
 by     = "python (image.bin: m[$44CC + word at $C440+2n] for n 0-58) ; scan of build/live_*.json rows: p1/p2 frame max, P1 frame on rows marked $AE67"
+
+[[fact]]
+kind   = "measured"
+says   = "time_ad44 played each lead only over a 0; worlds now hold each count and each tally ahead by one over a nonzero other, and 5-5 tallies at 1-1 (the draw): cases 11-15 derived, no new PCs"
+by     = "python tools/callio.py --derive --state p1 --fixture build/callio_ad44.json --case 2 --set 0xAA01=1 --set 0xAA41=2 (4 more, port.json) ; callio --check (16, 0 disagree)"

@@ -753,6 +753,13 @@ const mockCtx = (state) => ({
   check('the callio cases reach every branch of the tick and its printer',
         [0x9C8E, 0x9C93, 0x934E, 0x935E, 0x922F, 0x9235, 0xC31E]
           .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+  /* OR (HL): played, only P2's reel ($AA43) was ever set; and CP $17 on
+     the move, whose nearest values played were $14 and $17 -- $16 is the
+     last move id (tables $B464-$B47A).  Above $17 is not built: no move. */
+  check('...and the cases hold every world the guards read: each reel alone, the move just below $17 and at it, the tick and Time at 1 and above (T124, T132, T141)',
+        G.worlds(fx, [{ 0x9C2B: 0, 0xAA03: 0x16, 0xAA43: 0 }, { 0x9C2B: 0, 0xAA03: 0, 0xAA43: 0x16 },
+                      ...G.world.cross([{ 0x9C2B: 0, 0xAA03: 0, 0xAA43: 0 }], G.world.at(0xAA04, 0x16, 0x17)),
+                      ...G.world.cross([{ 0xAA04: 6 }], G.world.at(0x9CA6, 1, 10)), ...G.world.at(0x9CA5, 1, 5)]), []);
 }
 
 /* ---- p2_hits_p1 $9ED2 against its frozen oracle (callio) ---------------
@@ -967,6 +974,15 @@ const mockCtx = (state) => ({
   check('the callio cases take the 1P exit and the RET Z of Yin_Yang_2UP',
         [[0x9774, 0x9776], [0x905B, 0x905C]]
           .filter(([a, b]) => !pcs.some(s => s.has(a) && !s.has(b))).map(([a]) => a.toString(16)), []);
+  /* $AF01 is pointPath's guard, ($AA03 XOR $AA43) AND $10.  Play pairs
+     the reel with the award -- $16 with 1, $1B with 2 -- and the side hit
+     with the other's award ($AA43 set: P1's $AA08), so the worlds pin
+     those pairs, not a mirror (T115). */
+  const PAIRS = [[0x16, 1], [0x1B, 2]];
+  check('...and the cases hold every world the guard and the award read: each side scoring 1 or 2, both or neither hit (T124, T132)',
+        G.worlds(fx, [...PAIRS.map(([h, p]) => ({ 0xAA03: 0, 0xAA43: h, 0xAA08: p })),
+                      ...PAIRS.map(([h, p]) => ({ 0xAA03: h, 0xAA43: 0, 0xAA08: 0, 0xAA48: p })),
+                      { 0xAA03: 0x16, 0xAA43: 0x16 }, { 0xAA03: 0, 0xAA43: 0 }]), []);
 }
 
 /* ---- the sound effect $B15A against its frozen oracle -------------------
@@ -1253,7 +1269,7 @@ const mockCtx = (state) => ({
 /* ---- P1 wins the 1UP bout: $AD5F, the pose $AE7A, the time bonus -------
    python tools/callio.py --capture --state p1 --poke 0xAA01=4 --call
    0xAD5F 0xACA6 (the start constructed: P1's count at 4, so the script's
-   first point wins), and Time 0 derived.  winStart, winPass until its RET,
+   first point wins), and Time 0 and 1 derived.  winStart, winPass until its RET,
    bonusStart, bonusPass until out: every byte outside the stack frames and
    the score row, the score-row bytes written (D5), T and R exactly. */
 {
@@ -1278,7 +1294,9 @@ const mockCtx = (state) => ({
   check('...and the machine left for $ACA6 with A = 1 (the bout won), a second counted for each left on the clock, played and none (Time 0 derived), then the seeds (callio --seed)',
         [fx.cases.map(c => c.exit[fx.regs.indexOf(0)]), secs, fx.cases.slice(0, 2).map(c => (c.derived || {}).set),
          fx.cases.slice(2).map(c => c.derived.from), secs[0] > 1],
-        [fx.cases.map(() => 1), fx.cases.map(clock), [undefined, { '9ca5': 0 }], [0, 0, 0, 0], true]);
+        [fx.cases.map(() => 1), fx.cases.map(clock), [undefined, { '9ca5': 0 }], [0, 0, 0, 0, 0], true]);
+  check('...and the cases hold every world the clock loop reads: Time 0, exactly 1 (one second, then out) and many (T124, T141)',
+        G.worlds(fx, G.world.at(0x9CA5, 0, 1, 27)), []);
   check('the winPass (P1) gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
   check('no winPass (P1) case stores the poison over a byte it never read (T131)', r.masked, 0);
 }
@@ -1362,7 +1380,15 @@ const mockCtx = (state) => ({
     check('timeUp, then the pose (and the bonus) or the draw, match the real $AD44 to $ACA6 on every case: bytes, T, R and A exactly',
           G.failed(r, 't', 'r', 'a'), [0, '']);
     check('...and the cases take every arm: the draw, P1 and P2 ahead on the count, then on the tally ($AD5C, $AD91)',
-          [ways, G.listed(fx).map(c => c.exit[iA])], [['draw', 'p1', 'p2', 'p1', 'p2'], [0x81, 1, 0, 1, 0]]);
+          [ways, G.listed(fx).map(c => c.exit[iA])],
+          [['draw', 'p1', 'p2', 'p1', 'p2', 'p2', 'p1', 'draw', 'p1', 'p2'], [0x81, 1, 0, 1, 0, 0, 1, 0x81, 1, 0]]);   // played, then the worlds' derives
+    /* two CP (HL), unsigned: played, each side led only over a 0, which a
+       test of "nonzero" passes too.  Each lead by one over a nonzero count,
+       and equal counts handing the tally the same three worlds. */
+    const W = G.world;
+    check('...and the cases hold every world the two compares read: each count and each tally ahead by one over a nonzero other, and equal (T124, T132, T141)',
+          G.worlds(fx, [{ 0xAA01: 1, 0xAA41: 2 }, { 0xAA01: 2, 0xAA41: 1 },
+                        ...W.cross([{ 0xAA01: 1, 0xAA41: 1 }], [{ 0xAA02: 5, 0xAA42: 4 }, { 0xAA02: 4, 0xAA42: 5 }, { 0xAA02: 5, 0xAA42: 5 }])]), []);
     check('the timeUp gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
     check('no timeUp case stores the poison over a byte it never read (T131)', r.masked, 0);
   }
@@ -1420,9 +1446,9 @@ const mockCtx = (state) => ({
   const r = G.replay(fx, run, Object.assign({ expect: { t: c => c.t, r: c => c.rx, at: c => c.xpc } }, opts));
   check("boutNext (and the draw's pose) match the real $ACA6 to $AC5F / $AC39 on every case: bytes, T, R and the PC left by exactly",
         G.failed(r, 't', 'r', 'at'), [0, '']);
-  check("...and the cases take every arm: lost, won with bouts left, rank up, rank up with the stage wrapping, the top rank's random, the draw; and from a real snapshot (stage2, not poked): rank up, then lost",
+  check("...and the cases take every arm: lost, won with bouts left, rank up, rank up with the stage wrapping, the top rank's random, the draw; and from a real snapshot (stage2, not poked): rank up, then lost; the quit's $80 (JP M, not $81: lost) derived",
         [G.listed(fx).map(c => c.regs[iA]), G.listed(fx).map(c => c.t), G.listed(fx).map(c => c.source)],
-        [[0, 1, 0, 1, 1, 1, 0x81, 1, 1, 0], [40, 54, 40, 222, 240, 251, fx.cases[6].t, 222, 222, 40], [...Array(8).fill(undefined), 'stage2', 'stage2']]);
+        [[0, 1, 0, 1, 1, 1, 0x81, 1, 1, 0, 0x80], [40, 54, 40, 222, 240, 251, fx.cases[6].t, 222, 222, 40, 47], [...Array(8).fill(undefined), 'stage2', 'stage2', undefined]]);
   check('...and one derived: the rank from 9 to $10, a BCD carry through DAA',
         [fx.cases[7].derived, fx.cases[7].out.find(([a]) => a === 0xB05F)], [{ from: 3, set: { b05f: 9 } }, [0xB05F, '10']]);
   check('the boutNext gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);

@@ -34,7 +34,7 @@
       "key": "timer9c6f",
       "file": "build/callio_9c6f.json",
       "required": true,
-      "note": "oracle for bout_timer $9C6F and its printer: python tools/callio.py --capture --blind 0x4000-0x57FF (ROM reads and glyphs as addresses only, D5)"
+      "note": "oracle for bout_timer $9C6F and its printer: python tools/callio.py --capture --blind 0x4000-0x57FF (ROM reads and glyphs as addresses only, D5); the guards' worlds derived (--state s1): case 4 --set 0xAA03=0x16,0xAA43=0, case 11 --set 0xAA04=0x16"
     },
     {
       "key": "hit9ed2",
@@ -64,7 +64,7 @@
       "key": "yy976f",
       "file": "build/callio_976f.json",
       "required": true,
-      "note": "oracle for the 2P yin-yang award $976F-$978D and Yin_Yang_1UP $900E: python tools/callio.py --capture --poke 0x9C2C=2 --call 0x976F 0x978D"
+      "note": "oracle for the 2P yin-yang award $976F-$978D and Yin_Yang_1UP $900E: python tools/callio.py --capture --poke 0x9C2C=2 --call 0x976F 0x978D; P1's full point derived (--state s1): case 6 --set 0xAA43=0x1B,0xAA08=2"
     },
     {
       "key": "sfx",
@@ -100,7 +100,7 @@
       "key": "win_ad5f",
       "file": "build/callio_ad5f.json",
       "required": true,
-      "note": "oracle for P1 winning the 1UP bout, $AD5F through the pose $AE7A and the time bonus to $ACA6, the start constructed (P1's count poked to 4, so the script's first point wins): python tools/callio.py --capture --state p1 --poke 0xAA01=4 --call 0xAD5F 0xACA6 --frames 3000 --blind 0x4000-0x471F, then --derive case 0 --set 0x9CA5=0 (no time left)"
+      "note": "oracle for P1 winning the 1UP bout, $AD5F through the pose $AE7A and the time bonus to $ACA6, the start constructed (P1's count poked to 4, so the script's first point wins): python tools/callio.py --capture --state p1 --poke 0xAA01=4 --call 0xAD5F 0xACA6 --frames 3000 --blind 0x4000-0x471F, then --derive case 0 --set 0x9CA5=0 (no time left); Time 1 derived: case 0 --set 0x9CA5=1"
     },
     {
       "key": "end_ae67",
@@ -112,7 +112,7 @@
       "key": "time_ad44",
       "file": "build/callio_ad44.json",
       "required": true,
-      "note": "oracle for the time-up decision $AD44 to $ACA6, each start constructed and played, not derived (derive reads Time from the image, not the machine's 0): python tools/callio.py --capture --state p1 --call 0xAD44 0xACA6 --frames 3000 --blind 0x4000-0x471F --poke 0x9CA5=1 (the draw), then --append with 0x9CA5=1 and 0xAA01=1 / 0xAA41=1 / 0xAA02=5 / 0xAA42=5"
+      "note": "oracle for the time-up decision $AD44 to $ACA6, each start constructed and played, not derived (derive reads Time from the image, not the machine's 0): python tools/callio.py --capture --state p1 --call 0xAD44 0xACA6 --frames 3000 --blind 0x4000-0x471F --poke 0x9CA5=1 (the draw), then --append with 0x9CA5=1 and 0xAA01=1 / 0xAA41=1 / 0xAA02=5 / 0xAA42=5; the compares' worlds (kit.test.js) case 2 --set 0xAA01=1,0xAA41=2, case 1 --set 0xAA01=2,0xAA41=1, case 0 --set 0xAA01=1,0xAA41=1,0xAA02=5,0xAA42=5, case 3 --set 0xAA01=1,0xAA41=1,0xAA02=5,0xAA42=4, case 4 --set 0xAA01=1,0xAA41=1,0xAA02=4,0xAA42=5"
     },
     {
       "key": "draw_ad44",
@@ -124,7 +124,7 @@
       "key": "next_aca6",
       "file": "build/callio_aca6.json",
       "required": true,
-      "note": "oracle for the 1UP game after a bout, $ACA6 to $AC5F (won, ranks up, draw) or $AC39 (lost): python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39 --frames 3000, played, then appended with --poke 0xAA01=4 (P1 wins), and with 0xAA3C=1, 0xAF34=3, 0xB05F=0x10 added, and 0x9CA5=1 (the draw); the rank-up run's draw case dropped (draw_ad44 gates that pose); plus 2 (rank up won, then lost) real case(s) marked source \"stage2\": python tools/callio.py --capture --state stage2 (the same --call and --blind) --frames 4000 --per 1, appended -- stage2 from python tools/snapimport.py snapshots/going_to_stage_2.szx --save stage2 (the user's 128K .szx in the 48K configuration, inside P1's victory pose before the time bonus; gitignored, rule 7)"
+      "note": "oracle for the 1UP game after a bout, $ACA6 to $AC5F (won, ranks up, draw) or $AC39 (lost): python tools/callio.py --capture --state p1 --call 0xACA6 0xAC5F,0xAC39 --frames 3000, played, then appended with --poke 0xAA01=4 (P1 wins), and with 0xAA3C=1, 0xAF34=3, 0xB05F=0x10 added, and 0x9CA5=1 (the draw); the rank-up run's draw case dropped (draw_ad44 gates that pose); plus 2 (rank up won, then lost) real case(s) marked source \"stage2\": python tools/callio.py --capture --state stage2 (the same --call and --blind) --frames 4000 --per 1, appended -- stage2 from python tools/snapimport.py snapshots/going_to_stage_2.szx --save stage2 (the user's 128K .szx in the 48K configuration, inside P1's victory pose before the time bonus; gitignored, rule 7); the quit derived: case 0 --reg 0=0x80"
     },
     {
       "key": "hiscore_ac39",

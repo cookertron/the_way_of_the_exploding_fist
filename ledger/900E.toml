@@ -39,3 +39,8 @@ by     = "python tools/build.py ; node test/kit.test.js ; python tools/mutants.p
 kind   = "gated"
 says   = "yinYang2P and its helpers count their M1 into M1.m1 and match rx - r mod 128 on all 22 callio cases; every cell is at row 8 or 16, so Screen_Calc takes its 24-M1 top-third path and $9229 never steps to the next third"
 by     = "python tools/blockcost.py 0x976F 0x978D ; python tools/blockcost.py 0x900E 0x9090 ; python tools/blockcost.py 0x9255 0x92A0 ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "yy976f pairs reel and award as play does ($16 with 1, $1B with 2; the side hit holds the other award); P1 scoring a full point ($AA43=$1B, $AA08=2) was missing: case 22 derived from case 6, no new PCs"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_976f.json --case 6 --set 0xAA43=0x1B --set 0xAA08=2 ; python tools/callio.py --check (23 cases, 0 disagree) ; node test/kit.test.js"

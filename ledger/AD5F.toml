@@ -28,3 +28,8 @@ by     = "node test/kit.test.js (live block, P1)"
 kind   = "measured"
 says   = "$C42C-$C433 XOR $FF outgrows the back buffer: the fill, decode and LDIRs wrap past $FFFF into ROM, which drops the store; the engine now drops stores below $4000 there, and --seed refuses a derive reading ROM as data (D5)"
 by     = "node test/kit.test.js (the ROM drops a store)"
+
+[[fact]]
+kind   = "measured"
+says   = "the time bonus loop held Time 27 and 0, not its exact edge; Time 1 (one second, then out) derived as case 6, no new PCs; JR Z read as <= 1 now killed"
+by     = "python tools/callio.py --derive --state p1 --fixture build/callio_ad5f.json --case 0 --set 0x9CA5=1 ; python tools/callio.py --check (7 cases, 0 disagree) ; node test/kit.test.js"

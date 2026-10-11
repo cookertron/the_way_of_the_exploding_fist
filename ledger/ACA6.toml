@@ -28,3 +28,8 @@ by     = "python tools/callio.py --check --state p1 --fixture build/callio_aca6.
 kind   = "measured"
 says   = "confirmed from a real start: the port matches the cases captured from the user's snapshot (state stage2, nothing poked) exactly, as it matches the poke-built ones"
 by     = "python tools/callio.py --check --state stage2 --fixture (this routine's fixture) ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+says   = "the quit A=$80 (JP M to $ACCF, CP $81 fails, XOR A, RET to $AC39, 47 T) was never in the fixture; case 13 derived from case 0 with --reg 0=0x80, no new PCs; bouts left 2/1, stage 2/3 and rank 9/$10 already held their thresholds"
+by     = "python tools/callio.py --derive --state p1 --fixture build/callio_aca6.json --case 0 --reg 0=0x80 ; python tools/callio.py --check --state p1 --fixture build/callio_aca6.json (14 cases, 0 disagree) ; node test/kit.test.js"

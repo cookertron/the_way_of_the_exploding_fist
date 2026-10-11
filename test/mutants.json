@@ -5221,5 +5221,69 @@
   "new": "      if (m[0xAA01] === 4) return (t += 5, out('p1'));",
   "increment": "ABCB worlds",
   "kills": "demoPoint matches the real $ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44: timeUp: count CP as nonzero: P2 ahead only over a 0",
+  "old": "  if (m[0xAA01] < m[0xAA41]) return { t: t + 12, exit: 'p2' };",
+  "new": "  if (!m[0xAA01] && m[0xAA41]) return { t: t + 12, exit: 'p2' };",
+  "increment": "AD44 worlds",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44: timeUp: count CP as nonzero: P1 ahead only over a 0",
+  "old": "  if (m[0xAA01] > m[0xAA41]) return (M1.m1 += 1,",
+  "new": "  if (m[0xAA01] && !m[0xAA41]) return (M1.m1 += 1,",
+  "increment": "AD44 worlds",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44: timeUp: tally CP as nonzero: P2 ahead only over a 0",
+  "old": "  if (m[0xAA02] < m[0xAA42]) return (t += 12, call('p2'));",
+  "new": "  if (!m[0xAA02] && m[0xAA42]) return (t += 12, call('p2'));",
+  "increment": "AD44 worlds",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44"
+ },
+ {
+  "file": "template.html",
+  "label": "AD44: timeUp: tally draw only at 0 apiece",
+  "old": "  if (m[0xAA02] === m[0xAA42]) return (M1.m1 += 2,",
+  "new": "  if (!m[0xAA02] && !m[0xAA42]) return (M1.m1 += 2,",
+  "increment": "AD44 worlds",
+  "kills": "timeUp, then the pose (and the bonus) or the draw, match the real $AD44"
+ },
+ {
+  "file": "template.html",
+  "label": "ACA6: boutNext: the quit's $80 not taken by JP M (plays on as a win)",
+  "old": "  if (a & 0x80) return (M1.m1 += 3, { t: 4 + 10 + 7 + 12 + 4 + 10, at: 0xAC39 });",
+  "new": "  if (false) return (M1.m1 += 3, { t: 4 + 10 + 7 + 12 + 4 + 10, at: 0xAC39 });",
+  "increment": "ACA6 quit",
+  "kills": "boutNext (and the draw's pose) match the real $ACA6"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: boutTimer: reel guard reads P2's only (T132)",
+  "old": "  if (m[0xAA03] | m[0xAA43]) return t + 11;",
+  "new": "  if (m[0xAA43]) return t + 11;",
+  "increment": "9C6F worlds",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen"
+ },
+ {
+  "file": "template.html",
+  "label": "9C6F: boutTimer: move guard CP $17 as >= $16",
+  "old": "  if (m[0xAA04] === 0x17) return t + 11;",
+  "new": "  if (m[0xAA04] >= 0x16) return t + 11;",
+  "increment": "9C6F worlds",
+  "kills": "boutTimer writes every byte the real $9C6F wrote outside the screen"
+ },
+ {
+  "file": "template.html",
+  "label": "AD5F: bonusStart: Time 1 counted as none (JR Z as <= 1)",
+  "old": "  if (!m[0x9CA5]) return { t: 13 + 4 + 12 + bonusOut(m), out: true };",
+  "new": "  if (m[0x9CA5] <= 1) return { t: 13 + 4 + 12 + bonusOut(m), out: true };",
+  "increment": "AD5F worlds",
+  "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F"
  }
 ]
