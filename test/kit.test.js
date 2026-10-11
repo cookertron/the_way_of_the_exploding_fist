@@ -762,6 +762,43 @@ const mockCtx = (state) => ({
                       ...G.world.cross([{ 0xAA04: 6 }], G.world.at(0x9CA6, 1, 10)), ...G.world.at(0x9CA5, 1, 5)]), []);
 }
 
+/* ---- the hit cores' gap worlds: a computed threshold ---------------------
+   For a context -- move D, the victim's frame f, the facings a (attacker)
+   and v (victim), the victim's x X -- the reach E and the steps k1, k2 are
+   table bytes as the cases read them ($A98A/$A9BC rows, $A93F+D, $A958+D,
+   $B47E+D picks near or far).  The gap C's edges: near, E+1 misses, E is
+   2, E-k1 still 2, E-k2 still 1, each with the world one past; far, the
+   mirror at E-1, E, E+k1, E+k2.  The worlds set the attacker's x to give
+   each C.  The derived cases flip at exactly these edges (ledger/9ED2.toml).
+   The facing pairs are play's own: the pairs (P1, P2) the cases of both
+   cores were captured with (T115). */
+function hitWorlds(fx, k, ctxs){
+  const byte = a => {
+    for (const c of fx.cases) for (const [a0, h] of c.in)
+      if (a0 <= a && a < a0 + h.length / 2) return parseInt(h.substr(2 * (a - a0), 2), 16);
+    throw new Error(`hitWorlds: no case read $${a.toString(16)}`);
+  };
+  return ctxs.flatMap(({ D, f, X, a, v }) => {
+    const tb = b => byte((b & 0xFF00) | ((b + D) & 0xFF));
+    const same = a === v, row = (same ? 0xA9BC : 0xA98A) + ((D << 1) & 0xFF);
+    const r = byte(((byte(row) | byte(row + 1) << 8) + f) & 0xFFFF);
+    if (r === 0x80) throw new Error(`hitWorlds: no reach at move ${D}, frame ${f}`);
+    const E = (r + 0x80) & 0xFF, vFirst = !a !== same, k1 = tb(0xA93F), k2 = tb(0xA958);
+    const Cs = (tb(0xB47E) ? same : !same) ? [E + 1, E, E - 1, E - k1, E - k1 - 1, E - k2, E - k2 - 1]
+                                           : [E - 1, E, E + 1, E + k1 - 1, E + k1, E + k2 - 1, E + k2];
+    return Cs.map(C => ({ [k.A + 4]: D, [k.V + 0x12]: f, [k.A + 0x17]: a, [k.V + 0x17]: v,
+                          [k.xv]: X, [k.xa]: (vFirst ? X - (C - 0x80) : X + (C - 0x80)) & 0xFF }));
+  });
+}
+const hitPairs = () => [...new Set([P.assets.hit9d29, P.assets.hit9ed2].flatMap(fx => fx.cases
+  .filter(c => !c.derived && c.in.some(([a0, h]) => a0 <= 0xAA17 && 0xAA17 < a0 + h.length / 2))
+  .map(c => c.in.flatMap(([a0, h]) => [0xAA17, 0xAA57].filter(a => a0 <= a && a < a0 + h.length / 2)
+    .map(a => parseInt(h.substr(2 * (a - a0), 2), 16))).join(','))))].sort();
+/* play's pairs as (attacker, victim) facings, each on the context for
+   facings that differ or agree (the reach row differs, so may the frame) */
+const hitCtx = (p1, differ, agree) => hitPairs().map(s => s.split(',').map(Number))
+  .map(([f1, f2]) => Object.assign({ a: p1 ? f1 : f2, v: p1 ? f2 : f1 }, f1 === f2 ? agree : differ));
+
 /* ---- p2_hits_p1 $9ED2 against its frozen oracle (callio) ---------------
    Bracketed from the CALL at $9748 to $974B (python tools/callio.py
    --capture --call 0x9748 0x974B); derived cases reach the branches driven
@@ -788,6 +825,13 @@ const mockCtx = (state) => ({
          0x9FC7, 0x9FD0, 0x9FE4, 0x9FE8, 0x9FE9, 0x9FF4, 0x9FFF, 0xA000, 0xA004, 0xA005, 0xA010, 0xA01B,
          0x9F9F, 0x9FA7, 0xA043, 0xA047, 0xA04B, 0xA056, 0xA05C, 0xA062, 0xA06C]
           .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+  /* play faced the fighters both ways and both left, never both right */
+  check("the facing pairs (P1, P2) play held at the hit cores' facing test (T115)", hitPairs(), ['0,0', '0,1', '1,0']);
+  /* move $0F has $B47E set, $0B not: between them every range test */
+  const K = { A: 0xAA40, V: 0xAA00, xa: 0xA072, xv: 0xA071 };
+  check('...and the cases hold every gap world of $9ED2: the gap at each edge of the reach and its steps and one past, on each of play\'s facing pairs, near and far (T124, T141)',
+        G.worlds(fx, hitWorlds(fx, K, [...hitCtx(false, { D: 0x0F, f: 0, X: 95 }, { D: 0x0F, f: 1, X: 95 }),
+                                       ...hitCtx(false, { D: 0x0B, f: 0x0F, X: 43 }, { D: 0x0B, f: 2, X: 95 })])), []);
 }
 
 /* ---- p1_hits_p2 $9D29 against its frozen oracle (callio) ---------------
@@ -817,6 +861,12 @@ const mockCtx = (state) => ({
          0x9E2A, 0x9E33, 0x9E47, 0x9E4B, 0x9E4C, 0x9E57, 0x9E62, 0x9E63, 0x9E67, 0x9E68, 0x9E73, 0x9E7E,
          0x9E02, 0x9E0A, 0x9EA6, 0x9EAA, 0x9EAE, 0x9EB9, 0x9EBF, 0x9EC5, 0x9ECF]
           .filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+  /* the x bytes are $AA19, $AA59 here: the prefix copies them.  Move $0F
+     has $B47E set, $11 not */
+  const K = { A: 0xAA00, V: 0xAA40, xa: 0xAA19, xv: 0xAA59 };
+  check('...and the cases hold every gap world of $9D29: the gap at each edge of the reach and its steps and one past, on each of play\'s facing pairs, near and far (T124, T141)',
+        G.worlds(fx, hitWorlds(fx, K, [...hitCtx(true, { D: 0x11, f: 6, X: 47 }, { D: 0x11, f: 6, X: 47 }),
+                                       ...hitCtx(true, { D: 0x0F, f: 0x19, X: 58 }, { D: 0x0F, f: 0x19, X: 58 })])), []);
 }
 
 /* ---- fighter_motion $95D4 against its frozen oracle (callio) ----------

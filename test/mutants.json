@@ -5285,5 +5285,21 @@
   "new": "  if (m[0x9CA5] <= 1) return { t: 13 + 4 + 12 + bonusOut(m), out: true };",
   "increment": "AD5F worlds",
   "kills": "winStart, winPass, bonusStart and bonusPass match the real $AD5F"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2 worlds: add-side 1-point reach off by one",
+  "old": "if (((tb(0xA958) + C) & 0xFF) >= E){ pts = 1; t += 12; }",
+  "new": "if (((tb(0xA958) + C) & 0xFF) > E){ pts = 1; t += 12; }",
+  "increment": "9ED2 worlds",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9ED2 worlds: sub-side 2-point reach off by one",
+  "old": "if (((C - tb(0xA93F)) & 0xFF) < E){ pts = 2; t += 12; }",
+  "new": "if (((C - tb(0xA93F)) & 0xFF) <= E){ pts = 2; t += 12; }",
+  "increment": "9ED2 worlds",
+  "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
  }
 ]

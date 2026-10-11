@@ -33,3 +33,8 @@ by     = "python tools/callio.py --derive --state s1 --fixture build/callio_9d29
 kind   = "gated"
 says   = "the JS counts its M1 cycles into M1.m1 and matches R advanced in the real code (rx - r mod 128, stamped by callio --stamp-r) on every callio case"
 by     = "python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "gap worlds on play's facing pairs, moves $11 and $0F: the 56 derived cases already held every one (hitWorlds in kit.test.js, shared with $9ED2); no derive needed"
+by     = "node test/kit.test.js"
