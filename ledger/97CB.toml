@@ -43,13 +43,8 @@ by     = "python tools/grepbytes.py \"ED 4F\" ; python tools/adis.py 0xA090 6"
 
 [[fact]]
 kind   = "gated"
-says   = "27 controlPass/AI mutants all killed; 3 derived cases added to kill them (case 1 with R=$0D; $AA19=$5B for d=$D4; Kempston $08 via --derive --port); fixture 673 cases"
+says   = "27 controlPass/AI mutants all killed (3 derived cases added: R=$0D; $AA19=$5B for d=$D4; Kempston $08); 18 more for the starts, New_Round and the print M1 tallies, all killed"
 by     = "python tools/mutants.py --affected ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json"
-
-[[fact]]
-kind   = "gated"
-says   = "18 mutants for the starts, New_Round and the print M1 tallies, 46 affected cases all killed (4 older anchors repointed after the print edits)"
-by     = "python tools/mutants.py --affected"
 
 [[fact]]
 kind   = "unreachable"
@@ -77,3 +72,8 @@ by     = "node test/kit.test.js (followGate, dan 2-10, top1-2)"
 kind   = "gated"
 says   = "play runs under every control set the menu installs: P1 and P2 each default, Sinclair 1, Sinclair 2, Kempston, redefined keys; 13 constructed cases (6 derived, 7 poked), 702 in all; 3 table mutants survived on the 689-case fixture"
 by     = "python tools/callio.py --check --state s1 --fixture build/callio_97cb.json ; python tools/mutants.py --match \"controls: P1 reads the default||controls: P2 always||controls: Kempston for P1\""
+
+[[fact]]
+kind   = "gated"
+says   = "AI edge worlds on the 1P cases (P2's AI alone): the gaps at $A251 $A2B9, doubled at $A5B6 $A5E1, ranks at $A387 $A393 $A563 $A49D, play's facing pairs only (T115); 26 derived, each outcome flips at the computed edge; 729 cases"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_97cb.json --case 139 --set 0xAA59=0x2E (25 more) ; python tools/callio.py --check --state s1 --fixture build/callio_97cb.json ; node test/kit.test.js"

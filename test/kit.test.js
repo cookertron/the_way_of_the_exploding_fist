@@ -997,6 +997,24 @@ const hitCtx = (p1, differ, agree) => hitPairs().map(s => s.split(',').map(Numbe
           .filter(([a, b]) => !pcs.some(s => s.has(a) && !s.has(b))).map(([a]) => a.toString(16)), []);
   check('the callio cases include the quit (H+G held), 2P and Kempston passes',
         [0x9835, 0x8B2A, 0x8BBF].filter(a => !pcs.some(s => s.has(a))).map(a => a.toString(16)), []);
+  /* The AI's ordered tests, each at its edge and one past, over the 1P
+     cases that ran it: P2's AI is then the only one, so its self is $AA40,
+     its foe $AA00, its rank $AA80 (ledger/97CB.toml).  The gaps are P2's x
+     less P1's ($A251, $A2B9; doubled at $A5B6, $A5E1, move $0F the one
+     with $B47E set), on play's pairs only (T115): facing each other with P2
+     either side, both facing 0 with P2 to the left.  Play's x is 0-95, so
+     the $80 splits are the sign.  $A49D is only reached below rank 7
+     (fact 5).  The R tests ($A3E5) are not bytes. */
+  const gaps = (f1, f2, X, ds) => ds.map(d => ({ 0xAA17: f1, 0xAA57: f2, 0xAA19: X, 0xAA59: (X + d) & 0xFF }));
+  const ai = [[0xA251, [...gaps(0, 1, 26, [20, 21, 22]), ...gaps(0, 1, 95, [-44, -43, -42])]],
+              [0xA2B9, gaps(0, 0, 92, [-34, -33, -32])],
+              [0xA5B3, gaps(0, 1, 29, [10, 11, -9, -8])],
+              [0xA5DE, gaps(0, 0, 92, [-1, -2, -7, -8]).map(w => Object.assign(w, { 0xAA04: 0x0F }))],
+              [0xA387, G.world.bounds(0xAA80, 7)], [0xA393, G.world.bounds(0xAA80, 2)],
+              [0xA563, G.world.bounds(0xAA80, 7)], [0xA49D, G.world.at(0xAA80, 6)]];
+  check('...and the 1P cases hold every edge world of the AI: its gap windows and its rank tests, each at the edge and one past (T124, T141)',
+        ai.flatMap(([pc, want]) => G.worlds({ cases: fx.cases.filter((c, i) => pcs[i].has(pc)) },
+                                            want.map(w => Object.assign({ 0x9C2C: 1 }, w))).map(m => `${pc.toString(16)}: ${m}`)), []);
 }
 
 /* ---- the 2P yin-yang award $976F-$978D against its frozen oracle -------

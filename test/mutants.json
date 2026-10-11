@@ -5301,5 +5301,77 @@
   "new": "if (((C - tb(0xA93F)) & 0xFF) <= E){ pts = 2; t += 12; }",
   "increment": "9ED2 worlds",
   "kills": "p2HitsP1 writes every byte the real $9ED2 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A2B9 edge $DF as $E0",
+  "old": "if (d >= 0xDF){ k(32, 3); return a2c7(); }",
+  "new": "if (d >= 0xE0){ k(32, 3); return a2c7(); }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A5B6 doubled edge $EF as $EE",
+  "old": "if (a >= 0xEF){ k(32, 3); return a5c0(); }",
+  "new": "if (a >= 0xEE){ k(32, 3); return a5c0(); }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A5BA doubled edge $16 as $17",
+  "old": "if (a < 0x16){ k(19, 2); return a5c0(); }",
+  "new": "if (a < 0x17){ k(19, 2); return a5c0(); }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A5E1 doubled edge 3 as 2",
+  "old": "if (a < 3){ k(32, 3); return a5be(); }",
+  "new": "if (a < 2){ k(32, 3); return a5be(); }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A5E5 doubled edge $10 as $11",
+  "old": "if (a >= 0x10){ k(19, 2); return a5be(); }",
+  "new": "if (a >= 0x11){ k(19, 2); return a5be(); }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A387 rank edge 7 as 8",
+  "old": "if (l < 7){ k(40, 5); return a358(b); }",
+  "new": "if (l < 8){ k(40, 5); return a358(b); }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A393 rank edge 2 as 3",
+  "old": "if (m[0xA614] < 2){ k(27 + 10, 3 + 1); return; }",
+  "new": "if (m[0xA614] < 3){ k(27 + 10, 3 + 1); return; }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A563 rank edge 7 as 8",
+  "old": "if (m[0xA614] < 7){ k(32, 3); return a57b(); }",
+  "new": "if (m[0xA614] < 8){ k(32, 3); return a57b(); }",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "ai worlds: $A49D rank edge 7 as 6",
+  "old": "if (m[0xA614] < 7){\n      k(32, 3);\n      if (m[0xA62F] !== 1)",
+  "new": "if (m[0xA614] < 6){\n      k(32, 3);\n      if (m[0xA62F] !== 1)",
+  "increment": "97CB worlds",
+  "kills": "controlPass writes every byte the real $97CB wrote outside the screen (callio cases)"
  }
 ]
