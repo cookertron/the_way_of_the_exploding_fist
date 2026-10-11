@@ -5197,5 +5197,29 @@
   "new": "if (false) bad.push(`${name}: ${threw.get(name)}`);",
   "increment": "guard",
   "kills": "identity names a step that throws, never crashing: a flag run's, and the faithful run's"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: guard ORs the hit bits (both hit scores)",
+  "old": "  if ((m[0xAA03] ^ m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 4 + 7;",
+  "new": "  if ((m[0xAA03] | m[0xAA43]) & 0x10){\n    t += yinYang(m) + award(m);\n    t += 13 + 4 + 7;",
+  "increment": "ABCB worlds",
+  "kills": "demoPoint matches the real $ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: P2 wins at exactly 4",
+  "old": "      if (m[0xAA41] >= 4) return out('p2');",
+  "new": "      if (m[0xAA41] === 4) return out('p2');",
+  "increment": "ABCB worlds",
+  "kills": "demoPoint matches the real $ABCB"
+ },
+ {
+  "file": "template.html",
+  "label": "ABCB: demoPoint: P1 wins at exactly 4",
+  "old": "      if (m[0xAA01] >= 4) return (t += 5, out('p1'));",
+  "new": "      if (m[0xAA01] === 4) return (t += 5, out('p1'));",
+  "increment": "ABCB worlds",
+  "kills": "demoPoint matches the real $ABCB"
  }
 ]

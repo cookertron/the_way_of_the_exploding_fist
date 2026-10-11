@@ -1179,6 +1179,19 @@ const mockCtx = (state) => ({
         [[true, true, true], [[0, false], [0, true], [0x80, false]]]);
   check('...and P1 at 4 with $AA03 set is not looked at: back in, faithful',
         fx.cases.filter(c => set(c).aa03 === 1).map(c => c.xpc), [0xAE29]);
+  /* pointPath's guard ($AF01), then $AA03 picks whose count meets CP 4.
+     In play the side hit holds the move id: $AA43 set with P1's award in
+     $AA08, $AA03 set with $AA08 0 and P2's in $AA48 ($900E reads $AA48
+     only then) -- so the worlds pin those pairs, not a mirror (T115).
+     Each count is met at its sum after the award: 3 and 4 by 1 and 2,
+     and 5 (3 and a full point) past the CP 4. */
+  const W = G.world;
+  const P1S = { 0xAA03: 0, 0xAA43: 0x1B }, P2S = { 0xAA03: 0x16, 0xAA43: 0, 0xAA08: 0 };
+  const sums = (n, a) => [[2, 1], [3, 1], [1, 2], [2, 2], [3, 2]].map(([c, p]) => ({ [n]: c, [a]: p }));
+  check('...and the cases hold every world the point guard and both counts read: each side scoring 1 or 2, both or neither hit, each count reaching 3, 4 and 5, $9C2B either way (T132, T124, T141)',
+        G.worlds(fx, [...W.cross([P1S], W.at(0xAA08, 1, 2)), ...W.cross([P2S], W.at(0xAA48, 1, 2)),
+                      { 0xAA03: 0x16, 0xAA43: 0x1B }, { 0xAA03: 0, 0xAA43: 0 }, ...W.at(0x9C2B, 0, 1),
+                      ...W.cross([P1S], sums(0xAA01, 0xAA08)), ...W.cross([P2S], sums(0xAA41, 0xAA48))]), []);
   check('the demoPoint gate fails on a case with one byte corrupted (T100)', G.negative(fx, run, opts), 1);
   check('no demoPoint case stores the poison over a byte it never read (T131)', r.masked, 0);
 }

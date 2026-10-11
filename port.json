@@ -220,7 +220,7 @@
       "key": "demo_abcb",
       "file": "build/callio_abcb.json",
       "required": true,
-      "note": "oracle for the demo's point path $ABCB back to $AE29 (or out at $AC00, $ABE5, or by its RET to $ABB9): python tools/callio.py --capture --state p1 --call 0xABCB 0xAE29,0xABB9,0xAC00,0xABE5 --frames 6000 --per 3 --blind 0x4000-0x47FF (the demo after the lost bout), then --derive case 3 --set 0xAA41=3 / 0xAA41=2 / 0xAA03=0, case 4 --set 0xAA03=1, case 2 --set 0xAA01=3,0xAA41=1, and with --up 0xABB9 (the return of the CALL at $ABB6) case 3 --set 0x9C2B=1 / 0xAA03=0,0x9C2B=1 / --reg 0=0x80"
+      "note": "oracle for the demo's point path $ABCB back to $AE29 (or out at $AC00, $ABE5, or by its RET to $ABB9): python tools/callio.py --capture --state p1 --call 0xABCB 0xAE29,0xABB9,0xAC00,0xABE5 --frames 6000 --per 3 --blind 0x4000-0x47FF (the demo after the lost bout), then --derive case 3 --set 0xAA41=3 / 0xAA41=2 / 0xAA03=0, case 4 --set 0xAA03=1, case 2 --set 0xAA01=3,0xAA41=1, and with --up 0xABB9 (the return of the CALL at $ABB6) case 3 --set 0x9C2B=1 / 0xAA03=0,0x9C2B=1 / --reg 0=0x80; the guard's and counts' worlds (kit.test.js) case 1 --set 0xAA08=2 / 0xAA01=1,0xAA08=2 / 0xAA01=3,0xAA08=2, case 3 --set 0xAA48=2 / 0xAA41=2,0xAA48=2 / 0xAA43=0x1B / 0xAA41=3,0xAA48=2"
     },
     {
       "key": "demo_abb9",

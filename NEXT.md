@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     apply G.worlds to the other guard-bearing gates (demoPoint $ABCB)
-Step:     python tools/status.py ABCB; python tools/manual.py --map gate; read build/mutants/summary.txt first -- the full run started before this unit (17:20) is the first with stamped verdicts
-Then:     once the stamped full run is in, an --all-rows run then --prune for redundant cases (6.12 step 6); roster still to build: censuses stating population, N and window (T31, T84, T165), and the differ grouping mismatches by roster column
+Unit:     apply G.worlds to the remaining guard-bearing gates (pointPath $AD1B and demoPoint $ABCB done)
+Step:     grep -n "G.worlds" test/kit.test.js against the gate blocks with a guard; python tools/manual.py --map gate; pin play's pairs from the cases before writing worlds (ABCB fact 5: a mirror can be unreachable, T115)
+Then:     user asked for an annotated disassembly: tools/skool.py, a SkoolKit .skool from symbols, regions and ledgers, skool2html to a gitignored dir (rule 7); then --all-rows, --prune (6.12); roster censuses
 Blocked:  none
-Notes:    Roster landed: tools/roster.py, build/roster.json (16 states, all usable); stamps carry the rows of the states read; status warns when stale. No state has sound off, changed controls, 2UP or P2 yin-yang (ledger/topics/roster.toml)
+Notes:    full run 2026-10-10 654/654 killed; affected run at ABCB worlds 49/49 killed, 33.0 min on 4 workers

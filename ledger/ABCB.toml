@@ -28,3 +28,8 @@ by     = "node test/kit.test.js (live block, P2 leave row)"
 kind   = "gated"
 says   = "the demo's poses, time up and the RET M lead to $ABB9; ported as demoOn (ledger ABB9), live through both poses"
 by     = "node test/kit.test.js (demo_abb9 block ; live block, P2 both poses row)"
+
+[[fact]]
+kind   = "measured"
+says   = "worlds pin play's pairs: $AA43 set with P1's award in $AA08; $AA03 set, $AA08 0, P2's in $AA48. 9 were missing (full points, both hit, counts to 3/4/5); cases 19-25 derived, no new PCs; an OR guard and a win at exactly 4 now killed"
+by     = "python tools/callio.py --derive --state p1 --fixture build/callio_abcb.json --case 1 --set 0xAA08=2 (and 2 more), --case 3 --set 0xAA48=2 (and 3 more) ; python tools/callio.py --check ... (26 cases, 0 disagree) ; node test/kit.test.js"
