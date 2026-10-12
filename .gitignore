@@ -31,3 +31,5 @@ build/built.json
 build/gate.json
 # the gallery PNGs are tape-derived (rule 7; tools/gallery.py)
 build/gallery/
+# the annotated disassembly embeds the game's bytes (rule 7; tools/skool.py)
+build/skool/

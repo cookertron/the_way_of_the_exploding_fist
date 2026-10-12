@@ -90,6 +90,7 @@ Read a tool's `--help` before extending it or writing a new one (TRAPS #65,
 | tool | purpose | typical invocation | manual phase |
 |---|---|---|---|
 | `refcheck.py` | phase 3 gate: assemble each line of a third-party SkoolKit disassembly alone at its stated address and compare with our image (start-up relocation applied); prints "bytes compared N / mismatching M / skipped S" with every range and unparsed line named; `--coverage` titled vs default-titled routines and commented lines; `--symbols OUT` imports its @labels without overwriting ours | `python tools/refcheck.py ../ref_wayoftheexplodingfist/sources/wotef.skool [--coverage | --symbols tools/symbols.json]` | 3 find and verify any third-party disassembly |
+| `skool.py` | the annotated disassembly from the records: a SkoolKit skool over our relocated image, laid out by the reference's control file (old macro syntax rewritten for SkoolKit 10; each ledger routine split out as its own entry) or, without `--ref`, by the static walk; symbols.json as @labels (ours win, displaced reference names listed), each ledger's port, oracle, fixtures, manual IDs and facts (with their commands) as entry descriptions, facts with `at` as instruction comments, topics on their routines, addresses linked; skool2html into build/skool/html (gitignored, rule 7); UNPLACED names a record at no skool line, `--strict` exits 1 on one; `--entry ADDR` prints one entry | `python tools/skool.py --ref ../ref_wayoftheexplodingfist/sources/wotef.ctl` | 3/10 the annotated disassembly (12.11) |
 
 ## The manifest keys the tools read
 

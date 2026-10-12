@@ -29,3 +29,8 @@ kind   = "insn"
 at     = "$AE29"
 says   = "DISAGREES: reference labels $9745 Game_Over, but $AC3E calls it at $AE29 then AND A / RET M, once per pass (battery.toml); our play_pass stands in symbols.json"
 by     = "python tools/adis.py 0xAE29 3"
+
+[[fact]]
+kind   = "measured"
+says   = "annotated disassembly builds under SkoolKit 10 from the reference ctl over our image once 53 old macros are rewritten; 209 entries (17 ledger routines split out), 215 labels (5 reference names displaced), 0 unplaced"
+by     = "python tools/skool.py --ref ../ref_wayoftheexplodingfist/sources/wotef.ctl --strict"
