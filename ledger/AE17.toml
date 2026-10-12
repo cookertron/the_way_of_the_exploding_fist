@@ -44,3 +44,8 @@ by     = "python tools/callio.py --check --state p1 --fixture build/callio_ae17.
 kind   = "measured"
 says   = "ported; live_2up (2400 passes) followed row for row: point 599, time ups 880 1301 1722, rank-4 end with P1's pose out to $AC34 and the demo at 2143; tune passes within 0.05%, end pass 0.37% under"
 by     = "python tools/build.py ; node test/kit.test.js ; node scratch/endpass.js"
+
+[[fact]]
+kind   = "gated"
+says   = "G.worlds: no edge worlds needed -- RET M, $9C2B, the rank CP 4, $A6B6 0/1/2 and $AF36's awarded 0/1/2 are equality tests; the ways row pins the point, the quit, time up and all three game ends"
+by     = "python tools/adis.py 0xAE17 10 ; python tools/adis.py 0xADE0 25 ; python tools/adis.py 0xAF36 12 ; node test/kit.test.js"

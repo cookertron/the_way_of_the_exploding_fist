@@ -740,6 +740,13 @@ const hitPairs = () => [...new Set([P.assets.hit9d29, P.assets.hit9ed2].flatMap(
         G.missing([0x9AE3, 0x9AF4, 0x9AFD, 0x9B09, 0x9B0E, 0x9B1E, 0x9B23, 0x9B67, 0x9B71, 0x9B8A], G.ran(fx.cases)), []);
   check('the callio cases call $9AD7 for both fighters (C = 0 and $40)',
         G.missing([0, 0x40], v => fx.cases.some(c => c.regs[iC] === v)), []);
+  /* $9AD7's guards are all equality tests, so no edge worlds: what the PC
+     list above cannot tell apart is D = 3 ($9ADB) from D = 2 ($9ADF), both
+     landing at $9AE3, and D = $11 under a set $AA16 ($9B1A) needs a value
+     the reach of $9B1E already implies; each pinned here for both fighters */
+  check('...and hold D = 2 and D = 3, and D = $11 with $AA16 set, for both fighters (T124)',
+        G.worlds(fx, G.world.both([...G.world.at(0xAA04, 2, 3),
+                                   ...G.world.cross(G.world.at(0xAA16, 1), G.world.at(0xAA04, 0x11))], 0xAA00, 0xAA19, 0x40)), []);
 }
 
 /* ---- bout_timer $9C6F and its printer against its frozen oracle (callio) -

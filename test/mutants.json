@@ -5493,5 +5493,29 @@
   "new": "if (dist >= 0x11) {",
   "increment": "97BB worlds",
   "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7 worlds: $9ADB move 3 -> 4",
+  "old": "    if (d === 3) { t += 12;",
+  "new": "    if (d === 4) { t += 12;",
+  "increment": "9AD7 worlds",
+  "kills": "fighterPost tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7 worlds: $9AE3 block skipped on move 3",
+  "old": "    if (d === 2 || d === 3){",
+  "new": "    if (d === 2){",
+  "increment": "9AD7 worlds",
+  "kills": "fighterPost tallies the uncontended T of every case exactly"
+ },
+ {
+  "file": "template.html",
+  "label": "9AD7 worlds: $9B1A move $11 -> $10",
+  "old": "    if (d === 0x11){\n      const h",
+  "new": "    if (d === 0x10){\n      const h",
+  "increment": "9AD7 worlds",
+  "kills": "fighterPost writes every byte the real $9AD7+$9B9D wrote (callio cases)"
  }
 ]

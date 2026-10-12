@@ -43,3 +43,8 @@ by     = "python tools/sample.py (live's arguments) --from 4250 --passes 5420 --
 kind   = "measured"
 says   = "demo time up charge: $AD0B passes 0.987-0.995 of the machine (live_time's own 0.980-1.018, D4 means), to $ABB9 0.9993 and 0.9996, stage passes 1.0004-1.0012"
 by     = "node test/kit.test.js (demo time block: ratio of the engine's charge to live_dtime's t)"
+
+[[fact]]
+kind   = "gated"
+says   = "G.worlds: no edge worlds needed -- CP 4 after INC on Current_Rank and on the stage ($AF27) are equality tests, the cases hold ranks 0-3 and stages 1-3; RET M tests the caller's A (0 or $80, both pinned by the ways row)"
+by     = "python tools/adis.py 0xABB9 8 ; python tools/adis.py 0xAF27 6 ; node test/kit.test.js"

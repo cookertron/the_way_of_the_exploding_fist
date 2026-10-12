@@ -38,3 +38,8 @@ by     = "node test/kit.test.js (live block, the 1UP rows)"
 kind   = "measured"
 says   = "--seed drops $9C2C 1 (the 1UP way): 12.9M T passes its cap and it reads ROM glyphs the demo case never read. Derived by hand as seed case 6; the demo_ac27 gate follows it through $AC5F; all 26 fixtures now seed every store"
 by     = "python tools/callio.py --derive --state p1 --fixture build/callio_ac27.json --case 0 --set 0x9C2C=0x01 ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "G.worlds: no edge worlds needed -- the only guard is Num_Players 0/1/2 (equality), each value its own fixture and gate row (demo_ac27, start_ac27, start2_ac27)"
+by     = "python tools/adis.py 0xAC27 8 ; node test/kit.test.js"

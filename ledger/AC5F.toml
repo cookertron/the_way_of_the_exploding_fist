@@ -44,3 +44,8 @@ by     = "node test/kit.test.js (liveGate P1, time) ; python tools/mutants.py --
 kind   = "measured"
 says   = "confirmed from a real start: the port matches the cases captured from the user's snapshot (state stage2, nothing poked) exactly, as it matches the poke-built ones"
 by     = "python tools/callio.py --check --state stage2 --fixture (this routine's fixture) ; node test/kit.test.js"
+
+[[fact]]
+kind   = "gated"
+says   = "G.worlds: no edge worlds needed -- every guard to the CALL $AD18 is equality ($AF35, Flag_Sound, rank 0/1/2/3/other, fixed tune data); the arms row pins stages 2, 3, the wrap, ranks 1 2 3 6, novice, sound off, no new stage"
+by     = "python tools/adis.py 0xAC5F 40 ; python tools/adis.py 0xAEBF 20 ; python tools/adis.py 0x90D1 45 ; node test/kit.test.js"
