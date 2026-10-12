@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     battery open question -- stack-unwinding idiom on a P1 bout win (ledger/topics/battery.toml open 1)
-Step:     python tools/stackscan.py --help; then --mark 909E,A647 over dan2 (P1 wins, dan progression) and dan10b
-Then:     close the open with record.py close battery N; a 2P state still needs building (callio --poke 9C2C=2 or snapimport)
+Unit:     battery open 1 -- does the Spectrum tape have a bonus stage at all (D1 scope)
+Step:     python tools/manual.py --grep bonus; then search the reference ctl and the walker's reach for a stage handler outside the bout loop $AC3E/$AB70
+Then:     a 2P state worth saving: s1 then key 2 (20:,30:2) is a real 2P game, and (60:D,30:E,30:) repeated makes P1 score -- save it if a 2P gate needs one
 Blocked:  none
-Notes:    roster census done: all 7 never-varying columns gated by built worlds (roster topic fact 3). Stamps all fresh after 15 callio replays, 0 disagree. Battery 82 kept + 10 unmeasured.
+Notes:    Q19 closed: 0 discards over 1P loss, demo, P1 bout win (stage2) and real 2P play. No code changed this unit, no mutation run due.
