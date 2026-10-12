@@ -5437,5 +5437,61 @@
   "new": "if (m[A + 0x0E] >= ((m[A + 0x0F] - 2) & 0xFF))",
   "increment": "95D4 worlds",
   "kills": "fighterMotion writes every byte the real $95D4 wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB worlds: $9BE8 far limit $EF -> $F0",
+  "old": "if (dist >= 0xEF) {",
+  "new": "if (dist >= 0xF0) {",
+  "increment": "97BB worlds",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB worlds: $9BE8 far limit $EF -> $EE",
+  "old": "if (dist >= 0xEF) {",
+  "new": "if (dist >= 0xEE) {",
+  "increment": "97BB worlds",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB worlds: $9BEC near limit $16 -> $15",
+  "old": "if (dist < 0x16) {",
+  "new": "if (dist < 0x15) {",
+  "increment": "97BB worlds",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB worlds: $9C1D low limit 3 -> 2",
+  "old": "if (dist < 3) {",
+  "new": "if (dist < 2) {",
+  "increment": "97BB worlds",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB worlds: $9C1D low limit 3 -> 4",
+  "old": "if (dist < 3) {",
+  "new": "if (dist < 4) {",
+  "increment": "97BB worlds",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB worlds: $9C21 high limit $10 -> $0F",
+  "old": "if (dist >= 0x10) {",
+  "new": "if (dist >= 0x0F) {",
+  "increment": "97BB worlds",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
+ },
+ {
+  "file": "template.html",
+  "label": "97BB worlds: $9C21 high limit $10 -> $11",
+  "old": "if (dist >= 0x10) {",
+  "new": "if (dist >= 0x11) {",
+  "increment": "97BB worlds",
+  "kills": "fighterStep writes every byte the real $97BB wrote (callio cases)"
  }
 ]

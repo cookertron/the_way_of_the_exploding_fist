@@ -668,6 +668,13 @@ const mockCtx = (state) => ({
         worst < 0.03 ? '' : `${(100 * worst).toFixed(2)}% at ${at}`, '');
 }
 
+/* the facing pairs (P1, P2) play held, read from the hit cores' play cases
+   (T115; checked below at $9ED2) */
+const hitPairs = () => [...new Set([P.assets.hit9d29, P.assets.hit9ed2].flatMap(fx => fx.cases
+  .filter(c => !c.derived && c.in.some(([a0, h]) => a0 <= 0xAA17 && 0xAA17 < a0 + h.length / 2))
+  .map(c => c.in.flatMap(([a0, h]) => [0xAA17, 0xAA57].filter(a => a0 <= a && a < a0 + h.length / 2)
+    .map(a => parseInt(h.substr(2 * (a - a0), 2), 16))).join(','))))].sort();
+
 /* ---- fighter_step $97BB against its frozen oracle (callio) -----------
    Every case is replayed in a poisoned 64K holding only the bytes the real
    call read (rig.gate.replay); the whole of memory must then equal the
@@ -694,6 +701,24 @@ const mockCtx = (state) => ({
          0x9BF1, 0x9BF4, 0x9C18, 0x9C1F, 0x9C23, 0x9C27], G.ran(fx.cases)), []);
   check('the callio cases call $97BB for both fighters (C = 0 and $40)',
         G.missing([0, 0x40], v => fx.cases.some(c => c.regs[iC] === v)), []);
+  /* $9BA7's distance tests, each at its edge and one past, for both
+     fighters on play's facing pairs (T115): facings that differ test the
+     gap against $16 and $EF when the other's move has no $B47E byte
+     ($9BE5); facings that agree, against 3 and $10 when it has one ($9C1A).
+     The gap is the other's x less the own x when the own facing is 0, else
+     the reverse; the own x is the one play's parents held (52 differ, 55
+     agree).  The derived cases flip at exactly these edges (ledger/97BB.toml). */
+  const pcs = fx.cases.map(c => G.ran([c]));
+  const dist = [[0x9BE5, 52, [0x15, 0x16, 0x17, -0x12, -0x11, -0x10]], [0x9C1A, 55, [2, 3, 4, 0x0F, 0x10, 0x11]]];
+  check('...and the cases hold every edge world of $9BA7 for both fighters: the gap at each distance limit and one past, on play\'s facing pairs (T124, T141)',
+        [0, 0x40].flatMap(C => dist.flatMap(([pc, X, ds]) => {
+          const want = hitPairs().map(s => s.split(',').map(Number)).filter(([f1, f2]) => (f1 === f2) === (pc === 0x9C1A))
+            .flatMap(([f1, f2]) => ds.map(d => ({ 0xAA17: f1, 0xAA57: f2, [0xAA19 + C]: X,
+                                                  [0xAA59 - C]: (X + ((C ? f2 : f1) ? -d : d)) & 0xFF })));
+          const cs = fx.cases.filter((c, i) => c.regs[iC] === C && pcs[i].has(pc));
+          return (cs.length ? G.worlds({ cases: cs }, want) : ['no case reaches it'])
+            .map(m => `C=${C.toString(16)} ${pc.toString(16)}: ${m}`);
+        })), []);
 }
 
 /* ---- fighter_post $9AD7 + $9B9D against its frozen oracle (callio) ---
@@ -790,10 +815,6 @@ function hitWorlds(fx, k, ctxs){
                           [k.xv]: X, [k.xa]: (vFirst ? X - (C - 0x80) : X + (C - 0x80)) & 0xFF }));
   });
 }
-const hitPairs = () => [...new Set([P.assets.hit9d29, P.assets.hit9ed2].flatMap(fx => fx.cases
-  .filter(c => !c.derived && c.in.some(([a0, h]) => a0 <= 0xAA17 && 0xAA17 < a0 + h.length / 2))
-  .map(c => c.in.flatMap(([a0, h]) => [0xAA17, 0xAA57].filter(a => a0 <= a && a < a0 + h.length / 2)
-    .map(a => parseInt(h.substr(2 * (a - a0), 2), 16))).join(','))))].sort();
 /* play's pairs as (attacker, victim) facings, each on the context for
    facings that differ or agree (the reach row differs, so may the frame) */
 const hitCtx = (p1, differ, agree) => hitPairs().map(s => s.split(',').map(Number))

@@ -26,10 +26,21 @@ by     = "python tools/callio.py --capture --state p1 --keys W --call 0x9763 0x9
 
 [[fact]]
 kind   = "gated"
-says   = "fighterStep (web/template.html) writes every byte and tallies the exact uncontended T of all 170 fixture cases (159 play + 11 derived: $9A1E, same-facing $9BF5-$9C27, $9BA7 distance limits $16/$EF and 3/$10 each side); 14 mutants killed"
+says   = "fighterStep (web/template.html) writes every byte and tallies the exact uncontended T of all 198 fixture cases (159 play + 39 derived: $9A1E, same-facing $9BF5-$9C27, $9BA7 distance limits $16/$EF and 3/$10 at each edge, fact 6); 21 mutants killed"
 by     = "python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 63 --set 0xAA19=0x1E ; python tools/build.py ; node test/kit.test.js ; python tools/mutants.py --match 97BB"
 
 [[fact]]
 kind   = "gated"
-says   = "fighterStep counts its M1 cycles into M1.m1 (one per instruction: no prefixed opcode in $97BB-$9C27; lumps 22 and 31 are 4 instructions, 52 is 8) and matches rx - r mod 128 on all 170 callio cases"
+says   = "fighterStep counts its M1 cycles into M1.m1 (one per instruction: no prefixed opcode in $97BB-$9C27; lumps 22 and 31 are 4 instructions, 52 is 8) and matches rx - r mod 128 on all 198 callio cases"
 by     = "python tools/blockcost.py 0x9920 0x9AD7 ; python tools/build.py ; node test/kit.test.js"
+
+[[fact]]
+kind   = "measured"
+at     = "$9BA7"
+says   = "distance edges, both fighters on play's facing pairs: facings differ, 1 at gaps $15 $EF $F0, 0 at $16 $17 $EE; facings agree, 1 at 3 4 $0F, 0 at 2 $10 $11; 28 derived (parents 119 63 151), --check 198/198"
+by     = "python tools/callio.py --derive --state s1 --fixture build/callio_97bb.json --case 119 --set 0xAA17=0x0,0xAA19=0x37,0xAA44=0xF,0xAA57=0x0,0xAA59=0x3A ; python tools/callio.py --check --state s1 --fixture build/callio_97bb.json"
+
+[[fact]]
+kind   = "gated"
+says   = "G.worlds: the cases hold all 36 distance edge worlds of $9BA7 (both fighters, play's pairs); 7 edge mutants killed; flipping the agree-branch gap on own facing 1 survives: it needs the pair (1,1), which play never holds (T115)"
+by     = "node test/kit.test.js ; python tools/mutants.py --match \"97BB worlds\""
