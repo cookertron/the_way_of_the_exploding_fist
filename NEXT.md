@@ -1,8 +1,8 @@
 # NEXT -- where things stand
 <!-- Overwritten at every unit end by python tools/record.py next; 20 lines at most (manual 12.11). -->
 
-Unit:     roster censuses (manual 12.6)
-Step:     read manual 12.6 and roster.py --help; run the census of columns no state varies
-Then:     refresh the 14 stale fixture stamps (python tools/stamp.py)
+Unit:     battery open question -- stack-unwinding idiom on a P1 bout win (ledger/topics/battery.toml open 1)
+Step:     python tools/stackscan.py --help; then --mark 909E,A647 over dan2 (P1 wins, dan progression) and dan10b
+Then:     close the open with record.py close battery N; a 2P state still needs building (callio --poke 9C2C=2 or snapimport)
 Blocked:  none
-Notes:    battery pruned to 82 kept + 10 unmeasured (602 withdrawn). 40 rig.js-anchored cases always list as --affected: their anchor stamp is None, by design. skool.py --ref ../ref_wayoftheexplodingfist/sources/wotef.ctl builds build/skool/html
+Notes:    roster census done: all 7 never-varying columns gated by built worlds (roster topic fact 3). Stamps all fresh after 15 callio replays, 0 disagree. Battery 82 kept + 10 unmeasured.

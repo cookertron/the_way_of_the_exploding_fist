@@ -16,3 +16,8 @@ says   = "no saved state has sound off ($B2FA 0), a changed control table ($8BD2
 by     = "python tools/roster.py --print"
 window = "every build/*.pkl, the columns of port.json roster.columns"
 n      = 16
+
+[[fact]]
+kind   = "measured"
+says   = "each reader of the 7 never-varying columns is gated on the uncaptured value by a built world: sound 0 (ac5f, sfx, live_msound), $AF35 0/1 (ac5f), $AA41 0-7 and 4 ($AD2F), $B035 beaten (ac39, ae17), all 4 control tables (97cb); $9057 is code"
+by     = "python tools/roster.py --print ; grep of build/skool/fist.skool for the 7 addresses ; census of callio_*.json in-bytes ; build/mutants/last.json"
