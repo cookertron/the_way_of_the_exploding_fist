@@ -1288,6 +1288,9 @@ def t_records():
         eq((len(data['fact']), 'open' in data, data['manual']), (3, False, ['C9', 'T141']),
            'the ledger file round-trips')
         eq(data['fact'][0]['says'], "RET Z -- $8D22's caller", 'text survives the heredoc untouched')
+        code, out, _ = rec(d, 'next', '--help')
+        if code != 0 or not out.startswith('record.py --'):
+            raise AssertionError('--help after a command must print usage, not read stdin (it hung on a terminal)')
         eq(rec(d, 'next', stdin='unit: $B34C gate next\nstep: write the gate\n')[0], 0, 'next')
         eq(rec(d, 'decide', stdin='title: No ROM glyphs\ntext: substitute cells\n')[0], 0, 'decide')
         with open(os.path.join(d, 'test', 'game.test.js'), 'a') as f:

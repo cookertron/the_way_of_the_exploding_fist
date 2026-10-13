@@ -651,9 +651,11 @@ COMMANDS = {'new': cmd_new, 'fact': cmd_fact, 'refute': cmd_refute, 'open': cmd_
 
 
 def main(argv):
-    if not argv or argv[0] in ('-h', '--help') or argv[0] not in COMMANDS:
+    # --help anywhere, never only first: "next --help" used to wait on stdin forever
+    wants_help = not argv or '-h' in argv or '--help' in argv
+    if wants_help or argv[0] not in COMMANDS:
         print(__doc__.strip())
-        return 0 if not argv or argv[0] in ('-h', '--help') else 2
+        return 0 if wants_help else 2
     try:
         COMMANDS[argv[0]](argv[1:])
     except RecordError as e:
