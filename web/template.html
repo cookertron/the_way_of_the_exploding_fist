@@ -1,4 +1,4 @@
-<title>Spectrum Port Kit -- starter</title>
+<title>The Way of the Exploding Fist</title>
 <style>
   /* The page is a frame around a Spectrum screen and nothing else.  Two
      themes: the default follows the system, and the corner button pins one.
@@ -80,6 +80,7 @@ function sprLdir(m, s, d, n){
 function sprPut16(m, a, v){ m[a] = v & 0xFF; m[a + 1] = (v >> 8) & 0xFF; }
 const sprGet16 = (m, a) => m[a] | m[a + 1] << 8;
 
+// @z80 $8803 -- decode one packed sprite into the back buffer, masked at each row end
 function spriteDecode(m, hl, de, paths){
   const tally = paths ? k => { paths[k] = (paths[k] || 0) + 1; } : () => {};
   const F = m[0xC40E];
@@ -401,6 +402,7 @@ function rfCopyOut(m, x0, y0){
    every state; one call within 2.9% (frame phase). */
 const RF_DEC = 0.0317, RF_COPY = 4.72, RF_OWN = 0.0425;
 const rfPlayT = (t, c) => t + RF_DEC * c.dec + RF_COPY * c.copy + RF_OWN * (t - c.dec - c.ldir);
+// @z80 $BF13 -- draw both fighters: box union with last frame, overlap test, copy to the screen
 function renderFighters(m, paths, sp = 0x5BF5, cost){
   rfCost = cost || { dec: 0, copy: 0, ldir: 0 };
   const tally = paths ? k => { paths[k] = (paths[k] || 0) + 1; } : () => {};
@@ -476,6 +478,7 @@ function renderFighters(m, paths, sp = 0x5BF5, cost){
    uncontended T from the CALL at $9763/$976C to its return, which the
    frozen oracle gates (python tools/callio.py --capture; ledger/97BB.toml). */
 const fsAt = (base, k) => (base & 0xFF00) | ((base + k) & 0xFF);
+// @z80 $97BB -- advance each fighter's move by one frame from the move tables
 function fighterStep(m, c){
   const o = m[0x9C29];
   let t = 17 + 17 + 17 + 17 + 17 + 17 + 10; M1.m1 += 7;      // the site's CALL, five CALLs, RET
@@ -686,6 +689,7 @@ function fighterStep(m, c){
    uncontended T from the CALL at $979A/$97A6 to $97A0/$97AC (python
    tools/callio.py --capture --call 0x979A 0x97A0 --call 0x97A6 0x97AC;
    ledger/9AD7.toml). */
+// @z80 $9AD7 -- settle a finished move and store the move, frame pair back ($9B9D)
 function fighterPost(m, c){
   let t = 17 + 17; M1.m1 += 2;                               // the site's CALL, CALL $9B93
   let hl = fsAt(0xAA05, c);
@@ -894,6 +898,7 @@ function printNumber(m, hl, pos){
    drops by one and is reprinted at $0B00, setting $9C2B at 0.  Returns the
    uncontended T from the CALL at $9745 to $9748 (python tools/callio.py
    --capture --call 0x9745 0x9748 --blind 0x4000-0x57FF; ledger/9C6F.toml). */
+// @z80 $9C6F -- the bout clock: one second per 13 passes, frozen while time is up or a fighter reels
 function boutTimer(m){
   let t = 17 + 13 + 4;
   M1.m1 += 4;                                      // to the first RET NZ
@@ -973,6 +978,7 @@ function yinYang(m){                               // Yin_Yang_1UP $900E with it
   if (!m[0xAA48]) return t + 11;
   return t + 5 + yyAward(m, 0xAA41, m[0xAA48], 0x1A08, 0x1D08);
 }
+// @z80 $900E -- 2P yin-yang award: draw and add the points scored this pass
 function yinYang2P(m){
   let t = 13 + 7; M1.m1 += 2;
   M1.m1 += 1;
@@ -1006,6 +1012,7 @@ const SFX_ROM = (() => {
   }
   return rom;
 })();
+// @z80 $B15A -- play the requested sound effect on the beeper, inline and blocking
 function soundEffect(m, a, out){
   /* M1 (for R): one per instruction, two for the CB and ED ones; each
      RET's own is counted with the test before it */
@@ -1201,6 +1208,7 @@ function hitTest(m, A, V, t){
 
 /* p2_hits_p1 $9ED2: the uncontended T from the CALL at $9748 to $974B
    (python tools/callio.py --capture --call 0x9748 0x974B) */
+// @z80 $9ED2 -- P2's move against P1: reach and gap from the move tables, the reel and the points
 function p2HitsP1(m){
   M1.m1 += 1;                                      // the CALL
   return hitTest(m, 0xAA40, 0xAA00, 17);
@@ -1209,6 +1217,7 @@ function p2HitsP1(m){
 /* p1_hits_p2 $9D29: first copies the x bytes $AA19, $AA59 to $A071,
    $A072, which $9ED2 then reads; the T from the CALL at $974B to $974E
    (python tools/callio.py --capture --call 0x974B 0x974E) */
+// @z80 $9D29 -- P1's move against P2: copy the x bytes, then the shared hit core
 function p1HitsP2(m){
   m[0xA071] = m[0xAA19]; m[0xA072] = m[0xAA59];
   M1.m1 += 1 + 4;                                  // the CALL and the copy
@@ -1228,6 +1237,7 @@ function p1HitsP2(m){
    pass then adds frame byte 2 to A+$18 and moves x A+$19 by byte 3,
    clamped to 0..$5F.  Returns the uncontended T from the CALL at $978D to
    $9790 (python tools/callio.py --capture --call 0x978D 0x9790). */
+// @z80 $95D4 -- step each fighter's motion script: hold, y, x clamped to the arena
 function fighterMotion(m){
   M1.m1 += 6;                                      // the site's CALL, LD HL / CALL twice, RET
   return 17 + 10 + 17 + motion(0xAA00) + 10 + 17 + motion(0xAA40) + 10;
@@ -1364,6 +1374,7 @@ function newRound(m, cnt){                         // New_Round $909E without it
   cnt.m1 += 1;
   return t + 10;
 }
+// @z80 $97CB -- read the keys or Kempston for 1P/2P, or drive a fighter by the AI; quit keys
 function controlPass(m, io){
   let t = 0, n = 0;
   const k = (T, R) => { t += T; n += R; };
@@ -1413,6 +1424,7 @@ function controlPass(m, io){
      with t as the clock; the gate runs it to the end.  T and M1 per
      instruction from the listing (python tools/adis.py 0x8C54 120);
      live, io.menuK (MENU_K) charges its clears and prints contended */
+  // @z80 $8C54 -- the options menu: players, controls (keys, Sinclair, Kempston), sound on/off
   function* configs(){
     const K = io.menuK || { clear: 1, print: 1 };
     const tp = 0x8E69;                             // Temp_Player
@@ -2052,6 +2064,7 @@ function controlPass(m, io){
    whole against python tools/callio.py --capture --call 0xAE29 0xAE2C
    (ledger/9745.toml).  io.cost, if given, receives $BF13's split and its T
    (.t), so a caller can charge it rfPlayT. */
+// @z80 $9745 -- one pass of play, the callees in the machine's order, from the CALL at $AE29
 function playPass(m, io, sp){
   M1.m1 = 1;                                       // CALL $9745
   let t = 17 + boutTimer(m) + p2HitsP1(m) + p1HitsP2(m);
@@ -2095,6 +2108,7 @@ function playPass(m, io, sp){
    is returned as roundTail's.  roundTail is
    the body from $AE2C alone, A and R there, gated exactly against python
    tools/callio.py --capture --call 0xAE2C 0xAE29 (build/callio_ae2c.json). */
+// @z80 $AE26 -- round_loop: the play pass, then the quit, $C427 from the moves, a point or time up
 function roundPass(m, io, sp, demo, two){
   const p = playPass(m, io, sp), b = roundTail(m, p.a, p.r);
   b.t += p.t;
@@ -2229,6 +2243,7 @@ function copyLdir(m, s, d, len){                   // LD HL: LD DE: LD BC: LDIR
   M1.m1 += 3 + 2 * len;
   return 30 + 21 * len - 5;
 }
+// @z80 $AD1B -- after a point: yin-yang, score, a bout won at 4, time up, or the next point
 function pointPath(m, a, r){
   M1.m1 = 0;
   let t = 4 + 5; M1.m1 += 2;                       // AND A: RET M
@@ -2257,6 +2272,7 @@ function pointPath(m, a, r){
    'time'; the RET M: 'quit', to $ABB9 too.  Else $ABC8 calls $AE26 again,
    roundIn's.  Gated against python tools/callio.py --capture --call 0xABCB
    0xAE29,0xABB9,0xAC00,0xABE5 (build/callio_abcb.json). */
+// @z80 $ABCB -- the demo's point: score, the yin-yang, a pose at count 4, or round_loop again
 function demoPoint(m, a, r){
   M1.m1 = 0;
   let t = 4 + 5; M1.m1 += 2;                       // AND A: RET M
@@ -2292,6 +2308,7 @@ function demoPoint(m, a, r){
    was zero.  Returns T and at: 0xAE29 or 0xAC27.  Gated against python
    tools/callio.py --capture --call 0xABB9 0xAE29,0xAC27 (build/
    callio_abb9.json).  cost.scen as demoIn's. */
+// @z80 $ABB9 -- the demo's ways on: stage and rank up, the next demo stage, or back to the dispatch
 function demoOn(m, a, r, cost){
   let t = 4; M1.m1 += 2;                           // AND A: RET M
   if (a & 0x80) return { t: t + 11, at: 0xAC27 };
@@ -2306,6 +2323,7 @@ function demoOn(m, a, r, cost){
 
 /* $AD18 to $AE29: CALL $AE26, CALL $9CA8 (the fighters reset), falling
    into $9D29, whose RET is to $AE29.  r is R where M1.m1 was zero: the T */
+// @z80 $AD18 -- the bout's loop top: fighters reset, into round_loop
 function roundIn(m, r){
   let t = 17 + 17 + 9; M1.m1 += 1 + 1 + 2;         // CALL $AE26: CALL $9CA8: LD A,R
   m[0xA645] = (r & 0x80) | ((r + M1.m1) & 0x7F);
@@ -2344,6 +2362,7 @@ function winStart(m, A){
   M1.m1 += p2 ? 10 : 9;                            // CALL, then LD A,n: LD (nn),A x2, XOR A, LD (nn),A x3 (and INC A)
   return 17 + (p2 ? 87 : 83);
 }
+// @z80 $AD94 -- P2 wins the bout: the victory pose, out of the 1UP game
 function winPass(m, A, sp, cost){
   let t = fighterMotion(m);                        // CALL $95D4, counted there
   const tr = renderFighters(m, null, (sp - 2) & 0xFFFF, cost);
@@ -2385,6 +2404,7 @@ function bonusStart(m){
   M1.m1 += 2;                                      // LD BC: CALL $AF1D
   return { t: 13 + 4 + 7 + 10 + 17 + delayLoop(0xF0, 0), out: false };
 }
+// @z80 $AD5F -- P1 wins the bout: the pose, then the time bonus counted down second by second
 function bonusPass(m){
   M1.m1 += 2;                                      // LD B,1: CALL $AF52
   let t = 7 + 17 + awardTail(m, 1, SIDE1);
@@ -2436,6 +2456,7 @@ function endTail(m){
   const t = 17 + 10 + delayLoop(0, 0) + 17 + 10 + delayLoop(0, 0) + 10;   // each delay counts its own M1
   return { t, a: m[m[0xC428] | m[0xC429] << 8] };  // LD A,(IX) last in $AF1D
 }
+// @z80 $AD44 -- time up: both posed, then the decision by count and tally, or the draw
 function timeUp(m){
   let t = 13 + 10 + 7; M1.m1 += 3;                 // LD A,($AA01): LD HL,$AA41: CP (HL)
   const call = exit => (M1.m1 += 2, { t: t + 17 + 10, exit });   // CALL $AE78 / $AE9B, to a RET
@@ -2462,6 +2483,7 @@ function timeUp(m){
    less the M1 already in M1.m1.  Returns T and the PC reached.  Gated
    against python tools/callio.py --capture --call 0xACA6 0xAC5F,0xAC39
    (build/callio_aca6.json, the starts constructed by pokes). */
+// @z80 $ACA6 -- after a 1UP bout: lost to the high score, won (bouts left, stage, rank up), or the draw
 function boutNext(m, a, r){
   M1.m1 += 3;                                      // AND A: JP M: JR Z
   if (a & 0x80) return (M1.m1 += 3, { t: 4 + 10 + 7 + 12 + 4 + 10, at: 0xAC39 });   // the quit's $80: JP M, $ACCF CP $81: JR NZ, $ACD9 XOR A: RET
@@ -2518,6 +2540,7 @@ function lddr3(m, hl, de){                         // LDDR with BC = 3: (HL) to 
   for (let i = 0; i < 3; i++) m[(de - i) & 0xFFFF] = m[(hl - i) & 0xFFFF];
   M1.m1 += 6; return 21 + 21 + 16;
 }
+// @z80 $AC39 -- Check_HighScore: compare BCD scores and copy a new high score
 function checkHighScore(m){
   let t = 17 + 10 + 10 + 13 + 7, hl = 0xB035, de = 0xB02F; M1.m1 += 6;   // CALL: LD HL: LD DE: LD A,(Num_Players): CP 2: JR NZ
   if (m[0x9C2C] !== 2) t += 12;
@@ -2727,6 +2750,7 @@ function setupMusic(m, outs){                      // $AC5F to the music's RET, 
   t += 7 + 4 + 13; M1.m1 += 2;                     // DEC A: LD ($AF35),A
   return { t: t + introMusic(m, outs, t), stage: true };
 }
+// @z80 $AC5F -- the next bout's setup: tune, scenery, scores, rank, New_Round, CALL $AD18
 function setupRest(m, stage, cost){                // on to $AD18, with the CALL
   let t = 0;
   if (stage){
@@ -2757,6 +2781,7 @@ function setupRest(m, stage, cost){                // on to $AD18, with the CALL
    0xAB70 80); gated against python tools/callio.py --capture --state p1
    --call 0xAC3C 0xAE29 (build/callio_ac3c.json).  cost.scen gets the
    scenery's T, as setupRest's. */
+// @z80 $AC09 -- Main_Game_Loop into Demo_Mode: text rows, rank, scenery, to the first $AE29
 function demoIn(m, r, cost){
   M1.m1 += 1;                                      // JR Main_Game_Loop
   return 12 + mainLoop(m, r, cost);
@@ -2772,6 +2797,7 @@ function demoIn(m, r, cost){
    python tools/callio.py --capture --state p1 --call 0xAC27 0xAE29
    (build/callio_ac27.json; with --keys 1, build/callio_ac27_1up.json;
    --keys 2, build/callio_ac27_2up.json).  cost.scen as demoIn's. */
+// @z80 $AC27 -- the dispatch after Demo_Mode: a new demo, the 1UP game or the 2UP game
 function gameDispatch(m, r, cost){
   const n = m[0x9C2C];
   if (n > 1){                                      // LD A,(Num_Players): AND A: JR Z: CP 1: JR Z: CALL $AD9C
@@ -2810,6 +2836,7 @@ function players(m){
    the high score from $B038, players again, Init_Time, $9C2B cleared.
    From the listing (python tools/adis.py 0xADBA 20).  cost.scen as
    setupRest's. */
+// @z80 $AD9C -- Start_2UP_Game: rank, scores, tune, the per-bout stage, into the 2UP round
 function stage2(m, cost){
   const sc = 13 + scenery(m, m[0xAF34]);           // LD A,($AF34): CALL $9200
   if (cost) cost.scen = sc;
@@ -2840,6 +2867,7 @@ function stage2(m, cost){
    'quit' ($AC34) or 'time' ($ADE2).  Gated against python tools/callio.py
    --capture --state p1 --call 0xAE17 0xAE29,0xAC34 (build/callio_ae17.json,
    the quit and the game ends derived). */
+// @z80 $AE17 -- the 2UP game's ways on: next round, next bout, game end with its pose, quit
 function twoOn(m, a, r){
   M1.m1 = 0;
   let t = 4 + 5; M1.m1 += 2;                       // AND A: RET M
@@ -2889,6 +2917,7 @@ function twoOut(A){                                // out of a pose's loop: the 
    border's OUT in out.  Gated with mainLoop by the boot's live rows
    (build/live_boot.json). */
 const BOOT_LDIR = 5.997;
+// @z80 $9C2E -- Game_Start: move the scenery code down to $5F00, then into Main_Game_Loop
 function gameStart(m, out){
   out.push([10 + 4 + 7, 5]);                       // JP: DI: LD A,5: OUT ($FE),A
   m[0xB153] = 1; m[0xB151] = m[0xB152] = 0xFF;

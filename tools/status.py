@@ -263,6 +263,14 @@ def check(ctx):
         if '$' + addr not in have:
             warn.append('web/ tags @z80 $%s but no ledger entry covers it' % addr)
 
+    # the provenance record (manual P15), once one has been written
+    if read('docs/PROVENANCE.md') is not None:
+        import provenance as PV
+        text, probs = PV.generate()
+        warn += ['provenance: ' + p for p in probs]
+        if read(PV.OUT) != text:
+            warn.append('%s is stale: python tools/provenance.py' % PV.OUT)
+
     # the mutation battery (manual 6.12): is a full run due?
     mlast = read('build/mutants/last.json')
     if mlast:
