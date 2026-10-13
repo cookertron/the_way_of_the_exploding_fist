@@ -5,6 +5,7 @@ name     = "game_configs"
 entries  = ["$8C54"]
 oracle   = "tools/callio.py"
 fixtures = ["control97cb", "live_menu", "live_msound"]
+port     = "configs"
 manual   = ["5.1", "7.2"]
 
 [[fact]]

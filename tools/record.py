@@ -301,7 +301,8 @@ def source_text(folder, exts):
 
 
 def port_defined(name, web_text):
-    pat = r'(\bfunction\s+%s\s*\()|(\b%s\s*[:=]\s*(async\s+)?(function\b|\())|(^\s*(async\s+)?%s\s*\([^)]*\)\s*\{)'
+    # generators too: function* f(, f = function*, a method *f() {
+    pat = r'(\bfunction\s*\*?\s*%s\s*\()|(\b%s\s*[:=]\s*(async\s+)?(function\b|\())|(^\s*(async\s+)?\*?\s*%s\s*\([^)]*\)\s*\{)'
     n = re.escape(name)
     return re.search(pat % (n, n, n), web_text, re.M) is not None
 

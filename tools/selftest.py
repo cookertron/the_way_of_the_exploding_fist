@@ -1281,6 +1281,8 @@ def t_records():
             import importlib
             R = importlib.import_module('record')
             data = R.load(os.path.join(d, 'ledger', 'B34C.toml'))
+            eq([R.port_defined('cfg', t) for t in ('function* cfg(){', '  *cfg() {', 'for (const _ of cfg());')],
+               [True, True, False], 'a generator is a port function; a call is not')
         finally:
             sys.path.pop(0)
             sys.modules.pop('record', None)
