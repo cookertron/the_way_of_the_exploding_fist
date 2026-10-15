@@ -2109,6 +2109,38 @@ liveGate(P.assets.live_menu, 'menu', 'menu', { keys: true, sound: 1, steps: 100,
 liveGate(P.assets.live_msound, 'menu sound off', 'menu', { keys: false, sound: 0, steps: 4, frames: false, tol: 0.02, what: 'the sound turned off (Flag_Sound $B2FA 0), the new demo silent' });
 liveGate(P.assets.live_boot, 'boot', 'boot');
 
+/* the menu at a human's pace: each key held 10 frames, 60 apart, by the
+   clock -- about 300000 port reads before the menu's RET, where the gates
+   above hold a key for one read.  Fist.pass replays every one of them when
+   the menu closes; with replay.shift() that took 62 s on 298000 reads (a
+   frozen redefine screen, the user's report 2026-10-15), with a cursor
+   44 ms (scratch timing, node).  The nine keys must land in P1's table. */
+(function menuHumanPace(L){
+  if (!L){ console.log('  note  live_menu absent (tape-derived, not in the repository): the human-pace menu not run'); return; }
+  const g = new P.Fist(L.start), kb = new S.Keyboard(), plan = [];
+  for (const seg of (L.script || '').split(',')){
+    const [n, keys] = seg.split(':');
+    for (let i = 0; i < +n; i++) plan.push(keys ? keys.split('+') : []);
+  }
+  for (let n = 0, i = 0; !g.menu && n < 5000; n++){
+    if (!g.win && !g.bonus && !g.both && !g.setup && !g.enter && !g.demoAt && g.demoNext === null){ kb.releaseAll(); for (const x of plan[i++] || []) kb.press(x); }
+    g.pass(kb);
+  }
+  const keys = ['1', '4', 'Q', 'W', 'P', 'L', 'A', 'Z', 'O', '1', 'SPACE'], F = g.simFrame;
+  let reads = 0, ms = -1;
+  while (g.menu && g.simFrame < F + 5 + keys.length * 70 + 600){
+    kb.releaseAll();
+    keys.forEach((k, j) => { const at = F + 5 + j * 70; if (g.simFrame >= at && g.simFrame < at + 10) kb.press(k); });
+    reads = g.menu.rec.length;
+    const t0 = Date.now(); g.pass(kb);
+    if (!g.menu) ms = Date.now() - t0;
+  }
+  checkTrue(`menu at a human's pace: the RET's replay of ${reads} reads is linear (under 2 s; shift() took 62 s)`, ms >= 0 && ms < 2000 && reads > 200000, `closed ${ms >= 0}, ${ms} ms, ${reads} reads`);
+  check("menu at a human's pace: P1's keyboard Q W P L A Z O 1 SPACE, each its port row and bit",
+        [g.m[0x8BD2] | g.m[0x8BD3] << 8, [...g.m.subarray(0x8BD4, 0x8BE6)]],
+        [0x8BD4, [0x01, 0xFB, 0x02, 0xFB, 0x01, 0xDF, 0x02, 0xBF, 0x01, 0xFD, 0x02, 0xFE, 0x02, 0xDF, 0x01, 0xF7, 0x01, 0x7F]]);
+})(P.assets.live_menu);
+
 /* bouts at dans 2-8, from the user's snapshots (in the new stage's tune
    after a won bout; optional fixtures, absent from a fresh clone): the
    machine's samples followed row for row as liveGate's, through whatever

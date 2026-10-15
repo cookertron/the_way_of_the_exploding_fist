@@ -3105,3 +3105,13 @@ docs/TRAPS-MAP.md (tools/status.py --check, tools/selftest.py). -->
     and the commit about to land changed the runner.
     The rule: **anything a long job ran against is read when it starts** -- the
     revision, and the tracked files that were dirty -- and stamped on each result.
+199. **A GATE THAT PRESSES EACH KEY FOR ONE READ NEVER MEETS A HUMAN'S SCALE**
+    (Exploding Fist, options menu, 2026-10-15).  The live menu ran in a generator,
+    and on its RET the pass replayed every port read it had recorded, taken with
+    `replay.shift()`.  The gate drove the menu one planned key per read, a few
+    hundred reads, and was green.  A person holding each key for a few frames
+    makes about 300,000 reads on the redefine screen, and `shift()` is O(n) per
+    call: 62 s of frozen screen, reported as "the last key never leaves the
+    redefine screen".  Caught by the user playing the page, not by any gate.
+    The rule: **drive every input-paced routine once at a human's pace, by the
+    clock, as well as at the minimal script**, and give that run a time bound.

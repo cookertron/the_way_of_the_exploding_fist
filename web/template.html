@@ -3034,8 +3034,9 @@ class Fist {
     const replay = this.replay, rec = [], r0 = this.r, sim0 = this.simT;
     this.replay = null;
     if (!replay) this.snap.set(this.m);
+    let ri = 0;                                    // a cursor, not shift(): a human's menu records 10^5-10^6 reads, and shift() made the replay quadratic (a minute's frozen screen per 300000)
     const portIn = replay ? p => {
-      const x = replay.shift();
+      const x = replay[ri++];
       if (!x || x[0] !== p) throw new Error(`menu replay: port $${p.toString(16)} read, the recording has ${x ? '$' + x[0].toString(16) : 'no more'}`);
       return x[1];
     } : p => {
@@ -3053,7 +3054,7 @@ class Fist {
       this.menu = { g: e.g, t: e.t, n: 0, rec, r0, sim0, paid: 0 };
       return this.menuPass();
     }
-    if (replay && replay.length) throw new Error(`menu replay: ${replay.length} reads left over`);
+    if (replay && ri < replay.length) throw new Error(`menu replay: ${replay.length - ri} reads left over`);
     let cost = res.t + rfPlayT(io.cost.t, io.cost) - io.cost.t;
     for (const [t, v] of io.out){                  // before the ways on: a tune there logs its edges after these
       this.border = v & 7;

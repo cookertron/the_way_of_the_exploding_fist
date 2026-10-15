@@ -100,6 +100,7 @@ Lessons this port added to docs/TRAPS.md:
 
 - T197 An engine throw outside a catch is a crash, not a kill
 - T198 A long run that reads its revision when it ends credits the wrong commit
+- T199 A gate that presses each key for one read never meets a human's scale
 
 ## 4. What is still open
 

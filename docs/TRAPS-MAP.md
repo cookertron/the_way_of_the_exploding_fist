@@ -1,21 +1,21 @@
 # Trap-to-check map for the Spectrum Port Kit
 
-Every trap in `docs/TRAPS.md` (198 entries: 1-25 from the ports before Bubble Bobble, 26-196 from Bubble Bobble, 197 on from this port), mapped to the kit mechanism that should make it impossible to fall into again, and whether that mechanism exists yet. A rule that lives only in `TRAPS.md` protects the next port only if it is read at the right moment, which fails after a compaction and across days. A rule that lives in a tool, a gate helper or a hook protects it every time. Bubble Bobble's own log reached the same conclusion (TRAPS #169): writing a lesson down did not prevent it, and only an assert did.
+Every trap in `docs/TRAPS.md` (199 entries: 1-25 from the ports before Bubble Bobble, 26-196 from Bubble Bobble, 197 on from this port), mapped to the kit mechanism that should make it impossible to fall into again, and whether that mechanism exists yet. A rule that lives only in `TRAPS.md` protects the next port only if it is read at the right moment, which fails after a compaction and across days. A rule that lives in a tool, a gate helper or a hook protects it every time. Bubble Bobble's own log reached the same conclusion (TRAPS #169): writing a lesson down did not prevent it, and only an assert did.
 
 Rules are one-line paraphrases; `python tools/manual.py T146` prints the full entry with its row here, and `python tools/manual.py --map gate` (or `--map BUILD`) lists the rows for one mechanism or state. States come from what the trap texts and the Bubble Bobble handover say. Where neither says a fix exists, the row is marked BUILD, so check before building.
 
 ## Summary
 
-| State | Meaning | All 198 | #61 onward |
+| State | Meaning | All 199 | #61 onward |
 |---|---|---|---|
 | KIT | the kit already prevents it | 60 | 33 |
 | BB | built in the Bubble Bobble repo and generic; move it into the kit | 9 | 9 |
-| BUILD | no mechanism yet; build it | 105 | 78 |
+| BUILD | no mechanism yet; build it | 106 | 79 |
 | READ | knowledge only; read by ID when relevant | 24 | 18 |
 
 | Mechanism | Traps | Still to build |
 |---|---|---|
-| `gate`: Gate helpers in test/rig.js | 50 | 37 |
+| `gate`: Gate helpers in test/rig.js | 51 | 38 |
 | `measure`: measure(), the single measurement entry point (manual 6.11) | 24 | 24 |
 | `battery`: Kit mutation runner, tools/mutants.py (manual 6.12) | 23 | 6 |
 | `lint`: Static checks on engine and test source | 14 | 11 |
@@ -292,6 +292,7 @@ Traps: #178, #179, #184
 | 196 | Drain FAIL lines before killing a timed-out run. | `battery` | KIT |
 | 197 | Step the engine inside a catch that fails a named row. | `gate` | KIT |
 | 198 | Read what a long run ran against when it starts, and stamp each result. | `battery` | KIT |
+| 199 | Drive input-paced routines at a human's pace by the clock too, with a time bound. | `gate` | BUILD |
 
 ## Keeping the map honest
 

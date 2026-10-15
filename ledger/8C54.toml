@@ -6,7 +6,7 @@ entries  = ["$8C54"]
 oracle   = "tools/callio.py"
 fixtures = ["control97cb", "live_menu", "live_msound"]
 port     = "configs"
-manual   = ["5.1", "7.2"]
+manual   = ["5.1", "7.2", "T199"]
 
 [[fact]]
 kind   = "insn"
@@ -65,3 +65,8 @@ by     = "python tools/adis.py 0x8C54 120 ; python tools/callio.py --check --sta
 kind   = "gated"
 says   = "menuRead throws 64 reads past the planned keys; the pass's catch fails the row. Both menu mutants (Get_Key next row, sound off key 3) KILLED by the live menu rows in 45 s each, no crash; rec grew per read until the heap ran out"
 by     = "python tools/mutants.py --match \"menu: Get_Key reads the next row||menu: sound off tests key 3\" --jobs 2"
+
+[[fact]]
+kind   = "gated"
+says   = "at a human's pace (each key 10 frames, 60 apart: 297925 reads) the RET's replay takes 44 ms and P1's table holds Q W P L A Z O 1 SPACE; replay.shift() took 62-68 s, a frozen redefine screen (T199)"
+by     = "python tools/build.py ; node test/kit.test.js (menu at a human's pace)"
